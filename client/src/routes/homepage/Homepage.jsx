@@ -27,7 +27,7 @@ import { Link } from 'react-router-dom';
       <img src="/orbital.png" alt="" className="orbital"/>
 
       <div className="left">
-        <h1>Welcome to Meller AI</h1>
+        <h1>Welcome to TRAVEL AI</h1>
         <h2>Supercharge your creativity and productivity</h2>
         <h3>This is the homepage of Meller AI, Enjoy boy..</h3>
         <Link to="/dashboard">Get Start</Link>
@@ -39,7 +39,7 @@ import { Link } from 'react-router-dom';
             <div className="bg"></div>
 
           </div>
-          <img src="/bot.png" alt="" className="bott" />
+          <img src="/travel_logo.jpeg" alt="" className="bott" />
         </div>
       </div>
     </div>
