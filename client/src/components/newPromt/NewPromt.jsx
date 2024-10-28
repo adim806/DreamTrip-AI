@@ -136,6 +136,7 @@ const NewPromt = ({data})=>{
           accuumltedtext+=chunkText;
           setAnswer(accuumltedtext);
       }
+      
       console.log(accuumltedtext);
       mutation.mutate();
         
