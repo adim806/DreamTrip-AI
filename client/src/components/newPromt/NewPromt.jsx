@@ -181,7 +181,7 @@ const NewPromt = ({data})=>{
 
 
       try {
-        const GenericPrompt = "Generate Travel Plan for Location: {location}, for {duration} for Couple with a X budget,Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for X days with each day plan with best time to visit in JSON format.";
+        const GenericPrompt = "Generate Travel Plan for Location: {location}, for {duration} days, for {travel_type} with a {budget} budget. Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for {duration} days with each day plan with best time to visit in JSON format.";
 
         const vacation_location = parsedData?.vacation_location || "destination not specified";
         const duration = parsedData?.duration || "duration not specified";
@@ -197,10 +197,10 @@ const NewPromt = ({data})=>{
         console.log("Preferred Activity: " + preferred_activity);
         console.log("Budget: " + budget);
 
-        const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration)
+        const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration).replace(`{travel_type}`,parsedData.constraints?.travel_type).replace(`{budget}`,parsedData.constraints?.budget).replace(`{duration}`,parsedData?.duration);
 
         console.log(finalPromt);
-
+        textTOgeneric(finalPromt);
         //const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
         //const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
   
@@ -249,8 +249,8 @@ const NewPromt = ({data})=>{
       });
       const result = await chatSession.sendMessage(jsonTEST);
 
-      console.log(jsonTEST);
-      console.log(typeof jsonTEST);
+      //console.log(jsonTEST);
+      //console.log(typeof jsonTEST);
       //const extractedData = JSON.parse(jsonTEST);
       //console.log("Extracted Data:", extractedData);
       console.log(result);
