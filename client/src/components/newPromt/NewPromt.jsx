@@ -175,11 +175,13 @@ const NewPromt = ({data})=>{
     
     const EditText_toGenericPrompt = async(parsedData) => {
 
+      ////i need to add use affect maybe when action 
+
       console.log("In EditText_toGenericPrompt function: \n");
 
 
       try {
-        const GenericPrompt = "Generate Travel Plan for Location: X, for X for Couple with a X budget,Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for X days with each day plan with best time to visit in JSON format.";
+        const GenericPrompt = "Generate Travel Plan for Location: {location}, for {duration} for Couple with a X budget,Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for X days with each day plan with best time to visit in JSON format.";
 
         const vacation_location = parsedData?.vacation_location || "destination not specified";
         const duration = parsedData?.duration || "duration not specified";
@@ -187,11 +189,17 @@ const NewPromt = ({data})=>{
         const preferred_activity = parsedData.constraints?.preferred_activity || "not specified";
         const budget = parsedData.constraints?.budget || "not specified";
 
+        //if vacation_location =="destination not specified: enter locationwhile"
+
         console.log("Destenation: " + vacation_location);
         console.log("Duration: " + duration);
         console.log("Travel Type: " + travel_type);
         console.log("Preferred Activity: " + preferred_activity);
         console.log("Budget: " + budget);
+
+        const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration)
+
+        console.log(finalPromt);
 
         //const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
         //const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
