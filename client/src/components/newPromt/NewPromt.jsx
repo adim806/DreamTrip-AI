@@ -6,6 +6,7 @@ import { IKImage } from 'imagekitio-react';
 import model from '../../lib/gemini';
 import Markdown from 'react-markdown';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
  * NewPromt Component
@@ -118,9 +119,32 @@ const NewPromt = ({data})=>{
       },
     })
 
+  const anlayzePROMT = async () => {
+    
+    // Make sure to include these imports:
+    // import { GoogleGenerativeAI } from "@google/generative-ai";
+    const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash",systemInstruction: "Please analyze the following text and extract the following information from it: 1. The vacation location. 2. Duration of vacation (in days). 3. Additional constraints, if any (preferred vacation type, budget, or specific places). and return in JSON format", });
+    const prompt = "help me a vacation for 4 days to thailand for solo trip and i want a good extereme";
+    //const result = await model.generateContent(prompt);
+    //console.log(result.response.text());
+    const result = await model.generateContentStream(prompt);
+
+    let test="";
+    // Print text as it comes in.
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      //process.stdout.write(chunkText);
+      test+=chunkText;
+    }
+    console.log(test);
+    
+
+    };
+
+
 
     const add = async (text,isInitial) => {
-
       console.log("IN ADD FUNC");
       if (!isInitial) setQuestion(text);
 
@@ -129,14 +153,21 @@ const NewPromt = ({data})=>{
       const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
       //console.log(result.response.text);
       let accuumltedtext="";
-
       for await (const chunk of result.stream) {
           const chunkText = chunk.text();
           //console.log(chunkText);
           accuumltedtext+=chunkText;
           setAnswer(accuumltedtext);
       }
+
       console.log(accuumltedtext);
+
+      ///
+      console.log("before analysis promt function");
+      
+      
+      ///
+
       mutation.mutate();
         
     } catch (error) {
@@ -151,6 +182,7 @@ const NewPromt = ({data})=>{
       const text= e.target.text.value;
       if(!text) return;
       add(text, false);
+      
     };
 
 
@@ -182,8 +214,11 @@ const NewPromt = ({data})=>{
             {question && <div className="message user">{question}</div>}
             {answer && <div className="message"><Markdown>{answer}</Markdown></div>}
 
+            <button onClick={anlayzePROMT}>Start test</button>
 
             <div className="endChat" ref={endRef}></div>
+
+
             <form className="newform" onSubmit={handleSubmit} ref={formRef}>
                 <Upload setImg={setImg}/>
                 <input id="file" type="file" multiple={false} hidden/>
