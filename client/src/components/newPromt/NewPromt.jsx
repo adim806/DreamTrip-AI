@@ -138,22 +138,22 @@ const NewPromt = ({data})=>{
         });
 
       //exm for user promt
-      const USERprompt = "help me a vacation for 4 days to thailand for solo trip and i want a good extereme";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
+      const UserPrompt = "i want a vacation for 3 days to Canada for 2 people trip with avarage budget";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
 
-      const result = await model.generateContentStream(USERprompt);
-      let test="";
+      const result = await model.generateContentStream(UserPrompt);
+      let FINAL_TEXT_ANS="";
       // Print text as it comes in.
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
-        test+=chunkText;
+        FINAL_TEXT_ANS+=chunkText;
       }
-      console.log("The prompt: \n"+ USERprompt);
+      console.log("The User Prompt: \n"+ UserPrompt);
 
       // ניקוי התגובה מכל סימון "```json" או "`"
-      const cleanedResponseText = test.replace(/```json|```/g, "").trim();
+      const cleanedResponseText = FINAL_TEXT_ANS.replace(/```json|```/g, "").trim();
       console.log("Cleaned Response Text: \n", cleanedResponseText);
+      // Use parsed data as a structured JSON object
       try {
-        
         // Try parsing the text response to JSON
         const parsedData = JSON.parse(cleanedResponseText);
 
@@ -162,7 +162,7 @@ const NewPromt = ({data})=>{
         console.log(typeof parsedData);
 
 
-        console.log("result:\n" +typeof result);
+        console.log("TYPE OF result:\n" +typeof result);
         //textTOgeneric(cleanedResponseText);
         EditText_toGenericPrompt(parsedData);
 
@@ -175,7 +175,7 @@ const NewPromt = ({data})=>{
     
     const EditText_toGenericPrompt = async(parsedData) => {
 
-      ////i need to add use affect maybe when action 
+      ////i need to add use affect maybe when action ON SERVER change
 
       console.log("In EditText_toGenericPrompt function: \n");
 
@@ -200,7 +200,7 @@ const NewPromt = ({data})=>{
         const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration).replace(`{travel_type}`,parsedData.constraints?.travel_type).replace(`{budget}`,parsedData.constraints?.budget).replace(`{duration}`,parsedData?.duration);
 
         console.log(finalPromt);
-        textTOgeneric(finalPromt);
+        BuildPlanAI(finalPromt);
         //const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
         //const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
   
@@ -215,7 +215,7 @@ const NewPromt = ({data})=>{
 
     };
 
-    const textTOgeneric= async(jsonTEST)=>{
+    const BuildPlanAI= async(finalPromt_str)=>{
       console.log("IN textTOgeneric FUNCTION");
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
 
@@ -247,7 +247,8 @@ const NewPromt = ({data})=>{
           },
         ],
       });
-      const result = await chatSession.sendMessage(jsonTEST);
+      console.log("Creating chatSession for final promt");
+      const result = await chatSession.sendMessage(finalPromt_str);
 
       //console.log(jsonTEST);
       //console.log(typeof jsonTEST);
@@ -299,16 +300,15 @@ const NewPromt = ({data})=>{
     };
 
 
-  // IN PRODUCTION WE DON'T NEED IT
-  const hasRun = useRef(false);
-  useEffect(() => {
-    if (!hasRun.current) {
-      if (data?.history?.length === 1) {
-        add(data.history[0].parts[0].text, true);
+    const hasRun = useRef(false);
+    useEffect(() => {
+      if (!hasRun.current) {
+        if (data?.history?.length === 1) {
+          add(data.history[0].parts[0].text, true);
+        }
       }
-    }
-    hasRun.current = true;
-  }, []);
+      hasRun.current = true;
+    }, []);
 
     return(
         <div className="newpPromt">
@@ -326,7 +326,7 @@ const NewPromt = ({data})=>{
 
             {question && <div className="message user">{question}</div>}
             {answer && <div className="message"><Markdown>{answer}</Markdown></div>}
-
+            
             <button onClick={anlayze_varPROMT}>Start test</button>
 
             <div className="endChat" ref={endRef}></div>
