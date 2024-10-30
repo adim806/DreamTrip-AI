@@ -7,6 +7,9 @@ import model from '../../lib/gemini';
 import Markdown from 'react-markdown';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Button } from '../ui/button';
+//import { Button } from "@/components/ui/button";
+import { AiOutlineLoading3Quarters } from "react-icons/ai";
 
 /**
  * NewPromt Component
@@ -61,6 +64,7 @@ const NewPromt = ({data})=>{
         dbData: {},
         aiData: {},
     });
+    const [loading,setloading] = useState(false);
 
     const chat = model.startChat({
       history: [
@@ -122,7 +126,7 @@ const NewPromt = ({data})=>{
 
     //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
     const anlayze_varPROMT = async () => {
-
+      setloading(true);
       //the ideal is to start chat with history and in the systeminsruction att we can present that he will act like a smart trip planner
 
       console.log("IN ANALAYZR varPROMT FUNC");
@@ -133,7 +137,7 @@ const NewPromt = ({data})=>{
           "constraints": {
           "travel_type": "Solo" || "not specified",
           "preferred_activity": "Extreme" || "not specified",
-          "budget": "none" || "Avarage budget" }
+          "budget": "none" || "Avarage" }
           } `,
         });
 
@@ -260,7 +264,7 @@ const NewPromt = ({data})=>{
       console.log(result.response.text());
       console.log(typeof result.response.text());
 
-
+      setloading(false);
     };
 
 
@@ -327,7 +331,18 @@ const NewPromt = ({data})=>{
             {question && <div className="message user">{question}</div>}
             {answer && <div className="message"><Markdown>{answer}</Markdown></div>}
             
-            <button onClick={anlayze_varPROMT}>Start test</button>
+            
+            <>
+            <Button
+            disabled={loading}
+            onClick={anlayze_varPROMT}>
+            {loading?
+            <AiOutlineLoading3Quarters className="h-7 w-7 animate-spin" /> :'Generate Trip'}
+            </Button>
+            </>
+            
+
+            
 
             <div className="endChat" ref={endRef}></div>
 
