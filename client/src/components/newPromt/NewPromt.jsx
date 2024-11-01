@@ -10,6 +10,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Button } from '../ui/button';
 //import { Button } from "@/components/ui/button";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
+//import Aitrips from '../../../../backend/models/AiTrips.js';
+import { doc, setDoc } from "firebase/firestore";
+import { db } from '@/service/firebaseConfig';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * NewPromt Component
@@ -65,6 +69,7 @@ const NewPromt = ({data})=>{
         aiData: {},
     });
     const [loading,setloading] = useState(false);
+    const navigate = useNavigate();
 
     const chat = model.startChat({
       history: [
@@ -123,7 +128,7 @@ const NewPromt = ({data})=>{
       },
     });
     
-
+    //////////////////////test func 1
     //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
     const anlayze_varPROMT = async () => {
       setloading(true);
@@ -135,14 +140,14 @@ const NewPromt = ({data})=>{
          {"vacation_location": "Thailand" || "destination not specified",
           "duration": 4 || "duration not specified",
           "constraints": {
-          "travel_type": "Solo" || "not specified",
+          "travel_type": "Solo" || "Group" || "not specified",
           "preferred_activity": "Extreme" || "not specified",
           "budget": "none" || "Avarage" }
           } `,
         });
 
       //exm for user promt
-      const UserPrompt = "i want a vacation for 3 days to Canada for 2 people trip with avarage budget";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
+      const UserPrompt = "i want a vacation for 5 days to thailand for 3 people trip with avarage budget";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
 
       const result = await model.generateContentStream(UserPrompt);
       let FINAL_TEXT_ANS="";
@@ -178,7 +183,7 @@ const NewPromt = ({data})=>{
     };
     
     const EditText_toGenericPrompt = async(parsedData) => {
-
+      
       ////i need to add use affect maybe when action ON SERVER change
 
       console.log("In EditText_toGenericPrompt function: \n");
@@ -204,13 +209,14 @@ const NewPromt = ({data})=>{
         const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration).replace(`{travel_type}`,parsedData.constraints?.travel_type).replace(`{budget}`,parsedData.constraints?.budget).replace(`{duration}`,parsedData?.duration);
 
         console.log(finalPromt);
-        BuildPlanAI(finalPromt);
+        BuildPlanAI(finalPromt,parsedData);
         //const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
         //const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
   
         // לחשוב על רעיון איך לקבל את המחרוזת או הגייסון ולשאוב משם מידע עבור הפרומט הגנרי
         //const result = await model.generateContent(`Based of this generic prompt: ${GenericPrompt}. Replace and fit the variables X from the generic promt from this var: ${test}`);
         //console.log(result.response.text());
+        
         
       } catch (error) {
         console.log(error);
@@ -219,10 +225,9 @@ const NewPromt = ({data})=>{
 
     };
 
-    const BuildPlanAI= async(finalPromt_str)=>{
+    const BuildPlanAI= async(finalPromt_str,parsedData)=>{
       console.log("IN textTOgeneric FUNCTION");
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
       });
@@ -258,13 +263,44 @@ const NewPromt = ({data})=>{
       //console.log(typeof jsonTEST);
       //const extractedData = JSON.parse(jsonTEST);
       //console.log("Extracted Data:", extractedData);
-      console.log(result);
-      console.log(typeof result);
 
       console.log(result.response.text());
       console.log(typeof result.response.text());
 
-      setloading(false);
+
+
+      
+      console.log("before save function called");
+      SaveTrips(parsedData,result?.response?.text());
+      console.log("after save function called");
+    };
+
+    const SaveTrips = async (parsedData,tripData)=>{
+      console.log("try to save trip data packs:");
+      
+      console.log(parsedData);
+      console.log(tripData);
+     
+      console.log(data._id);
+
+      const docID=Date.now().toString();
+      console.log(docID);
+      try {
+        await setDoc(doc(db, "AiTrips", docID), {
+          userSelection: parsedData,
+          tripData: JSON.parse(tripData),
+          userID: data._id,
+          id:docID,
+        });
+        setloading(false);
+        navigate('/dashboard/createTrip');
+        
+        
+      } catch (error) {
+        console.log(error);
+      }
+
+
     };
 
 

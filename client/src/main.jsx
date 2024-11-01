@@ -12,6 +12,7 @@ import SignUpPage from "./routes/signUpPage/SignUpPage";
 import RootLayout from './layouts/rootLayout/RootLayout';
 import DashboardLayout from './layouts/dashboardLayout/DashboardLayout';
 import './index.css';
+import CreateTrip from './routes/createTrip/CreateTrip';
 
 /**
  * Main entry point for the React application using Vite and React Router DOM.
@@ -65,6 +66,11 @@ const router = createBrowserRouter([
             path: "/dashboard",
             element:<DashboardPage/>
           },
+          {
+            path: "/dashboard/createTrip",
+            element:<CreateTrip/>
+          },
+
           {
             path:"/dashboard/chats/:id",
             element: <ChatPage/>

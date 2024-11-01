@@ -1,0 +1,41 @@
+.CreateTrip {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #10222e;
+
+    .texts {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%; /* שיניתי ל-100% כדי ליישר נכון את כל האלמנטים */
+        gap: 20px; /* צמצמתי את הרווחים כדי שיהיה יותר אחיד */
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            opacity: 0.2;
+
+            img {
+                width: 64px;
+                height: 64px;
+            }
+
+            h1 {
+                font-size: 64px; /* תיקון טעות הקלדה, זה היה "128x" */
+                background: linear-gradient(to right, #217bfe, #e55571);
+                background-clip: text;
+                -webkit-background-clip: text;
+                color: transparent;
+            }
+        }
+       
+
+    }
+
+
+}
