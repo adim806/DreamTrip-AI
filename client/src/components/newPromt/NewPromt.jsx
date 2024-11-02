@@ -171,8 +171,6 @@ const NewPromt = ({data})=>{
         console.log(typeof parsedData);
 
 
-        console.log("TYPE OF result:\n" +typeof result);
-        //textTOgeneric(cleanedResponseText);
         EditText_toGenericPrompt(parsedData);
 
       } catch (error) {
@@ -182,6 +180,7 @@ const NewPromt = ({data})=>{
 
     };
     
+    /////////////test func 2!!
     const EditText_toGenericPrompt = async(parsedData) => {
       
       ////i need to add use affect maybe when action ON SERVER change
@@ -225,6 +224,7 @@ const NewPromt = ({data})=>{
 
     };
 
+    /////test func 3!!!
     const BuildPlanAI= async(finalPromt_str,parsedData)=>{
       console.log("IN textTOgeneric FUNCTION");
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
@@ -259,22 +259,16 @@ const NewPromt = ({data})=>{
       console.log("Creating chatSession for final promt");
       const result = await chatSession.sendMessage(finalPromt_str);
 
-      //console.log(jsonTEST);
-      //console.log(typeof jsonTEST);
-      //const extractedData = JSON.parse(jsonTEST);
-      //console.log("Extracted Data:", extractedData);
-
       console.log(result.response.text());
       console.log(typeof result.response.text());
-
-
-
       
       console.log("before save function called");
       SaveTrips(parsedData,result?.response?.text());
       console.log("after save function called");
     };
 
+
+    /////test func 4!!
     const SaveTrips = async (parsedData,tripData)=>{
       console.log("try to save trip data packs:");
       
@@ -293,7 +287,7 @@ const NewPromt = ({data})=>{
           id:docID,
         });
         setloading(false);
-        navigate('/dashboard/createTrip');
+        navigate('/createTrip/view-trip/'+ docID);
         
         
       } catch (error) {
