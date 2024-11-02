@@ -13,6 +13,7 @@ import RootLayout from './layouts/rootLayout/RootLayout';
 import DashboardLayout from './layouts/dashboardLayout/DashboardLayout';
 import './index.css';
 import CreateTrip from './routes/createTrip/CreateTrip';
+import Viewtrip from './routes/view-trip/[tripID]';
 
 /**
  * Main entry point for the React application using Vite and React Router DOM.
@@ -67,8 +68,14 @@ const router = createBrowserRouter([
             element:<DashboardPage/>
           },
           {
-            path: "/dashboard/createTrip",
+            //need to switch or merge with dashboard the trip
+            path: "/createTrip",
             element:<CreateTrip/>
+          },
+          {
+            //need to switch or merge with dashboard the trip
+            path: "/createTrip/view-trip/:tripID",
+            element:<Viewtrip/>
           },
 
           {

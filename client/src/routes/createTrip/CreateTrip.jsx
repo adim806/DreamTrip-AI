@@ -1,23 +1,18 @@
-import { QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams } from 'react-router-dom';
 import './createTrip.css';
 
 
-
-
-
 const CreateTrip = () => {
-
-  // Initializes the navigate function for programmatic routing
+    //const {tripID}= useParams();
   
   return (
     <div className="CreateTrip">
       <div className="texts">
         <div className="logo">
           <img src="/logo.png" alt="" />
-          <h1>create trip</h1>
+          <h1>create trip for </h1>
         </div>
       </div>
-
     </div>
   );
 };
