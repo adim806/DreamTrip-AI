@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import InfoSection from '../compo/infoSection';
 import Hotels from '../compo/Hotels';
+import PlacesToVisit from '../compo/PlacesToVisit';
+import Footer from '../compo/Footer';
 
 
 const Viewtrip = () => {
@@ -32,18 +34,18 @@ const Viewtrip = () => {
     };
   
   return (
-    <div className='p-10 md:px-20 lg:px-44 xl:px-56'>
+    <div className='p-10 md:px-20 lg:px-44 xl:px-56 h-screen overflow-y-scroll'>
       {/* Information section */}
       <InfoSection trip={trip}/>
 
       {/* hotel section */}
       <Hotels trip={trip}/>
 
-
       {/* daily plan */}
+      <PlacesToVisit trip={trip}/>
 
       {/* footer */}
-
+      <Footer/>
     </div>
   );
 };
