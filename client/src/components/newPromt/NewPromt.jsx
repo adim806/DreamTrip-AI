@@ -136,7 +136,13 @@ const NewPromt = ({data})=>{
 
       console.log("IN ANALAYZR varPROMT FUNC");
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash",systemInstruction: `Please analyze the following text and extract the following information from it: 1. The vacation location. 2. Duration of vacation (in days). 3. Additional constraints, if any (preferred vacation type, budget, or specific places).you will return a fixed general structure in JSON format.Take this one just for a example:
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: `Please analyze the following text and extract the following information from it:
+         1. The vacation location. 
+         2. Duration of vacation (in days). 
+         3. Additional constraints, if any (preferred vacation type, budget, or specific places).you will return a fixed general structure in JSON format.Take this one just for a example:
+         
          {"vacation_location": "Thailand" || "destination not specified",
           "duration": 4 || "duration not specified",
           "constraints": {
@@ -147,7 +153,7 @@ const NewPromt = ({data})=>{
         });
 
       //exm for user promt
-      const UserPrompt = "i want a vacation for 5 days to thailand for 3 people trip with avarage budget";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
+      const UserPrompt = "im looking for a vacation in israel for next week for 5 days and we are a group of 5 friends at the age of 27";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
 
       const result = await model.generateContentStream(UserPrompt);
       let FINAL_TEXT_ANS="";
@@ -361,7 +367,7 @@ const NewPromt = ({data})=>{
             {question && <div className="message user">{question}</div>}
             {answer && <div className="message"><Markdown>{answer}</Markdown></div>}
             
-            
+            {/*MY TEST BUTTON*/}
             <>
             <Button
             disabled={loading}
