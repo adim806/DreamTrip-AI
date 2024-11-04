@@ -1,17 +1,36 @@
 import { Button } from '@/components/ui/button';
-
+import { getPlaceDetails, PHOTO_REF_URL } from '@/service/GlobalApi';
+import { data } from 'autoprefixer';
 import { useEffect, useState } from 'react';
-
 import { IoIosSend } from "react-icons/io";
 
 
 const InfoSection = ({trip}) => {
   console.log("IN infoSection FUNCTION");
 
+  const [photo_url, setPhotoUrl] = useState();
+  useEffect(()=>{
+    trip&&getPlacePhoto();
+  },[trip])
+
+
+  const getPlacePhoto=async()=>{
+    const data={
+      textQuery:trip?.userSelection?.vacation_location
+    }
+    const result= await getPlaceDetails(data).then(resp=>{
+      //console.log(resp.data.places[0].photos[3].name);
+      const photo_url=PHOTO_REF_URL.replace('{NAME}',resp.data.places[0].photos[3].name);
+      setPhotoUrl(photo_url);
+    });
+    
+  }
+
+ 
   
   return (
     <div>
-      <img src='/place_holder.jpeg' className='h-[360px] w-full object-cover rounded-xl' />
+      <img src={photo_url?photo_url:"/place_holder.jpeg"} className='h-[360px] w-full object-cover rounded-xl' />
       <div className="flex justify-between items-center">
         <div className='my-5 flex flex-col gap-2'>
           <h2 className='font-bold text-2xl'>
