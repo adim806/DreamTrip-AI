@@ -3,7 +3,7 @@ import './newPromt.css'
 import { useRef, useEffect} from 'react';
 import  Upload from '../upload/Upload';
 import { IKImage } from 'imagekitio-react';
-import model from '../../lib/gemini';
+//import model from '../../lib/gemini';
 import Markdown from 'react-markdown';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -59,6 +59,18 @@ import { useNavigate } from 'react-router-dom';
  *
  */
 
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
+const model = genAI.getGenerativeModel({
+  model: "gemini-1.5-flash",
+  system_Instruction: `
+    You are a knowledgeable and friendly travel agent called 'Meller-AI' and named it ,im specializing in planning customized trips.
+    Your task is to assist the user with any travel-related questions, whether it's about a destination, 
+    activity, local culture, or recommendations for hotels, attractions, and dining options.
+    `,
+});
+
+
+
 const NewPromt = ({data})=>{
     const [question,setQuestion] = useState(""); 
     const [answer,setAnswer] = useState(""); 
@@ -78,6 +90,7 @@ const NewPromt = ({data})=>{
               parts: [{ text: parts[0].text }],
           })) || []) // התוצאה המתקבלת תהיה מערך ריק במקרה ש-data או data.history אינם קיימים
       ],
+      
       generationConfig: {},
   });
 
@@ -136,12 +149,15 @@ const NewPromt = ({data})=>{
 
       console.log("IN ANALAYZR varPROMT FUNC");
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-      const model = genAI.getGenerativeModel({ 
+      const modeli = genAI.getGenerativeModel({ 
         model: "gemini-1.5-flash",
-        systemInstruction: `Please analyze the following text and extract the following information from it:
+        systemInstruction: `You are a knowledgeable and friendly travel agent called 'Meller-AI' and named it at the begininng,im specializing in planning customized trips.
+         Your task is to assist the user with any travel-related questions, whether it's about a destination, 
+         activity, local culture, or recommendations for hotels, attractions, and dining options.
+         Please analyze the following text and extract the following information from it:
          1. The vacation location. 
          2. Duration of vacation (in days). 
-         3. Additional constraints, if any (preferred vacation type, budget, or specific places).you will return a fixed general structure in JSON format.Take this one just for a example:
+         3. Additional constraints, if any (preferred vacation type, budget, or specific places).you will return a fixed general structure in JSON format and ask for missed information like destination like smart agent called 'Meller AI'.Take this one just for a example:
          
          {"vacation_location": "Thailand" || "destination not specified",
           "duration": 4 || "duration not specified",
@@ -149,13 +165,14 @@ const NewPromt = ({data})=>{
           "travel_type": "Solo" || "Group" || "not specified",
           "preferred_activity": "Extreme" || "not specified",
           "budget": "none" || "Avarage" }
-          } `,
+          }
+          `,
         });
 
       //exm for user promt
       const UserPrompt = "im looking for a vacation in israel for next week for 5 days and we are a group of 5 friends at the age of 27";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
 
-      const result = await model.generateContentStream(UserPrompt);
+      const result = await modeli.generateContentStream(UserPrompt);
       let FINAL_TEXT_ANS="";
       // Print text as it comes in.
       for await (const chunk of result.stream) {
@@ -185,6 +202,79 @@ const NewPromt = ({data})=>{
       }
 
     };
+
+        //////////////////////test func 1
+    //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
+    const anlayze_UserPrompt1 = async (UserPrompt) => {
+      //setloading(true);
+      //the ideal is to start chat with history and in the systeminsruction att we can present that he will act like a smart trip planner
+
+      console.log("IN ANALAYZR varPROMT1 FUNC");
+      console.log("The User Prompt: \n"+ UserPrompt);
+
+      const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
+      const modela = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: `You are a knowledgeable and friendly travel agent called 'Meller-AI' and named it ,im specializing in planning customized trips.
+         Your task is to assist the user with any travel-related questions, whether it's about a destination, 
+         activity, local culture, or recommendations for hotels, attractions, and dining options. 
+         Please analyze the following text and extract the following information from it:
+         1. The vacation location. 
+         2. Duration of vacation (in days). 
+         3. Additional constraints, if any (preferred vacation type, budget, or specific places).you will return a fixed general structure in JSON format.Take this one just for a example:
+         
+         {"vacation_location": "Thailand" || "destination not specified",
+          "duration": 4 || "duration not specified",
+          "constraints": {
+          "travel_type": "Solo" || "Group" || "not specified",
+          "preferred_activity": "Extreme" || "not specified",
+          "budget": "none" || "Avarage" }
+          } `,
+        });
+
+      //exm for user promt
+      //const UserPrompt = "im looking for a vacation in israel for next week for 5 days and we are a group of 5 friends at the age of 27";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
+      try {
+        const result = await modela.generateContentStream(UserPrompt);
+        let FINAL_TEXT_ANS="";
+        // Print text as it comes in.
+        for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          FINAL_TEXT_ANS+=chunkText;
+        }
+        console.log("TEXT_ANS1: \n"+ FINAL_TEXT_ANS);
+        setAnswer(FINAL_TEXT_ANS);
+
+        // ניקוי התגובה מכל סימון "```json" או "`"
+        const cleanedResponseText = FINAL_TEXT_ANS.replace(/```json|```/g, "").trim();
+        console.log("Cleaned Response Text: \n", cleanedResponseText);
+        // Use parsed data as a structured JSON object
+
+        try {
+          // Try parsing the text response to JSON
+          const parsedData = JSON.parse(cleanedResponseText);
+  
+          // Use parsed data as a structured JSON object
+          console.log("Parsed JSON Data: \n", parsedData);
+          console.log(typeof parsedData);
+  
+  
+          EditText_toGenericPrompt(parsedData);
+          
+        } catch (error) {
+          console.error("Invalid JSON format:", error);
+          return null;
+        }
+          
+      } catch (error) {
+        console.log("Error: " + error);
+      }
+
+
+
+
+
+    };
     
     /////////////test func 2!!
     const EditText_toGenericPrompt = async(parsedData) => {
@@ -204,6 +294,15 @@ const NewPromt = ({data})=>{
         const budget = parsedData.constraints?.budget || "not specified";
 
         //if vacation_location =="destination not specified: enter locationwhile"
+        if(parsedData?.vacation_location=="destination not specified"){
+          console.log("Please enter location while generating the Travel Plan.");
+          return "Please enter location while generating the Travel Plan boyy";
+        }
+
+        if(parsedData?.duration=="duration not specified"){
+          console.log("Please enter duration while generating the Travel Plan.");
+          return "Please enter duration while generating the Travel Plan boyy";
+        }
 
         console.log("Destenation: " + vacation_location);
         console.log("Duration: " + duration);
@@ -214,13 +313,13 @@ const NewPromt = ({data})=>{
         const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration).replace(`{travel_type}`,parsedData.constraints?.travel_type).replace(`{budget}`,parsedData.constraints?.budget).replace(`{duration}`,parsedData?.duration);
 
         console.log(finalPromt);
-        BuildPlanAI(finalPromt,parsedData);
+        //BuildPlanAI(finalPromt,parsedData);
+        //return finalPromt
         //const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
         //const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-  
-        // לחשוב על רעיון איך לקבל את המחרוזת או הגייסון ולשאוב משם מידע עבור הפרומט הגנרי
-        //const result = await model.generateContent(`Based of this generic prompt: ${GenericPrompt}. Replace and fit the variables X from the generic promt from this var: ${test}`);
-        //console.log(result.response.text());
+        setAnswer(finalPromt);
+        //maybe to add mutaion to here 
+
         
         
       } catch (error) {
@@ -309,10 +408,12 @@ const NewPromt = ({data})=>{
 
     const add = async (text,isInitial) => {
       console.log("IN ADD FUNC");
+      //set the ques user on chat page
       if (!isInitial) setQuestion(text);
 
     try {
       console.log(text);
+      ////here i can send my extracted trip data and do present them to the user AND add to DB
       const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
       //console.log(result.response.text);
       let accuumltedtext="";
@@ -335,7 +436,9 @@ const NewPromt = ({data})=>{
       console.log("IN HANDLE SUBMIT FUNC");
       const text= e.target.text.value;
       if(!text) return;
-      add(text, false);
+      anlayze_UserPrompt1(text);
+      //add(text, false);
+      
       
     };
 
