@@ -411,32 +411,34 @@ const NewPromt = ({data})=>{
       console.log("Creating chatSession for final promt");
       //const [isLoading, setIsLoading] = useState(false);
       /// the text is sending in parts and we can fix it here when we can wait to get the all ans from the api
-      let cleanedText;
-      let result="";
       
       try {
         setIsLoading(true); // התחל טעינה
-        result = await chatSession.sendMessage(finalPromt_str);
+        const result = await chatSession.sendMessage(finalPromt_str);
         
         // פעולה לאחר סיום שליחת ההודעה
         console.log("Message sent successfully:", result.response.text());
         //console.log(result.response.text());
         //console.log(typeof result.response.text());
-        
+
+        setIsLoading(false); // סיים טעינה
+        console.log("in  try after finished the mess:\n");
+
+        // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
+        const jsonMatch = result.response.text().match(/{[\s\S]*}/);
+        const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
+    
+        const jsonObject = JSON.parse(jsonString); // המרה לאובייקט JSON
+        console.log("after parsing in try\n"+ jsonObject);
+        //console.log("Vacation location:);
       } catch (error) {
         console.error("Failed to send message:", error);
       }finally {
-        setIsLoading(false); // סיים טעינה
+        //setIsLoading(false); // סיים טעינה
         
-        console.log("in (finally) try after finished the mess");
+        //console.log("in (finally) try after finished the mess");
 
-         // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
-         const jsonMatch = result.match(/{[\s\S]*}/);
-         const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
 
-         const jsonObject = JSON.parse(jsonString); // המרה לאובייקט JSON
-         console.log("after parsing in finally\n"+ jsonObject);
-         //console.log("Vacation location:);
 
         //cleanedText = result.response.text().replace(/```json|```/g, "").trim();
         //if (!cleanedText.startsWith("{") || !cleanedText.endsWith("}")) {
@@ -543,6 +545,7 @@ const NewPromt = ({data})=>{
     }, []);
 
     return(
+      
         <div className="newpPromt">
             {/*ADD NEW CHAT*/}
             {img.isLoading && <div className=''>Loading...</div>}

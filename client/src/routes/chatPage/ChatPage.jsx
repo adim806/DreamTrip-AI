@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { IKImage } from 'imagekitio-react';
-import React from 'react';
+import React, { useEffect } from 'react';
 import InfoSection from '../view-trip/compo/infoSection';
 
 /**
@@ -45,19 +45,23 @@ const ChatPage = () => {
   })
   console.log(data);
 
-
+  useEffect(()=>{
+    data;
+  },[data]);
 
 
   return (
 
-    <div className="chatPage">
-        <div className="topContent p-10 md:px-20 lg:px-44 xl:px-56 h-screen overflow-y-scroll">
-          {/* Information section <InfoSection trip={trip}/>*/}
-          
-          <h1>Welcome to our Chat Page!</h1>
-        </div>
+    <div className="chatPage bg-rose-600">
 
-      <div className="wrapper">
+      <div className='topContent p-10 md:px-20 lg:px-44 xl:px-56 h-screen overflow-y-scroll'>
+        <h1 className='shadow-lg'>Welcome to our Chat Page!</h1>
+        {/* Information section <InfoSection trip={trip}/>*/}
+        <InfoSection data={data} />
+            
+      </div>
+
+        <div className="wrapper">
         <div className="chat">
           {isPending? "Loading.." : error? "Error": data?.history?.map((message,i)=>(
             <React.Fragment key={i}>

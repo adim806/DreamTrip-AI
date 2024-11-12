@@ -10,7 +10,7 @@
     .topContent{
         height: 50vh; /* חצי עליון של המסך */
         width: 100%;
-        background-color: #00b7bd; /* צבע רקע לבן */
+        background-color: #0032b0; /* צבע רקע לבן */
         display: flex;
         justify-content: center;
         align-items: center;
