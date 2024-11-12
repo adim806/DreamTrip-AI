@@ -59,15 +59,7 @@ import { useNavigate } from 'react-router-dom';
  *
  */
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash",
-  system_Instruction: `
-    You are a knowledgeable and friendly travel agent called 'Meller-AI' and named it ,im specializing in planning customized trips.
-    Your task is to assist the user with any travel-related questions, whether it's about a destination, 
-    activity, local culture, or recommendations for hotels, attractions, and dining options.
-    `,
-});
+
 
 
 
@@ -82,6 +74,16 @@ const NewPromt = ({data})=>{
     });
     const [loading,setloading] = useState(false);
     const navigate = useNavigate();
+
+    const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      system_Instruction: `
+        You are a knowledgeable and friendly travel agent called 'RON-AI' and named it ,im specializing in planning customized trips.
+        Your task is to assist the user with any travel-related questions, whether it's about a destination, 
+        activity, local culture, or recommendations for hotels, attractions, and dining options.
+        `,
+      });
 
     const chat = model.startChat({
       history: [
@@ -224,7 +226,7 @@ const NewPromt = ({data})=>{
          3. Additional constraints, if any (preferred vacation type, budget, or specific places).you will return a fixed general structure in JSON format.Take this one just for a example:
          
          {"vacation_location": "Thailand" || "destination not specified",
-          "duration": 4 || "duration not specified",
+          "duration": "4" || "duration not specified",
           "constraints": {
           "travel_type": "Solo" || "Group" || "not specified",
           "preferred_activity": "Extreme" || "not specified",
@@ -245,21 +247,66 @@ const NewPromt = ({data})=>{
         console.log("TEXT_ANS1: \n"+ FINAL_TEXT_ANS);
         setAnswer(FINAL_TEXT_ANS);
 
-        // ניקוי התגובה מכל סימון "```json" או "`"
-        const cleanedResponseText = FINAL_TEXT_ANS.replace(/```json|```/g, "").trim();
-        console.log("Cleaned Response Text: \n", cleanedResponseText);
-        // Use parsed data as a structured JSON object
+
 
         try {
           // Try parsing the text response to JSON
-          const parsedData = JSON.parse(cleanedResponseText);
-  
+          console.log("Try parsing the text response to JSON IN ANALAYZR varPROMT1 FUNC: \n");
+          
+          console.log(typeof FINAL_TEXT_ANS);
+
+         // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
+          const jsonMatch = FINAL_TEXT_ANS.match(/{[\s\S]*}/);
+
+          console.log("after match on text: \n" + jsonMatch +"\n"+ typeof jsonMatch);//object
+          console.log("Vacation location: "+ jsonMatch?.vacation_location);
+          if (jsonMatch){
+            const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
+            console.log("jsonMatch[0]: \n" + jsonString +"\n"+ typeof jsonString);//string
+            
+            try {
+              console.log("before parsing\n");
+
+              const jsonObject = JSON.parse(jsonString); // המרה לאובייקט JSON
+              console.log("before parsing\n"+ jsonObject);
+              console.log("Vacation location: "+ jsonObject?.vacation_location);
+              EditText_toGenericPrompt(jsonObject);
+
+            } catch (error) {
+              console.error("Failed to parse JSON:", error.message);
+              return null;
+            }
+          }
+
+          // ניקוי התגובה מכל סימון "```json" או "`"
+          //const cleanedResponseText = FINAL_TEXT_ANS
+          //.replace(/```json|```/g, "") // הסרת "```json" ו-"```"
+          //.replace(/\\n/g, "") // הסרת תווי שורה חדשה
+          //.replace(/\s\s+/g, " ") // הסרת רווחים מרובים
+          //.trim();
+
+          //console.log("after cleaned text:\n " + cleanedResponseText);
+
+          //console.log("after1111 cleaned text:\n");
+          //const cleanedResponseText = FINAL_TEXT_ANS.replace(/```json|```/g, "").trim();
+              // ודא שהמחרוזת מתחילה ומסתיימת בסוגריים מסולסלים
+          //if (!cleanedResponseText.startsWith("{") || !cleanedResponseText.endsWith("}")) {
+            //console.error("Invalid JSON format: Missing curly braces.");
+            //return null;
+          //}  
+          
+          //console.log("Cleaned Response Text: \n", cleanedResponseText);
+          //console.log(typeof parsedResponseText);
           // Use parsed data as a structured JSON object
-          console.log("Parsed JSON Data: \n", parsedData);
-          console.log(typeof parsedData);
-  
-  
-          EditText_toGenericPrompt(parsedData);
+
+            //const parsedData = JSON.parse(cleanedResponseText);
+    
+            // Use parsed data as a structured JSON object
+            //console.log("Parsed JSON Data: \n", parsedData);
+            //console.log(typeof parsedData);
+    
+    
+            //EditText_toGenericPrompt(parsedData);
           
         } catch (error) {
           console.error("Invalid JSON format:", error);
@@ -286,7 +333,7 @@ const NewPromt = ({data})=>{
 
       try {
         const GenericPrompt = "Generate Travel Plan for Location: {location}, for {duration} days, for {travel_type} with a {budget} budget. Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for {duration} days with each day plan with best time to visit in JSON format.";
-
+        //here i can create a self object with defult null (phone)
         const vacation_location = parsedData?.vacation_location || "destination not specified";
         const duration = parsedData?.duration || "duration not specified";
         const travel_type = parsedData.constraints?.travel_type || "not specified";
@@ -313,7 +360,7 @@ const NewPromt = ({data})=>{
         const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration).replace(`{travel_type}`,parsedData.constraints?.travel_type).replace(`{budget}`,parsedData.constraints?.budget).replace(`{duration}`,parsedData?.duration);
 
         console.log(finalPromt);
-        //BuildPlanAI(finalPromt,parsedData);
+        BuildPlanAI(finalPromt,parsedData);
         //return finalPromt
         //const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
         //const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -328,7 +375,7 @@ const NewPromt = ({data})=>{
 
 
     };
-
+    const [isLoading, setIsLoading] = useState(false);
     /////test func 3!!!
     const BuildPlanAI= async(finalPromt_str,parsedData)=>{
       console.log("IN textTOgeneric FUNCTION");
@@ -362,13 +409,52 @@ const NewPromt = ({data})=>{
         ],
       });
       console.log("Creating chatSession for final promt");
-      const result = await chatSession.sendMessage(finalPromt_str);
-
-      console.log(result.response.text());
-      console.log(typeof result.response.text());
+      //const [isLoading, setIsLoading] = useState(false);
+      /// the text is sending in parts and we can fix it here when we can wait to get the all ans from the api
+      let cleanedText;
+      let result="";
       
-      console.log("before save function called");
-      SaveTrips(parsedData,result?.response?.text());
+      try {
+        setIsLoading(true); // התחל טעינה
+        result = await chatSession.sendMessage(finalPromt_str);
+        
+        // פעולה לאחר סיום שליחת ההודעה
+        console.log("Message sent successfully:", result.response.text());
+        //console.log(result.response.text());
+        //console.log(typeof result.response.text());
+        
+      } catch (error) {
+        console.error("Failed to send message:", error);
+      }finally {
+        setIsLoading(false); // סיים טעינה
+        
+        console.log("in (finally) try after finished the mess");
+
+         // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
+         const jsonMatch = result.match(/{[\s\S]*}/);
+         const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
+
+         const jsonObject = JSON.parse(jsonString); // המרה לאובייקט JSON
+         console.log("after parsing in finally\n"+ jsonObject);
+         //console.log("Vacation location:);
+
+        //cleanedText = result.response.text().replace(/```json|```/g, "").trim();
+        //if (!cleanedText.startsWith("{") || !cleanedText.endsWith("}")) {
+          //console.error("Invalid JSON format: Missing curly braces.");
+          
+        //}
+        //console.log("in finally after cleanedText replacement");
+        //console.log(cleanedText);
+
+        //console.log("before parsing data\n");
+       // const jsonObject = JSON.parse(cleanedText);
+       // console.log("after parsing data");
+        //console.log(jsonObject);
+        //console.log(typeof jsonObject);
+      }
+
+      //console.log("before save function called");
+      //SaveTrips(parsedData,result?.response?.text());
       console.log("after save function called");
     };
 
@@ -400,6 +486,9 @@ const NewPromt = ({data})=>{
       }
 
 
+    };
+
+    const ViewTrip = async (parsedData, tripData)=>{
     };
 
 

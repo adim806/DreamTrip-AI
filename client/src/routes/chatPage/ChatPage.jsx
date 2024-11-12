@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { IKImage } from 'imagekitio-react';
 import React from 'react';
+import InfoSection from '../view-trip/compo/infoSection';
 
 /**
  * ChatPage Component
@@ -48,7 +49,14 @@ const ChatPage = () => {
 
 
   return (
+
     <div className="chatPage">
+        <div className="topContent p-10 md:px-20 lg:px-44 xl:px-56 h-screen overflow-y-scroll">
+          {/* Information section <InfoSection trip={trip}/>*/}
+          
+          <h1>Welcome to our Chat Page!</h1>
+        </div>
+
       <div className="wrapper">
         <div className="chat">
           {isPending? "Loading.." : error? "Error": data?.history?.map((message,i)=>(
@@ -74,7 +82,9 @@ const ChatPage = () => {
           {data && <NewPromt data={data}/>}
         </div>
       </div>
+
     </div>
+
   );
 };
 
