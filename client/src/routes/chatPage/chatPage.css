@@ -1,3 +1,4 @@
+
 .chatPage{
     height: 100%;
     display: flex;
@@ -5,6 +6,26 @@
     align-items: center;
     position: relative;
     background-color: #1d3b4d;
+
+    .topContent{
+        height: 50vh; /* חצי עליון של המסך */
+        width: 100%;
+        background-color: #00b7bd; /* צבע רקע לבן */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        z-index: 1;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* הוספת צל להפרדה */
+        padding: 20px;
+        overflow: hidden; /* להימנע מגלילה */
+        border-bottom: 10px solid #000000; /* קו תחתון */
+        border-top: 10px solid #000000; /* קו תחתון */
+        border-left: 10px solid #000000; /* קו תחתון */
+        border-right: 10px solid #000000; /* קו תחתון */
+
+
+    }
 
     .wrapper{
         flex: 1;
