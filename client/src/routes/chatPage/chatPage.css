@@ -1,62 +1,57 @@
+.chatPage {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  background-color: #092f47;
 
-.chatPage{
-    height: 100%;
+  .topContent {
+    height: 50vh; /* חצי עליון של המסך */
+    width: 100%;
+    background-color: #0032b0; /* צבע רקע לבן */
     display: flex;
-    flex-direction: column;
+    justify-content: center;
     align-items: center;
     position: relative;
-    background-color: #1d3b4d;
+    z-index: 1;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* הוספת צל להפרדה */
+    padding: 20px;
+    overflow: hidden; /* להימנע מגלילה */
+    border-bottom: 10px solid #000000; /* קו תחתון */
+    border-top: 10px solid #000000; /* קו תחתון */
+    border-left: 10px solid #000000; /* קו תחתון */
+    border-right: 10px solid #000000; /* קו תחתון */
+  }
 
-    .topContent{
-        height: 50vh; /* חצי עליון של המסך */
-        width: 100%;
-        background-color: #0032b0; /* צבע רקע לבן */
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        position: relative;
-        z-index: 1;
-        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* הוספת צל להפרדה */
+  .wrapper {
+    flex: 1;
+    overflow: scroll;
+    width: 125%;
+    display: flex;
+    justify-content: center;
+
+    .chat {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+
+      p,
+      li {
+        margin: 10px 0px;
+      }
+
+      .message {
         padding: 20px;
-        overflow: hidden; /* להימנע מגלילה */
-        border-bottom: 10px solid #000000; /* קו תחתון */
-        border-top: 10px solid #000000; /* קו תחתון */
-        border-left: 10px solid #000000; /* קו תחתון */
-        border-right: 10px solid #000000; /* קו תחתון */
 
-
-    }
-
-    .wrapper{
-        flex: 1;
-        overflow: scroll;
-        width: 125%;
-        display: flex;
-        justify-content: center;
-
-        .chat{
-            width: 50%;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-
-            p,li{
-                margin: 10px 0px;
-
-            }
-
-            .message{
-                padding: 20px;
-
-                &.user{
-                    background-color: #2c2937;
-                    border-radius: 20px;
-                    max-width: 80%;
-                    align-self: flex-end;
-                }
-            }
+        &.user {
+          background-color: #2c2937;
+          border-radius: 20px;
+          max-width: 80%;
+          align-self: flex-end;
         }
+      }
     }
-
-
+  }
 }

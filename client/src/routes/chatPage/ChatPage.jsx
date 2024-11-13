@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { IKImage } from 'imagekitio-react';
-import React, { useEffect } from 'react';
+import React, { useContext, useEffect } from 'react';
 import InfoSection from '../view-trip/compo/infoSection';
+import { TripContext, TripProvider } from '@/components/tripcontext/TripProvider';
 
 /**
  * ChatPage Component
@@ -34,6 +35,8 @@ const ChatPage = () => {
   const path= useLocation().pathname;
   const chatId= path.split("/").pop();
 
+  const { tripDetails } = useContext(TripContext);
+
   const { isPending, error, data } = useQuery({
     queryKey: ["chat", chatId],
     queryFn: () =>
@@ -45,23 +48,27 @@ const ChatPage = () => {
   })
   console.log(data);
 
+
+
   useEffect(()=>{
     data;
-  },[data]);
+  },[data,chatId]);
 
 
   return (
 
-    <div className="chatPage bg-rose-600">
-
+    
+    
+    <div className="chatPage ">
+      
       <div className='topContent p-10 md:px-20 lg:px-44 xl:px-56 h-screen overflow-y-scroll'>
-        <h1 className='shadow-lg'>Welcome to our Chat Page!</h1>
+
         {/* Information section <InfoSection trip={trip}/>*/}
-        <InfoSection data={data} />
+        <InfoSection trip={tripDetails} />
             
       </div>
 
-        <div className="wrapper">
+      <div className="wrapper">
         <div className="chat">
           {isPending? "Loading.." : error? "Error": data?.history?.map((message,i)=>(
             <React.Fragment key={i}>
@@ -86,8 +93,10 @@ const ChatPage = () => {
           {data && <NewPromt data={data}/>}
         </div>
       </div>
-
+      
     </div>
+    
+
 
   );
 };
