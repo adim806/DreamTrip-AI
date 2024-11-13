@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import './newPromt.css'
 import { useRef, useEffect} from 'react';
 import  Upload from '../upload/Upload';
@@ -14,6 +14,8 @@ import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from '@/service/firebaseConfig';
 import { useNavigate } from 'react-router-dom';
+import InfoSection from '@/routes/view-trip/compo/InfoSelection2';
+import { TripContext } from '../tripcontext/TripProvider';
 
 /**
  * NewPromt Component
@@ -72,6 +74,7 @@ const NewPromt = ({data})=>{
         dbData: {},
         aiData: {},
     });
+
     const [loading,setloading] = useState(false);
     const navigate = useNavigate();
 
@@ -323,6 +326,11 @@ const NewPromt = ({data})=>{
 
     };
     
+
+    const { setTripDetails } = useContext(TripContext);
+
+
+    
     /////////////test func 2!!
     const EditText_toGenericPrompt = async(parsedData) => {
       
@@ -358,6 +366,11 @@ const NewPromt = ({data})=>{
         console.log("Budget: " + budget);
 
         const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration).replace(`{travel_type}`,parsedData.constraints?.travel_type).replace(`{budget}`,parsedData.constraints?.budget).replace(`{duration}`,parsedData?.duration);
+
+        
+        //test
+        // עדכון ה-Context עם פרטי הטיול testtttt!!!
+        setTripDetails(parsedData);
 
         console.log(finalPromt);
         BuildPlanAI(finalPromt,parsedData);
@@ -545,8 +558,8 @@ const NewPromt = ({data})=>{
     }, []);
 
     return(
-      
-        <div className="newpPromt">
+      <>
+          <div className="newpPromt">
             {/*ADD NEW CHAT*/}
             {img.isLoading && <div className=''>Loading...</div>}
 
@@ -562,20 +575,17 @@ const NewPromt = ({data})=>{
             {question && <div className="message user">{question}</div>}
             {answer && <div className="message"><Markdown>{answer}</Markdown></div>}
             
-            {/*MY TEST BUTTON*/}
-            <>
+          {/*MY TEST BUTTON*/}
+          <>
             <Button
             disabled={loading}
             onClick={anlayze_varPROMT}>
             {loading?
             <AiOutlineLoading3Quarters className="h-7 w-7 animate-spin" /> :'Generate Trip'}
             </Button>
-            </>
+          </>
             
-
-            
-
-            <div className="endChat" ref={endRef}></div>
+          <div className="endChat" ref={endRef}></div>
 
 
             <form className="newform" onSubmit={handleSubmit} ref={formRef}>
@@ -587,6 +597,10 @@ const NewPromt = ({data})=>{
                 </button>
             </form>
         </div>
+
+      </>
+      
+
     );
 };
 

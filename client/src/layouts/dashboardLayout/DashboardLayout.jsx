@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect } from 'react';
 import './dashboardLayout.css';
 import ChatList from "../../components/chatList/ChatList";
+import { TripProvider } from '@/components/tripcontext/TripProvider';
 
 /**
  * DashboardLayout component that provides a layout for authenticated sections within the application.
@@ -42,6 +43,7 @@ const DashboardLayout = () => {
   if(!isLoaded) return "loading...";
 
   return (
+    <TripProvider>
     <div className="DashboardLayout">
       {/* Sidebar menu displaying chat list */}
         <div className="menu"><ChatList/> </div>
@@ -49,6 +51,7 @@ const DashboardLayout = () => {
         {/* Main content area rendering nested routes via Outlet */}
         <div className="content"><Outlet/></div>
     </div>
+    </TripProvider>
   );
 };
 
