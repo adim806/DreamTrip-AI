@@ -4,9 +4,10 @@ import { data } from 'autoprefixer';
 import { useEffect, useState } from 'react';
 import { IoIosSend } from "react-icons/io";
 
+//////////////////////not my function! //////////////////////
+const InfoSection = ({trip,alltrip}) => {
+  console.log("IN infoSection333 FUNCTION");
 
-const InfoSection = ({trip}) => {
-  console.log("IN infoSection FUNCTION");
 
   const [photo_url, setPhotoUrl] = useState();
   useEffect(()=>{

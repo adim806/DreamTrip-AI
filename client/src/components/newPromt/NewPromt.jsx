@@ -78,6 +78,8 @@ const NewPromt = ({data})=>{
     const [loading,setloading] = useState(false);
     const navigate = useNavigate();
 
+
+    ///RON AI DOESNT WORK 
     const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
@@ -199,7 +201,7 @@ const NewPromt = ({data})=>{
         console.log(typeof parsedData);
 
 
-        EditText_toGenericPrompt(parsedData);
+        //EditText_toGenericPrompt(parsedData);
 
       } catch (error) {
         console.error("Invalid JSON format:", error);
@@ -207,8 +209,8 @@ const NewPromt = ({data})=>{
       }
 
     };
-
-        //////////////////////test func 1
+        // my real func
+        //////////////////////test func 1 
     //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
     const anlayze_UserPrompt1 = async (UserPrompt) => {
       //setloading(true);
@@ -237,8 +239,6 @@ const NewPromt = ({data})=>{
           } `,
         });
 
-      //exm for user promt
-      //const UserPrompt = "im looking for a vacation in israel for next week for 5 days and we are a group of 5 friends at the age of 27";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
       try {
         const result = await modela.generateContentStream(UserPrompt);
         let FINAL_TEXT_ANS="";
@@ -250,9 +250,10 @@ const NewPromt = ({data})=>{
         console.log("TEXT_ANS1: \n"+ FINAL_TEXT_ANS);
         setAnswer(FINAL_TEXT_ANS);
 
-
+        ///NEED TO THINK ABOUT SAVING STATE WHEN WE HAVE ALL THE DATA WE CAN MOVE ON TO DISPLAY TRIPdata-
 
         try {
+          /// need to check if there is full data trip(like destination)
           // Try parsing the text response to JSON
           console.log("Try parsing the text response to JSON IN ANALAYZR varPROMT1 FUNC: \n");
           
@@ -263,7 +264,12 @@ const NewPromt = ({data})=>{
 
           console.log("after match on text: \n" + jsonMatch +"\n"+ typeof jsonMatch);//object
           console.log("Vacation location: "+ jsonMatch?.vacation_location);
+          
+
+          // if statement that indicates if jsonMatch is null -> it means that we get {}==that means all trip data
           if (jsonMatch){
+            console.log("in jsonmatch if statement:\n");
+
             const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
             console.log("jsonMatch[0]: \n" + jsonString +"\n"+ typeof jsonString);//string
             
@@ -280,6 +286,10 @@ const NewPromt = ({data})=>{
               return null;
             }
           }
+
+          //else ---> we dont get back json format(jsonmatch==null) and that means we didnt fully data trip so we need to ask again
+          console.log("in jsonmatch else statement:\n");//object
+
 
           // ניקוי התגובה מכל סימון "```json" או "`"
           //const cleanedResponseText = FINAL_TEXT_ANS
@@ -326,8 +336,8 @@ const NewPromt = ({data})=>{
 
     };
     
-
-    const { setTripDetails } = useContext(TripContext);
+    //new trick to get same data
+    const { setTripDetails , setallTripData} = useContext(TripContext);
 
 
     
@@ -368,9 +378,7 @@ const NewPromt = ({data})=>{
         const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration).replace(`{travel_type}`,parsedData.constraints?.travel_type).replace(`{budget}`,parsedData.constraints?.budget).replace(`{duration}`,parsedData?.duration);
 
         
-        //test
-        // עדכון ה-Context עם פרטי הטיול testtttt!!!
-        setTripDetails(parsedData);
+
 
         console.log(finalPromt);
         BuildPlanAI(finalPromt,parsedData);
@@ -441,8 +449,16 @@ const NewPromt = ({data})=>{
         const jsonMatch = result.response.text().match(/{[\s\S]*}/);
         const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
     
-        const jsonObject = JSON.parse(jsonString); // המרה לאובייקט JSON
-        console.log("after parsing in try\n"+ jsonObject);
+        const jsonTripObject = JSON.parse(jsonString); // המרה לאובייקט JSON
+        console.log("after parsing testttt\n"+ jsonTripObject);
+
+        ///my newwwwwwwww test
+        setallTripData(jsonTripObject);
+                //test
+        // עדכון ה-Context עם פרטי הטיול testtttt!!!
+        setTripDetails(parsedData);
+
+        console.log("after parsing in try\n"+ jsonTripObject);
         //console.log("Vacation location:);
       } catch (error) {
         console.error("Failed to send message:", error);

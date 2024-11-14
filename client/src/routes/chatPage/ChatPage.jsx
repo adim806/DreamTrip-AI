@@ -7,6 +7,9 @@ import { IKImage } from 'imagekitio-react';
 import React, { useContext, useEffect } from 'react';
 import InfoSection from '../view-trip/compo/infoSection';
 import { TripContext, TripProvider } from '@/components/tripcontext/TripProvider';
+import Hotels from '../view-trip/compo/Hotels';
+import PlacesToVisit from '../view-trip/compo/PlacesToVisit';
+import Footer from '../view-trip/compo/Footer';
 
 /**
  * ChatPage Component
@@ -35,7 +38,7 @@ const ChatPage = () => {
   const path= useLocation().pathname;
   const chatId= path.split("/").pop();
 
-  const { tripDetails } = useContext(TripContext);
+  const { tripDetails,allTripData } = useContext(TripContext);
 
   const { isPending, error, data } = useQuery({
     queryKey: ["chat", chatId],
@@ -61,11 +64,21 @@ const ChatPage = () => {
     
     <div className="chatPage ">
       
-      <div className='topContent p-10 md:px-20 lg:px-44 xl:px-56 h-screen overflow-y-scroll'>
+      <div className='topContent '>
 
         {/* Information section <InfoSection trip={trip}/>*/}
-        <InfoSection trip={tripDetails} />
-            
+        <InfoSection trip={tripDetails} alltrip={allTripData} />
+
+        {/* hotel section <Hotels trip={tripDetails}/>*/}
+        
+        <Hotels trip={tripDetails} alltrip={allTripData}/>
+        
+        {/* daily plan <PlacesToVisit trip={tripDetails}/>*/}
+       
+
+        {/* footer <Footer/> */}
+        
+                    
       </div>
 
       <div className="wrapper">
