@@ -5,9 +5,11 @@ export const TripContext = createContext();
 
 export function TripProvider({ children }) {
   const [tripDetails, setTripDetails] = useState(null);
+  const [allTripData, setallTripData] = useState(null);
+
 
   return (
-    <TripContext.Provider value={{ tripDetails, setTripDetails }}>
+    <TripContext.Provider value={{ tripDetails, setTripDetails,allTripData, setallTripData }}>
       {children}
     </TripContext.Provider>
   );

@@ -34,7 +34,7 @@ const Viewtrip = () => {
     };
   
   return (
-    <div className='p-10 md:px-20 lg:px-44 xl:px-56 h-screen overflow-y-scroll'>
+    <div className='flex p-10 md:px-20 lg:px-44 xl:px-56 h-screen overflow-y-scroll'>
       {/* Information section */}
       <InfoSection trip={trip}/>
 

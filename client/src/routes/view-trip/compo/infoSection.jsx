@@ -1,20 +1,45 @@
+import { TripContext } from '@/components/tripcontext/TripProvider';
 import { Button } from '@/components/ui/button';
 import { getPlaceDetails, PHOTO_REF_URL } from '@/service/GlobalApi';
 import { data } from 'autoprefixer';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { IoIosSend } from "react-icons/io";
 
 
-const InfoSection = ({trip}) => {
-  console.log("IN infoSection FUNCTION");
-  console.log(trip);
+const InfoSection = ({trip,alltrip}) => {
+  console.log("IN infoSection111 FUNCTION");
+  //console.log("trip:"+trip?);
+
+  //console.log("alltrip:"+alltrip?);
+  //console.dir(alltrip?);
+
+
+  console.log("hotels:"+alltrip?.hotels[0]);
+  // הדפסת מערך המלונות כולו בפורמט JSON עם ריווח
+  console.log(JSON.stringify(alltrip?.hotels, null, 2));
+  console.log("starting forEACH\n");
+
+  //test succ for printing the hotel from obj trip data print hotels details
+  alltrip?.hotels?.forEach((hotel, index) => {
+    console.log(`Hotel ${index + 1}:`);
+    console.log(`  Name: ${hotel.name}`);
+    console.log(`  Rating: ${hotel.rating}`);
+    console.log(`  Location: ${hotel.location}`);
+  });
+
+  //let tempData= JSON.stringify(alltrip);
+  //console.log("before parse alltrip:"+ JSON.parse(JSON.stringify(alltrip)));
+
+  //console.log(tempData);
+  //console.log("my tripObject with stringfy:\n" + JSON.stringify(alltrip));
+  //console.log("type of:\n" + typeof tempData);
 
 
   const [photo_url, setPhotoUrl] = useState();
   useEffect(()=>{
     trip&&getPlacePhoto();
     
-  },[trip])
+  },[trip,alltrip])
   
 
 
@@ -33,7 +58,9 @@ const InfoSection = ({trip}) => {
  
   
   return (
-    <div>
+    <>
+    
+    <div className='photoHOTEL #073c13'>
       <img src={photo_url?photo_url:"/place_holder.jpeg"} className='h-[360px] w-full object-cover rounded-xl' />
       <div className="flex justify-between items-center">
         <div className='my-5 flex flex-col gap-2'>
@@ -49,7 +76,14 @@ const InfoSection = ({trip}) => {
         <Button><IoIosSend /> </Button>
 
       </div>
+      
     </div>
+    
+    <div>
+        
+    </div>
+    </>
+    
   );
 };
 
