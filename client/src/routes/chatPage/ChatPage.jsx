@@ -59,27 +59,28 @@ const ChatPage = () => {
 
 
   return (
+    <>
 
+    <div className='topContent '>
+
+    {/* Information section <InfoSection trip={trip}/>*/}
+    <InfoSection trip={tripDetails} alltrip={allTripData} />
+
+    {/* hotel section <Hotels trip={tripDetails}/>*/}
     
+    <Hotels trip={tripDetails} alltrip={allTripData}/>
     
-    <div className="chatPage ">
+    {/* daily plan <PlacesToVisit trip={tripDetails}/>*/}
+   
+
+    {/* footer <Footer/> */}
+    
+                
+  </div>
+    
+    <div className="chatPage bg-fuchsia-900">
       
-      <div className='topContent '>
 
-        {/* Information section <InfoSection trip={trip}/>*/}
-        <InfoSection trip={tripDetails} alltrip={allTripData} />
-
-        {/* hotel section <Hotels trip={tripDetails}/>*/}
-        
-        <Hotels trip={tripDetails} alltrip={allTripData}/>
-        
-        {/* daily plan <PlacesToVisit trip={tripDetails}/>*/}
-       
-
-        {/* footer <Footer/> */}
-        
-                    
-      </div>
 
       <div className="wrapper">
         <div className="chat">
@@ -109,7 +110,7 @@ const ChatPage = () => {
       
     </div>
     
-
+    </>
 
   );
 };

@@ -78,17 +78,34 @@ const NewPromt = ({data})=>{
     const [loading,setloading] = useState(false);
     const navigate = useNavigate();
 
-
+        //this is the main chef of instuction
     ///RON AI DOESNT WORK 
     const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
+
+
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      system_Instruction: `
-        You are a knowledgeable and friendly travel agent called 'RON-AI' and named it ,im specializing in planning customized trips.
+      systemInstruction: `You are a knowledgeable and friendly travel agent called 'Meller-AI' and named it at the begininng,im specializing in planning customized trips.
         Your task is to assist the user with any travel-related questions, whether it's about a destination, 
         activity, local culture, or recommendations for hotels, attractions, and dining options.
+ 
+        Please analyze the user's input and return a JSON object with the following structure:
+        {
+          "mode": "Advice" or "Trip-Building",
+          "status": "Complete" or "Incomplete",
+          "response": "Your detailed response here",
+          "data": {
+            "vacation_location": "string",
+            "duration": "integer",
+            "constraints": {
+              "travel_type": "string",
+              "preferred_activity": "string",
+              "budget": "string"
+            }
+          }
+        }
         `,
-      });
+    });
 
     const chat = model.startChat({
       history: [
@@ -98,8 +115,7 @@ const NewPromt = ({data})=>{
           })) || []) // התוצאה המתקבלת תהיה מערך ריק במקרה ש-data או data.history אינם קיימים
       ],
       
-      generationConfig: {},
-  });
+    });
 
   
     const endRef= useRef(null);
@@ -148,60 +164,46 @@ const NewPromt = ({data})=>{
       },
     });
     
+
+
+    ///not in use!!!
     //////////////////////test func 1
     //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
-    const anlayze_varPROMT = async () => {
+    const anlayze_varPROMT = async (chat,text) => {
       setloading(true);
       //the ideal is to start chat with history and in the systeminsruction att we can present that he will act like a smart trip planner
 
       console.log("IN ANALAYZR varPROMT FUNC");
-      const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-      const modeli = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        systemInstruction: `You are a knowledgeable and friendly travel agent called 'Meller-AI' and named it at the begininng,im specializing in planning customized trips.
-         Your task is to assist the user with any travel-related questions, whether it's about a destination, 
-         activity, local culture, or recommendations for hotels, attractions, and dining options.
-         Please analyze the following text and extract the following information from it:
-         1. The vacation location. 
-         2. Duration of vacation (in days). 
-         3. Additional constraints, if any (preferred vacation type, budget, or specific places).you will return a fixed general structure in JSON format and ask for missed information like destination like smart agent called 'Meller AI'.Take this one just for a example:
-         
-         {"vacation_location": "Thailand" || "destination not specified",
-          "duration": 4 || "duration not specified",
-          "constraints": {
-          "travel_type": "Solo" || "Group" || "not specified",
-          "preferred_activity": "Extreme" || "not specified",
-          "budget": "none" || "Avarage" }
-          }
-          `,
-        });
 
-      //exm for user promt
-      const UserPrompt = "im looking for a vacation in israel for next week for 5 days and we are a group of 5 friends at the age of 27";//i can prevent a case if there is not all the details(if he doesn't enter location and more)
 
-      const result = await modeli.generateContentStream(UserPrompt);
-      let FINAL_TEXT_ANS="";
-      // Print text as it comes in.
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        FINAL_TEXT_ANS+=chunkText;
-      }
-      console.log("The User Prompt: \n"+ UserPrompt);
+        const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
+
+        let FINAL_TEXT_ANS="";
+        // Print text as it comes in.
+        for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          FINAL_TEXT_ANS+=chunkText;
+        }
+        console.log("TEXT_ANS1: \n"+ FINAL_TEXT_ANS);
+        setAnswer(FINAL_TEXT_ANS);
 
       // ניקוי התגובה מכל סימון "```json" או "`"
-      const cleanedResponseText = FINAL_TEXT_ANS.replace(/```json|```/g, "").trim();
-      console.log("Cleaned Response Text: \n", cleanedResponseText);
+      //const cleanedResponseText = FINAL_TEXT_ANS.replace(/```json|```/g, "").trim();
+      //console.log("Cleaned Response Text: \n", cleanedResponseText);
       // Use parsed data as a structured JSON object
       try {
         // Try parsing the text response to JSON
-        const parsedData = JSON.parse(cleanedResponseText);
+        //const parsedData = JSON.parse(cleanedResponseText);
 
         // Use parsed data as a structured JSON object
-        console.log("Parsed JSON Data: \n", parsedData);
-        console.log(typeof parsedData);
+        //console.log("Parsed JSON Data: \n", parsedData);
+        //console.log(typeof parsedData);
 
 
         //EditText_toGenericPrompt(parsedData);
+
+        setloading(false);
+
 
       } catch (error) {
         console.error("Invalid JSON format:", error);
@@ -222,24 +224,26 @@ const NewPromt = ({data})=>{
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
       const modela = genAI.getGenerativeModel({ 
         model: "gemini-1.5-flash",
-        systemInstruction: `You are a knowledgeable and friendly travel agent called 'Meller-AI' and named it ,im specializing in planning customized trips.
-         Your task is to assist the user with any travel-related questions, whether it's about a destination, 
-         activity, local culture, or recommendations for hotels, attractions, and dining options. 
-         Please analyze the following text and extract the following information from it:
-         1. The vacation location. 
-         2. Duration of vacation (in days). 
-         3. Additional constraints, if any (preferred vacation type, budget, or specific places).you will return a fixed general structure in JSON format.Take this one just for a example:
-         
-         {"vacation_location": "Thailand" || "destination not specified",
-          "duration": "4" || "duration not specified",
-          "constraints": {
-          "travel_type": "Solo" || "Group" || "not specified",
-          "preferred_activity": "Extreme" || "not specified",
-          "budget": "none" || "Avarage" }
+        systemInstruction: `
+          You are smart travel agent called 'Meller-AI' . so Please analyze the user's input and return a JSON object with the following structure:
+          {
+            "mode": "Advice" or "Trip-Building",
+            "status": "Complete" or "Incomplete",
+            "response": "Your detailed response here",
+            "data": {
+              "vacation_location": "string",
+              "duration": "integer",
+              "constraints": {
+                "travel_type": "string",
+                "preferred_activity": "string",
+                "budget": "string"
+              }
+            }
           } `,
-        });
+      });
 
       try {
+        setloading(true);
         const result = await modela.generateContentStream(UserPrompt);
         let FINAL_TEXT_ANS="";
         // Print text as it comes in.
@@ -278,8 +282,11 @@ const NewPromt = ({data})=>{
 
               const jsonObject = JSON.parse(jsonString); // המרה לאובייקט JSON
               console.log("before parsing\n"+ jsonObject);
-              console.log("Vacation location: "+ jsonObject?.vacation_location);
-              EditText_toGenericPrompt(jsonObject);
+              console.log("Mode chat: "+ jsonObject?.mode);
+              //EditText_toGenericPrompt(jsonObject);
+              setloading(false);
+
+              return jsonObject;
 
             } catch (error) {
               console.error("Failed to parse JSON:", error.message);
@@ -336,6 +343,8 @@ const NewPromt = ({data})=>{
 
     };
     
+
+    // displays in the info secction
     //new trick to get same data
     const { setTripDetails , setallTripData} = useContext(TripContext);
 
@@ -519,16 +528,13 @@ const NewPromt = ({data})=>{
 
     };
 
-    const ViewTrip = async (parsedData, tripData)=>{
-    };
-
 
 
 
 
     const add = async (text,isInitial) => {
       console.log("IN ADD FUNC");
-      //set the ques user on chat page
+      //maybe to remove this setquest
       if (!isInitial) setQuestion(text);
 
     try {
@@ -543,7 +549,75 @@ const NewPromt = ({data})=>{
           setAnswer(accuumltedtext);
       }
       console.log(accuumltedtext);
-      mutation.mutate();
+      console.log("Try parsing my test: \n");
+          
+
+     // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
+      const jsonMatch = accuumltedtext.match(/{[\s\S]*}/);
+
+      console.log("after match on text: \n" + jsonMatch +"\n"+ typeof jsonMatch);//object
+      console.log("Vacation location: "+ jsonMatch?.mode);
+
+
+
+      //mutation.mutate();
+        
+    } catch (error) {
+      console.error(error);   
+    } 
+    };
+
+    const sendMessageWithRetry = async (chat, text, retries = 3, delay = 2000) => {
+      for (let attempt = 0; attempt < retries; attempt++) {
+          try {
+              const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData, text] : [text]);
+              return result; // Success: return the result
+          } catch (error) {
+              console.error(`Error on attempt ${attempt + 1}:`, error.message);
+  
+              // Check if the error is a 503 and retryable
+              if (attempt < retries - 1 && error.message.includes("503")) {
+                  console.warn(`Retrying in ${delay}ms...`);
+                  await new Promise((resolve) => setTimeout(resolve, delay)); // Delay before retrying
+              } else {
+                  throw error; // If not retryable or last attempt, rethrow the error
+              }
+          }
+      }
+  };
+
+    const add22 = async (text,isInitial) => {
+      console.log("IN ADD22 FUNC");
+      //maybe to remove this setquest
+      if (!isInitial) setQuestion(text);
+
+    try {
+      console.log(text);
+
+      // שימוש במנגנון ה-Retry
+      const result22 = await sendMessageWithRetry(chat, text);
+      ////here i can send my extracted trip data and do present them to the user AND add to DB
+      //const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
+      //console.log(result.response.text);
+      let accuumltedtext="";
+      for await (const chunk of result22.stream) {
+          const chunkText = chunk.text();
+          accuumltedtext+=chunkText;
+          setAnswer(accuumltedtext);
+      }
+      console.log(accuumltedtext);
+      //console.log("Try parsing my test: \n");
+          
+
+     // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
+      //const jsonMatch = accuumltedtext.match(/{[\s\S]*}/);
+
+      //console.log("after match on text: \n" + jsonMatch +"\n"+ typeof jsonMatch);//object
+      //console.log("Vacation location: "+ jsonMatch?.mode);
+
+
+
+      //mutation.mutate();
         
     } catch (error) {
       console.error(error);   
@@ -556,7 +630,37 @@ const NewPromt = ({data})=>{
       console.log("IN HANDLE SUBMIT FUNC");
       const text= e.target.text.value;
       if(!text) return;
-      anlayze_UserPrompt1(text);
+      const analysisResult = await anlayze_UserPrompt1(text);
+      if (!analysisResult) {
+        console.error("Failed to analyze input.");
+        return;
+      }
+      console.log("Analysis Result:", analysisResult);
+      /// need to add object trip with use state hook to keep track of dynamic trip object
+      // need to to build manganon for retry and 503 error
+
+
+      if (analysisResult.mode === "Advice") {
+        console.log("Advice mode detected");
+        //add(text, false); // הוסף את הקלט למודל הראשי וענה תשובה
+      } else if (analysisResult.mode === "Trip-Building") {
+        console.log("Trip-Building mode detected");
+    
+        if (analysisResult.status === "Incomplete") {
+          console.log("Trip details are incomplete, asking for more info...");
+          // שלח שאלה נוספת למשתמש
+          //add(`Please provide additional details: ${analysisResult.response}`, false);
+        } else {
+          console.log("Trip details are complete, generating trip...");
+          //anlayze_varPROMT(chat, text); // עיבוד נוסף ליצירת הטיול
+        }
+      }
+
+
+
+      //anlayze_varPROMT(chat,text);
+
+      //add22(text, false);
       //add(text, false);
       
       
