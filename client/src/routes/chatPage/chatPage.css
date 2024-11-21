@@ -1,85 +1,25 @@
 .chatPage {
-  height: 100%;
   display: flex;
+  width: 27%; /* תופס 40% מהרוחב */
+  height: 99%; /* גובה מלא */
+
   flex-direction: column;
   align-items: center;
-  background-color: #04112d; /* צבע רקע כללי כהה */
-
-  .topContent {
-    display: flex;
-    width: 100vw; /* פריסה לרוחב המסך */
-    height: 50vh; /* גובה חלק עליון */
-    background: linear-gradient(145deg, #04290d, #1b2431); /* גרדיאנט עדין */
-    border-bottom: 5px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
-
-    /* חציית המסך בין המידע והמפה */
-    .info-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 30px;
-      color: #d4e0f5;
-      overflow-y: auto; /* גלילה פנימית */
-      backdrop-filter: blur(10px);
-      background: rgba(255, 255, 255, 0.1); /* רקע שקוף */
-      border-right: 1px solid rgba(255, 255, 255, 0.15);
-
-      /* כותרת מידע */
-      h2 {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #ffffff;
-        text-align: center;
-        margin-bottom: 20px;
-      }
-
-      /* גוף הטקסט */
-      p {
-        font-size: 1.1rem;
-        line-height: 1.6;
-        margin-bottom: 10px;
-      }
-    }
-
-    /* מפה דינמית */
-    .map-container {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(145deg, #0b2545, #2b3c5a);
-
-      /* מסגרת למפה */
-      .map {
-        width: 95%;
-        height: 85%;
-        border-radius: 20px;
-        box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.5);
-        transition: transform 0.3s ease;
-      }
-
-      /* אפקט הגדלה עם ריחוף */
-      .map:hover {
-        transform: scale(1.02);
-      }
-    }
-  }
+  overflow-y: auto; /* גלילה פנימית */
+  position: fixed; /* קיבוע בצד שמאל */
+  left: 1;
+  top: 0;
 
   .wrapper {
     flex: 1;
     overflow-y: scroll;
-    width: 100vw;
+    width: 100%;
     display: flex;
     justify-content: center;
     padding: 20px;
 
     .chat {
-      width: 60%;
+      width: 90%;
       display: flex;
       flex-direction: column;
       gap: 20px;
@@ -98,6 +38,67 @@
           align-self: flex-end;
         }
       }
+    }
+  }
+}
+
+.topContent {
+  width: 50%; /* תופס את שאר הרוחב */
+  height: 99%; /* גובה מלא */
+  display: flex;
+  flex-direction: column;
+  position: fixed; /* קיבוע בצד ימין */
+  right: 0;
+  top: 0;
+  background: linear-gradient(145deg, #103d77, #023179); /* גרדיאנט עדין */
+  border-left: 5px solid rgba(255, 255, 255, 0.15);
+  overflow-y: auto; /* גלילה פנימית */
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+
+  .info-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 30px;
+    color: #d4e0f5;
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.1); /* רקע שקוף */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+
+    h2 {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #ffffff;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    p {
+      font-size: 1.1rem;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+  }
+
+  .map-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, #0b2545, #2b3c5a);
+
+    .map {
+      width: 95%;
+      height: 85%;
+      border-radius: 20px;
+      box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.5);
+      transition: transform 0.3s ease;
+    }
+
+    .map:hover {
+      transform: scale(1.02);
     }
   }
 }
