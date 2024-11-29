@@ -1,104 +1,135 @@
-.chatPage {
-  display: flex;
-  width: 27%; /* תופס 40% מהרוחב */
-  height: 99%; /* גובה מלא */
+/* General Chat Container */
+.chat-container {
+  position: fixed;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  background: rgba(30, 30, 46, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  z-index: 1000;
+}
 
-  flex-direction: column;
-  align-items: center;
-  overflow-y: auto; /* גלילה פנימית */
-  position: fixed; /* קיבוע בצד שמאל */
-  left: 1;
-  top: 0;
+/* Open Chat */
+.chat-container.open {
+  height: 80vh;
+  animation: slideIn 0.4s ease forwards;
+}
 
-  .wrapper {
-    flex: 1;
-    overflow-y: scroll;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    padding: 20px;
-
-    .chat {
-      width: 90%;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-
-      .message {
-        padding: 15px 20px;
-        background-color: #233045;
-        border-radius: 12px;
-        color: #ffffff;
-        font-size: 1rem;
-        max-width: 75%;
-        box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.3);
-
-        &.user {
-          background-color: #1d1f28;
-          align-self: flex-end;
-        }
-      }
-    }
+/* Minimized Chat */
+.chat-container.closed {
+  height: 60px;
+  animation: slideOut 0.4s ease forwards;
+}
+@keyframes slideIn {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0%);
   }
 }
 
-.topContent {
-  width: 50%; /* תופס את שאר הרוחב */
-  height: 99%; /* גובה מלא */
+@keyframes slideOut {
+  from {
+    transform: translateY(0%);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* Chat Header */
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: linear-gradient(135deg, #4d5ee2, #30304b);
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 1rem;
+  border-bottom: 1px solid #444;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.chat-header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 1.2rem;
+}
+.chat-header h3 svg {
+  margin-right: 8px;
+  font-size: 1.5rem;
+}
+
+.toggle-button {
+  background: linear-gradient(90deg, #2b0bb9, #0478bb);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-button:hover {
+  background: linear-gradient(90deg, #4d5ee2, #5561c0);
+  transform: scale(1.05);
+}
+
+/* Chat Content */
+.chatPage {
   display: flex;
   flex-direction: column;
-  position: fixed; /* קיבוע בצד ימין */
-  right: 0;
-  top: 0;
-  background: linear-gradient(145deg, #103d77, #023179); /* גרדיאנט עדין */
-  border-left: 5px solid rgba(255, 255, 255, 0.15);
-  overflow-y: auto; /* גלילה פנימית */
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  height: calc(100% - 50px);
+  overflow-y: auto;
+  background: #292945;
+}
 
-  .info-section {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 30px;
-    color: #d4e0f5;
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.1); /* רקע שקוף */
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+.chatPage .wrapper {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+}
 
-    h2 {
-      font-size: 2rem;
-      font-weight: bold;
-      color: #ffffff;
-      text-align: center;
-      margin-bottom: 20px;
-    }
+.chatPage .chat {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
 
-    p {
-      font-size: 1.1rem;
-      line-height: 1.6;
-      margin-bottom: 10px;
-    }
+.message {
+  padding: 12px 18px;
+  background-color: #2b3c5a;
+  border-radius: 15px;
+  color: #ffffff;
+  font-size: 1rem;
+  max-width: 75%;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 0.5s ease;
+  line-height: 1.5;
+}
+
+.message.user {
+  background-color: #5561c0;
+  color: #f9f9f9;
+  align-self: flex-end;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
-
-  .map-container {
-    flex: 1;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(145deg, #0b2545, #2b3c5a);
-
-    .map {
-      width: 95%;
-      height: 85%;
-      border-radius: 20px;
-      box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.5);
-      transition: transform 0.3s ease;
-    }
-
-    .map:hover {
-      transform: scale(1.02);
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
