@@ -16,6 +16,7 @@ import { db } from '@/service/firebaseConfig';
 import { useNavigate } from 'react-router-dom';
 import InfoSection from '@/routes/view-trip/compo/InfoSelection2';
 import { TripContext } from '../tripcontext/TripProvider';
+import { sendTunedRequest } from '../tunemodel/TuneModel';
 
 /**
  * NewPromt Component
@@ -169,23 +170,29 @@ const NewPromt = ({data})=>{
     ///not in use!!!
     //////////////////////test func 1
     //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
-    const anlayze_varPROMT = async (chat,text) => {
+    const anlayze_varPROMT = async (text) => {
       setloading(true);
       //the ideal is to start chat with history and in the systeminsruction att we can present that he will act like a smart trip planner
 
-      console.log("IN ANALAYZR varPROMT FUNC");
+      console.log("IN ANALAYZR varPROMT test FUNC");
+
+      const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
+      const modela = genAI.getGenerativeModel({ 
+        model: "tunedModels/copy-of-mymodelo-wkp2udtqu478",
+      });
+      const result = await modela.generateContentStream(text);
+      let FINAL_TEXT_ANS="";
+      // Print text as it comes in.
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        FINAL_TEXT_ANS+=chunkText;
+      }
+      console.log("TEXT_ANS1: \n"+ FINAL_TEXT_ANS);
+        //const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
 
 
-        const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
 
-        let FINAL_TEXT_ANS="";
-        // Print text as it comes in.
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
-          FINAL_TEXT_ANS+=chunkText;
-        }
-        console.log("TEXT_ANS1: \n"+ FINAL_TEXT_ANS);
-        setAnswer(FINAL_TEXT_ANS);
+      setAnswer(FINAL_TEXT_ANS);
 
       // ניקוי התגובה מכל סימון "```json" או "`"
       //const cleanedResponseText = FINAL_TEXT_ANS.replace(/```json|```/g, "").trim();
@@ -361,12 +368,13 @@ const NewPromt = ({data})=>{
       try {
         const GenericPrompt = "Generate Travel Plan for Location: {location}, for {duration} days, for {travel_type} with a {budget} budget. Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for {duration} days with each day plan with best time to visit in JSON format.";
         //here i can create a self object with defult null (phone)
-        const vacation_location = parsedData?.vacation_location || "destination not specified";
+
+        /*
+        const vacation_location = parsedData?.data?.vacation_location || "destination not specified";
         const duration = parsedData?.duration || "duration not specified";
         const travel_type = parsedData.constraints?.travel_type || "not specified";
         const preferred_activity = parsedData.constraints?.preferred_activity || "not specified";
         const budget = parsedData.constraints?.budget || "not specified";
-
         //if vacation_location =="destination not specified: enter locationwhile"
         if(parsedData?.vacation_location=="destination not specified"){
           console.log("Please enter location while generating the Travel Plan.");
@@ -378,13 +386,13 @@ const NewPromt = ({data})=>{
           return "Please enter duration while generating the Travel Plan boyy";
         }
 
-        console.log("Destenation: " + vacation_location);
-        console.log("Duration: " + duration);
-        console.log("Travel Type: " + travel_type);
-        console.log("Preferred Activity: " + preferred_activity);
-        console.log("Budget: " + budget);
-
-        const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.vacation_location).replace(`{duration}`,parsedData?.duration).replace(`{travel_type}`,parsedData.constraints?.travel_type).replace(`{budget}`,parsedData.constraints?.budget).replace(`{duration}`,parsedData?.duration);
+        //console.log("Destenation: " + vacation_location);
+        //console.log("Duration: " + duration);
+        //console.log("Travel Type: " + travel_type);
+        //console.log("Preferred Activity: " + preferred_activity);
+        //console.log("Budget: " + budget);
+        */
+        const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.data?.vacation_location).replace(`{duration}`,parsedData?.data?.duration).replace(`{travel_type}`,parsedData?.data?.constraints?.travel_type).replace(`{budget}`,parsedData?.data?.constraints?.budget).replace(`{duration}`,parsedData?.data?.duration);
 
         
 
@@ -394,7 +402,7 @@ const NewPromt = ({data})=>{
         //return finalPromt
         //const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
         //const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        setAnswer(finalPromt);
+        //setAnswer(finalPromt);
         //maybe to add mutaion to here 
 
         
@@ -462,10 +470,10 @@ const NewPromt = ({data})=>{
         console.log("after parsing testttt\n"+ jsonTripObject);
 
         ///my newwwwwwwww test
-        setallTripData(jsonTripObject);
+        //setallTripData(jsonTripObject);
                 //test
         // עדכון ה-Context עם פרטי הטיול testtttt!!!
-        setTripDetails(parsedData);
+        //setTripDetails(parsedData);
 
         console.log("after parsing in try\n"+ jsonTripObject);
         //console.log("Vacation location:);
@@ -630,11 +638,16 @@ const NewPromt = ({data})=>{
       console.log("IN HANDLE SUBMIT FUNC");
       const text= e.target.text.value;
       if(!text) return;
+
+      //anlayze_varPROMT(text);
+       
       const analysisResult = await anlayze_UserPrompt1(text);
       if (!analysisResult) {
         console.error("Failed to analyze input.");
         return;
       }
+      
+      
       console.log("Analysis Result:", analysisResult);
       /// need to add object trip with use state hook to keep track of dynamic trip object
       // need to to build manganon for retry and 503 error
@@ -645,7 +658,9 @@ const NewPromt = ({data})=>{
         //add(text, false); // הוסף את הקלט למודל הראשי וענה תשובה
       } else if (analysisResult.mode === "Trip-Building") {
         console.log("Trip-Building mode detected");
-    
+        //test 
+        EditText_toGenericPrompt(analysisResult);
+
         if (analysisResult.status === "Incomplete") {
           console.log("Trip details are incomplete, asking for more info...");
           // שלח שאלה נוספת למשתמש
@@ -655,9 +670,16 @@ const NewPromt = ({data})=>{
           //anlayze_varPROMT(chat, text); // עיבוד נוסף ליצירת הטיול
         }
       }
+    
+
+      // try tune model + tunemodel.jsx file
+      try {
+        //const result = await sendTunedRequest(text);
 
 
-
+      } catch (error) {
+        console.log(error.message);
+      }
       //anlayze_varPROMT(chat,text);
 
       //add22(text, false);

@@ -73,7 +73,7 @@ const router = createBrowserRouter([
             element:<ViewTripData/>
           },
           {
-            //need to switch or merge with dashboard the trip
+            //need to switch or merge with dashboard the trip(test from the inidian guy)
             path: "/createTrip/view-trip/:tripID",
             element:<Viewtrip/>
           },

@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import './chatList.css';
 import { Link } from 'react-router-dom';
-
+import { MdTravelExplore } from "react-icons/md";
+import { MdOutlineMenuBook } from "react-icons/md";
 
 /**
  * ChatList Component
@@ -43,10 +44,12 @@ const ChatList = () =>{
 
     return (
         <div className="chatList">
-            <span className="title">DashBoard</span>
+            <span className="title"><MdOutlineMenuBook />
+            Menu</span>
             <Link to="/dashboard">Create a new chat</Link>        
             <Link to="/">Explore Meller AI</Link>  
             <Link to="/">Contact</Link>  
+            <Link to="/">My Trips <MdTravelExplore /></Link> 
             <hr/>
             <span className="title">Recent Chats</span>
             <div className="list">
