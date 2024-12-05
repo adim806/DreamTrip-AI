@@ -10,7 +10,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Button } from '../ui/button';
 //import { Button } from "@/components/ui/button";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-//import Aitrips from '../../../../backend/models/AiTrips.js';
 import { doc, setDoc } from "firebase/firestore";
 import { db } from '@/service/firebaseConfig';
 import { useNavigate } from 'react-router-dom';
@@ -79,10 +78,8 @@ const NewPromt = ({data})=>{
     const [loading,setloading] = useState(false);
     const navigate = useNavigate();
 
-        //this is the main chef of instuction
-    ///RON AI DOESNT WORK 
+    //this is the main model (model_1)
     const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-
 
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
@@ -170,56 +167,7 @@ const NewPromt = ({data})=>{
     ///not in use!!!
     //////////////////////test func 1
     //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
-    const anlayze_varPROMT = async (text) => {
-      setloading(true);
-      //the ideal is to start chat with history and in the systeminsruction att we can present that he will act like a smart trip planner
-
-      console.log("IN ANALAYZR varPROMT test FUNC");
-
-      const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-      const modela = genAI.getGenerativeModel({ 
-        model: "tunedModels/copy-of-mymodelo-wkp2udtqu478",
-      });
-      const result = await modela.generateContentStream(text);
-      let FINAL_TEXT_ANS="";
-      // Print text as it comes in.
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        FINAL_TEXT_ANS+=chunkText;
-      }
-      console.log("TEXT_ANS1: \n"+ FINAL_TEXT_ANS);
-        //const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
-
-
-
-      setAnswer(FINAL_TEXT_ANS);
-
-      // ניקוי התגובה מכל סימון "```json" או "`"
-      //const cleanedResponseText = FINAL_TEXT_ANS.replace(/```json|```/g, "").trim();
-      //console.log("Cleaned Response Text: \n", cleanedResponseText);
-      // Use parsed data as a structured JSON object
-      try {
-        // Try parsing the text response to JSON
-        //const parsedData = JSON.parse(cleanedResponseText);
-
-        // Use parsed data as a structured JSON object
-        //console.log("Parsed JSON Data: \n", parsedData);
-        //console.log(typeof parsedData);
-
-
-        //EditText_toGenericPrompt(parsedData);
-
-        setloading(false);
-
-
-      } catch (error) {
-        console.error("Invalid JSON format:", error);
-        return null;
-      }
-
-    };
-        // my real func
-        //////////////////////test func 1 
+    // model_2
     //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
     const anlayze_UserPrompt1 = async (UserPrompt) => {
       //setloading(true);
@@ -232,6 +180,41 @@ const NewPromt = ({data})=>{
       const modela = genAI.getGenerativeModel({ 
         model: "gemini-1.5-flash",
         systemInstruction: `
+        You are a smart travel agent called 'Meller-AI'. Analyze the user's input and classify it into a structured format to prepare for detailed trip planning.
+
+        Return a JSON object with the following structure:
+        {
+          "mode": "Advice" or "Trip-Building", // Determines if the user needs advice or a detailed travel plan
+          "status": "Complete" or "Incomplete", // Whether enough information has been provided
+          "response": "Your detailed response here if clarification is needed", // Suggestion or clarification message
+          "data": {
+            "vacation_location": "string", // Destination specified by the user
+            "duration": "integer", // Number of days for the trip
+            "constraints": {
+              "travel_type": "string", // e.g., Couple, Family, Solo Traveler, Adventure
+              "preferred_activity": "string", // Specific activity preference, e.g., Nature, Museums, Shopping
+              "budget": "string", // Budget level: Cheap, Moderate, Luxury
+              "special_requirements": [ // List of special requirements (new addition)
+                "Eco-Friendly",
+                "Accessible for Disabilities",
+                "Kid-Friendly",
+                "Pet-Friendly",
+                "Avoid long walks",
+                "Close to transportation",
+                "Vegetarian/Vegan dining"
+              ]
+            },
+            "preferences": { // Additional preferences for detailed planning (new section)
+              "hotel_preferences": "string", // e.g., '5-star hotels', 'Budget-friendly', 'Near city center'
+              "dining_preferences": "string", // e.g., 'Vegan', 'Local cuisine'
+              "transportation_mode": "string" // e.g., 'Public transport', 'Car rental'
+            },
+            "notes": "string" // Any free-text notes from the user (new field)
+          }
+        }`,
+      });
+      /*
+       systemInstruction: `
           You are smart travel agent called 'Meller-AI' . so Please analyze the user's input and return a JSON object with the following structure:
           {
             "mode": "Advice" or "Trip-Building",
@@ -246,8 +229,7 @@ const NewPromt = ({data})=>{
                 "budget": "string"
               }
             }
-          } `,
-      });
+          } ` */
 
       try {
         setloading(true);
@@ -259,6 +241,9 @@ const NewPromt = ({data})=>{
           FINAL_TEXT_ANS+=chunkText;
         }
         console.log("TEXT_ANS1: \n"+ FINAL_TEXT_ANS);
+
+        console.log("result: \n"+ result.stream.toString());
+
         setAnswer(FINAL_TEXT_ANS);
 
         ///NEED TO THINK ABOUT SAVING STATE WHEN WE HAVE ALL THE DATA WE CAN MOVE ON TO DISPLAY TRIPdata-
@@ -290,6 +275,7 @@ const NewPromt = ({data})=>{
               const jsonObject = JSON.parse(jsonString); // המרה לאובייקט JSON
               console.log("before parsing\n"+ jsonObject);
               console.log("Mode chat: "+ jsonObject?.mode);
+              console.log("vacation_location: "+ jsonObject?.data?.vacation_location);
               //EditText_toGenericPrompt(jsonObject);
               setloading(false);
 
@@ -304,23 +290,6 @@ const NewPromt = ({data})=>{
           //else ---> we dont get back json format(jsonmatch==null) and that means we didnt fully data trip so we need to ask again
           console.log("in jsonmatch else statement:\n");//object
 
-
-          // ניקוי התגובה מכל סימון "```json" או "`"
-          //const cleanedResponseText = FINAL_TEXT_ANS
-          //.replace(/```json|```/g, "") // הסרת "```json" ו-"```"
-          //.replace(/\\n/g, "") // הסרת תווי שורה חדשה
-          //.replace(/\s\s+/g, " ") // הסרת רווחים מרובים
-          //.trim();
-
-          //console.log("after cleaned text:\n " + cleanedResponseText);
-
-          //console.log("after1111 cleaned text:\n");
-          //const cleanedResponseText = FINAL_TEXT_ANS.replace(/```json|```/g, "").trim();
-              // ודא שהמחרוזת מתחילה ומסתיימת בסוגריים מסולסלים
-          //if (!cleanedResponseText.startsWith("{") || !cleanedResponseText.endsWith("}")) {
-            //console.error("Invalid JSON format: Missing curly braces.");
-            //return null;
-          //}  
           
           //console.log("Cleaned Response Text: \n", cleanedResponseText);
           //console.log(typeof parsedResponseText);
@@ -358,15 +327,39 @@ const NewPromt = ({data})=>{
 
     
     /////////////test func 2!!
-    const EditText_toGenericPrompt = async(parsedData) => {
+    const generatePromptFromObject = async(tripDetails) => {
       
       ////i need to add use affect maybe when action ON SERVER change
-
-      console.log("In EditText_toGenericPrompt function: \n");
-
-
+      //need to sync the tripDATA that return from the analayzed model
+      console.log("In generatePromptFromObject function: \n");
+      // מגדירים ברירות מחדל עבור השדות במקרה שהם חסרים באובייקט
+      const {
+        destination = "Unknown Destination",
+        duration = 1,
+        travelType = "General",
+        budget = "Moderate",
+        mode = "Regular",
+        constraints = "",
+        requests = ""
+      } = tripDetails;
       try {
-        const GenericPrompt = "Generate Travel Plan for Location: {location}, for {duration} days, for {travel_type} with a {budget} budget. Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for {duration} days with each day plan with best time to visit in JSON format.";
+        return `
+        Generate a detailed travel plan for the following trip:
+
+        - **Location**: ${destination}.
+        - **Duration**: ${duration} Days.
+        - **Travel Type**: ${travelType}.
+        - **Budget**: ${budget}.
+        - **Mode (Trip Type)**: ${mode}.
+
+        ### Special Constraints:
+        ${constraints ? constraints : "No specific constraints provided."}
+
+        ### Additional Requests:
+        ${requests ? requests : "No additional requests provided."}
+          `;
+
+        //const GenericPrompt = "Generate Travel Plan for Location: {location}, for {duration} days, for {travel_type} with a {budget} budget. Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for {duration} days with each day plan with best time to visit in JSON format.";
         //here i can create a self object with defult null (phone)
 
         /*
@@ -392,13 +385,15 @@ const NewPromt = ({data})=>{
         //console.log("Preferred Activity: " + preferred_activity);
         //console.log("Budget: " + budget);
         */
-        const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.data?.vacation_location).replace(`{duration}`,parsedData?.data?.duration).replace(`{travel_type}`,parsedData?.data?.constraints?.travel_type).replace(`{budget}`,parsedData?.data?.constraints?.budget).replace(`{duration}`,parsedData?.data?.duration);
+        //const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.data?.vacation_location).replace(`{duration}`,parsedData?.data?.duration).replace(`{travel_type}`,parsedData?.data?.constraints?.travel_type).replace(`{budget}`,parsedData?.data?.constraints?.budget).replace(`{duration}`,parsedData?.data?.duration);
 
         
 
 
-        console.log(finalPromt);
-        BuildPlanAI(finalPromt,parsedData);
+        //console.log(finalPromt);
+        ///////////
+
+        //BuildPlanAI(finalPromt,parsedData);
         //return finalPromt
         //const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
         //const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -414,8 +409,8 @@ const NewPromt = ({data})=>{
 
     };
     const [isLoading, setIsLoading] = useState(false);
-    /////test func 3!!!
-    const BuildPlanAI= async(finalPromt_str,parsedData)=>{
+    /////Original build plan ai  func 3!!!
+    const BuildPlanAI_1= async(finalPromt_str,parsedData)=>{
       console.log("IN textTOgeneric FUNCTION");
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
       const model = genAI.getGenerativeModel({
@@ -505,6 +500,90 @@ const NewPromt = ({data})=>{
       //SaveTrips(parsedData,result?.response?.text());
       console.log("after save function called");
     };
+    /////my test build plan ai  func 3!!!
+    const BuildPlanAI_2= async(finalPromt_str,parsedData)=>{
+      console.log("BuildPlanAI_2 FUNCTION");
+
+
+      const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
+      const model_3 = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: "You are a highly skilled travel planner specializing in creating personalized travel itineraries. Your goal is to generate a structured travel plan based on user input, including dynamic constraints and preferences.\n\n### Instructions:\n1. Always prioritize the user's preferences and constraints when generating the plan. These may include:\n   - **Location**: The travel destination.\n   - **Duration**: The number of days for the trip.\n   - **Travel Type**: (e.g., Couple, Family, Solo Traveler, Adventure, etc.).\n   - **Budget**: (e.g., Cheap, Moderate, Luxury).\n   - **Special Constraints**: \n     - Eco-friendly options (e.g., walking routes, green hotels).\n     - Accessibility for disabilities (e.g., wheelchair-friendly routes).\n     - Kid-friendly activities (e.g., amusement parks, playgrounds).\n   - **Specific User Requests**:\n     - Dining preferences (e.g., vegetarian/vegan options).\n     - Avoiding certain activities (e.g., \"Avoid long walking distances\").\n     - Hotel preferences (e.g., \"Close to city center\").\n\n2. **Structure the Travel Plan**:\n   - **Hotels**:\n     - Provide a list of 5-8 recommended hotels with the following details:\n       - Hotel_Name\n       - Hotel_Address\n       - Price_range\n       - Hotel_Image URL\n       - Geo_Coordinates\n       - Hotel_Rating (out of 5)\n       - Short description (e.g., unique features or benefits)\n   - **Daily Itinerary**:\n     - Divide each day into **morning**, **afternoon**, and **evening** activities.\n     - For each activity, include:\n       - Name of the activity or attraction\n       - Detailed description\n       - Recommended start time and duration\n       - Image URL\n       - Geo Coordinates\n       - Ticket pricing (if applicable)\n       - Rating (out of 5)\n     - Include dining recommendations for lunch and dinner with:\n       - Restaurant Name\n       - Address\n       - Cuisine Type\n       - Price Range (e.g., Cheap, Moderate, Expensive)\n   - **Additional Details**:\n     - Best time to visit each location (if season-specific).\n     - Estimated travel time between activities (by car, public transport, or walking).\n     - Special tips for the user (e.g., \"Arrive early to avoid crowds\").\n\n3. **Dynamic Handling**:\n   - If user constraints or preferences are incomplete, provide a follow-up question to clarify missing details.\n   - If no constraints are provided, assume standard recommendations based on popular trends and budget.\n   - If conflicts exist between constraints (e.g., eco-friendly but luxury travel), prioritize the user’s stated **preferences**.\n\n4. **Return Format**:\nReturn all information in the following **JSON structure**:\n```json\n{\n  \"hotels\": [\n    {\n      \"Hotel_Name\": \"string\",\n      \"Hotel_address\": \"string\",\n      \"price_range\": \"string\",\n      \"image_url\": \"string\",\n      \"geo_coordinates\": \"string\",\n      \"Hotel_rating\": \"float\",\n      \"Hotel_description\": \"string\"\n    }\n  ],\n  \"itinerary\": [\n    {\n      \"day\": 1,\n      \"morning\": [\n        {\n          \"activity_name\": \"string\",\n          \"description\": \"string\",\n          \"start_time\": \"string\",\n          \"duration\": \"string\",\n          \"image_url\": \"string\",\n          \"geo_coordinates\": \"string\",\n          \"ticket_pricing\": \"string\",\n          \"rating\": \"float\"\n        }\n      ],\n      \"afternoon\": [\n        // same structure as morning\n      ],\n      \"evening\": [\n        // same structure as morning\n      ]\n    }\n  ],\n  \"additional_details\": {\n    \"best_time_to_visit\": \"string\",\n    \"estimated_travel_times\": \"string\",\n    \"accessibility_options\": \"string\",\n    \"eco_friendly_options\": \"string\"\n  }\n}\n",
+      });
+
+      const generationConfig = {
+        temperature: 1,
+        topP: 0.95,
+        topK: 64,
+        maxOutputTokens: 8192,
+        responseMimeType: "application/json",
+      };
+
+      const chatSession = model.startChat({
+        generationConfig,
+        history: [
+          {
+            role: "user",
+            parts: [
+              {text: "Generate a detailed travel plan for the following trip:\n\n-Location: Kyoto, Japan.\n\n-Duration: 7 Days.\n\n-Travel Type: Family.\n\n-Budget: Moderate.\n\n-Mode (Trip Type): Kid-Friendly.\n\n-Special Constraints:\nInclude stroller-friendly attractions.\n\nPrioritize destinations with short walking distances.\n\nAccommodations close to train stations.\n\nAdditional Requests:\nInclude activities suitable for children, such as parks and museums with interactive exhibits.\n\nRecommend family-friendly dining options with kid-friendly menus.\n\nHighlight cultural experiences, such as tea ceremonies or traditional crafts workshops."},
+            ],
+          },
+          {
+            role: "model",
+            parts: [
+              {text: "```json\n{\n  \"hotels\": [\n    {\n      \"Hotel_Name\": \"Kyoto Granbell Hotel\",\n      \"Hotel_address\": \"Shiokoji-sagaru, Kawaramachi-dori, Nakagyo-ku, Kyoto, 604-8191, Japan\",\n      \"price_range\": \"Moderate\",\n      \"image_url\": \"https://www.kyotogranbell.com/images/top/top_img.jpg\",\n      \"geo_coordinates\": \"35.0117° N, 135.7690° E\",\n      \"Hotel_rating\": 4.2,\n      \"Hotel_description\": \"Family-friendly hotel near Kyoto Station with excellent transport links.\"\n    },\n    {\n      \"Hotel_Name\": \"Hotel Gracery Kyoto Sanjo\",\n      \"Hotel_address\": \"525 Sanjo-dori, Nakagyo-ku, Kyoto 604-0922, Japan\",\n      \"price_range\": \"Moderate\",\n      \"image_url\": \"https://expedia.mediacdn.com/media/a6d96514/63a82784/f6819957/7a018583/e4669e04/5b16b2a9/130832793.jpg?impolicy=fcrop&w=1200&h=630&q=80\",\n      \"geo_coordinates\": \"35.0207° N, 135.7665° E\",\n      \"Hotel_rating\": 4.0,\n      \"Hotel_description\": \"Modern hotel near Sanjo Station, offering comfortable rooms and family-friendly amenities.\"\n    },\n    {\n      \"Hotel_Name\": \"Richmond Hotel Premier Kyoto Shijo-Karasuma\",\n      \"Hotel_address\": \"494-1, Shimogyo-ku, Karasuma-dori, Gojo-sagaru, Kyoto, 600-8216, Japan\",\n      \"price_range\": \"Moderate\",\n      \"image_url\": \"https://www.richmondhotels.jp/premier-kyoto-shijo-karasuma/img/top/top_kv_pc_sp.jpg\",\n      \"geo_coordinates\": \"34.9889° N, 135.7551° E\",\n      \"Hotel_rating\": 4.3,\n      \"Hotel_description\": \"Convenient location near Karasuma Station, featuring spacious rooms and family plans.\"\n    }\n    // Add 3 more hotels with similar details.\n  ],\n  \"itinerary\": [\n    {\n      \"day\": 1,\n      \"morning\": [\n        {\n          \"activity_name\": \"Arrival in Kyoto & Check-in\",\n          \"description\": \"Settle into your hotel and leave your luggage.\",\n          \"start_time\": \"10:00 AM\",\n          \"duration\": \"1 hour\",\n          \"image_url\": null,\n          \"geo_coordinates\": null,\n          \"ticket_pricing\": null,\n          \"rating\": null\n        }\n      ],\n      \"afternoon\": [\n        {\n          \"activity_name\": \"Kyoto Railway Museum\",\n          \"description\": \"Interactive exhibits and real train cars, perfect for kids!\",\n          \"start_time\": \"1:00 PM\",\n          \"duration\": \"3 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Kyoto_Railway_Museum.jpg/1280px-Kyoto_Railway_Museum.jpg\",\n          \"geo_coordinates\": \"35.0339° N, 135.7676° E\",\n          \"ticket_pricing\": \"Adult: ¥1200, Child: ¥600\",\n          \"rating\": 4.5\n        }\n      ],\n      \"evening\": [\n        {\n          \"activity_name\": \"Dinner at Musashi Sushi\",\n          \"description\": \"Family-friendly sushi restaurant with a kid's menu.\",\n          \"start_time\": \"6:00 PM\",\n          \"duration\": \"1.5 hours\",\n          \"image_url\": null,\n          \"geo_coordinates\": null,\n          \"ticket_pricing\": \"Moderate\",\n          \"rating\": 4.0\n        }\n      ]\n    },\n    {\n      \"day\": 2,\n      \"morning\": [\n        {\n          \"activity_name\": \"Maruyama Park\",\n          \"description\": \"Stroller-friendly park with a pond and beautiful scenery.\",\n          \"start_time\": \"9:00 AM\",\n          \"duration\": \"2 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Maruyama-park-kyoto-cherry-blossom.jpg/1280px-Maruyama-park-kyoto-cherry-blossom.jpg\",\n          \"geo_coordinates\": \"34.9983° N, 135.7828° E\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.5\n        }\n      ],\n      \"afternoon\": [\n        {\n          \"activity_name\": \"Kyoto National Museum\",\n          \"description\": \"Explore Japanese art and history; some interactive exhibits for kids.\",\n          \"start_time\": \"1:00 PM\",\n          \"duration\": \"3 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Kyoto_National_Museum_%281%29.jpg/1280px-Kyoto_National_Museum_%281%29.jpg\",\n          \"geo_coordinates\": \"35.0180° N, 135.7604° E\",\n          \"ticket_pricing\": \"Adult: ¥620, Child: ¥310\",\n          \"rating\": 4.2\n        }\n      ],\n      \"evening\": [\n        // Add dinner and other activities.\n      ]\n    }\n    // Add days 3-7 with similar structure.  Include Arashiyama Bamboo Grove (stroller friendly paths available),  Fushimi Inari Shrine (many steps, might not be fully stroller-friendly, but parts are accessible),  and a traditional tea ceremony.\n  ],\n  \"additional_details\": {\n    \"best_time_to_visit\": \"Spring (cherry blossoms) or Autumn (fall foliage)\",\n    \"estimated_travel_times\": \"Mostly short distances, easily accessible by public transport.\",\n    \"accessibility_options\": \"Many attractions are stroller-friendly, but check individual websites for details.\",\n    \"eco_friendly_options\": \"Utilize public transport; consider walking or cycling for shorter distances.\"\n  }\n}\n```\n"},
+            ],
+          },
+        ],
+      });
+      console.log("Creating chatSession for Trip promt");
+      //const [isLoading, setIsLoading] = useState(false);
+      /// the text is sending in parts and we can fix it here when we can wait to get the all ans from the api
+      
+      try {
+        setIsLoading(true); // התחל טעינה
+        const result = await chatSession.sendMessage(finalPromt_str);
+        
+        // פעולה לאחר סיום שליחת ההודעה
+        console.log("Message sent successfully:", result.response.text());
+        console.log(result.response.text());
+        console.log(typeof result.response.text());
+
+        setIsLoading(false); // סיים טעינה
+        console.log("in  try after finished the mess:\n");
+
+        // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
+        //const jsonMatch = result.response.text().match(/{[\s\S]*}/);
+        //const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
+    
+        //const jsonTripObject = JSON.parse(jsonString); // המרה לאובייקט JSON
+        //console.log("after parsing testttt\n"+ jsonTripObject);
+
+        ///my newwwwwwwww test
+        //setallTripData(jsonTripObject);
+                //test
+        // עדכון ה-Context עם פרטי הטיול testtttt!!!
+        //setTripDetails(parsedData);
+
+        //console.log("after parsing in try\n"+ jsonTripObject);
+        //i can return the jsonObject according to the response of the model_3 
+        //return jsonObject
+      } catch (error) {
+        console.error("Failed to send message:", error);
+      }finally {
+        //setIsLoading(false); // סיים טעינה
+        
+        //console.log("in (finally) try after finished the mess");
+
+
+      }
+
+      //console.log("before save function called");
+      //SaveTrips(parsedData,result?.response?.text());
+      //console.log("after save function called");
+    };
+
+
 
 
     /////test func 4!!
@@ -640,7 +719,7 @@ const NewPromt = ({data})=>{
       if(!text) return;
 
       //anlayze_varPROMT(text);
-       
+      // use of model_2 in anlayze_UserPrompt1 function for analyzing the user request
       const analysisResult = await anlayze_UserPrompt1(text);
       if (!analysisResult) {
         console.error("Failed to analyze input.");
@@ -652,15 +731,27 @@ const NewPromt = ({data})=>{
       /// need to add object trip with use state hook to keep track of dynamic trip object
       // need to to build manganon for retry and 503 error
 
-
+      
       if (analysisResult.mode === "Advice") {
         console.log("Advice mode detected");
         //add(text, false); // הוסף את הקלט למודל הראשי וענה תשובה
       } else if (analysisResult.mode === "Trip-Building") {
         console.log("Trip-Building mode detected");
-        //test 
-        EditText_toGenericPrompt(analysisResult);
+        //test -change func name
 
+        // דוגמה לאובייקט שמייצג את פרטי הטיול
+        const tripDetails = {
+          destination: "Barcelona",
+          duration: 5,
+          travelType: "Couple",
+          budget: "Luxury",
+          mode: "Eco-Friendly",
+          constraints: "- Use public transportation\n- Stay in green-certified hotels",
+          requests: "- Include vegan-friendly restaurants\n- Prefer cultural activities",
+        };
+        
+        // use of model_3 in generatePromptFromObject function for generating trip plan 
+        const UserPromt= generatePromptFromObject(analysisResult);
         if (analysisResult.status === "Incomplete") {
           console.log("Trip details are incomplete, asking for more info...");
           // שלח שאלה נוספת למשתמש
@@ -669,9 +760,9 @@ const NewPromt = ({data})=>{
           console.log("Trip details are complete, generating trip...");
           //anlayze_varPROMT(chat, text); // עיבוד נוסף ליצירת הטיול
         }
+        
       }
-    
-
+      
       // try tune model + tunemodel.jsx file
       try {
         //const result = await sendTunedRequest(text);
@@ -717,7 +808,7 @@ const NewPromt = ({data})=>{
             {question && <div className="message user">{question}</div>}
             {answer && <div className="message"><Markdown>{answer}</Markdown></div>}
             
-          {/*MY TEST BUTTON*/}
+          {/*MY TEST BUTTON onClick={anlayze_varPROMT}>
           <>
             <Button
             disabled={loading}
@@ -726,6 +817,7 @@ const NewPromt = ({data})=>{
             <AiOutlineLoading3Quarters className="h-7 w-7 animate-spin" /> :'Generate Trip'}
             </Button>
           </>
+          */}
             
           <div className="endChat" ref={endRef}></div>
 
