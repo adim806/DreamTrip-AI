@@ -635,6 +635,7 @@ const NewPromt = ({data})=>{
           accuumltedtext+=chunkText;
           setAnswer(accuumltedtext);
       }
+      
       console.log(accuumltedtext);
       console.log("Try parsing my test: \n");
           
