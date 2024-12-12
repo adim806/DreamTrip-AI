@@ -10,6 +10,7 @@ import { TripContext } from '@/components/tripcontext/TripProvider';
 import { FcAssistant } from "react-icons/fc";
 import { FaMinus } from "react-icons/fa";
 import { FaPlus } from "react-icons/fa";
+import ViewMap from '../view-trip/compo/ViewMap';
 
 const ChatPage = () => {
   const path = useLocation().pathname;
@@ -81,11 +82,15 @@ const ChatPage = () => {
                     </React.Fragment>
                   ))}
               {data && <NewPromt data={data} />}
+              
             </div>
           </div>
+          
         </div>
+        
       )}
     </div>
+    
   );
 };
 

@@ -15,6 +15,7 @@ import './index.css';
 import CreateTrip from './routes/createTrip/ViewTripData';
 import Viewtrip from './routes/view-trip/[tripID]';
 import ViewTripData from './routes/createTrip/ViewTripData';
+import ViewMap from './routes/view-trip/compo/ViewMap';
 
 /**
  * Main entry point for the React application using Vite and React Router DOM.
@@ -68,19 +69,16 @@ const router = createBrowserRouter([
             path: "/dashboard",
             element:<DashboardPage/>
           },
-          {
-            //need to switch or merge with dashboard the trip
-            element:<ViewTripData/>
-          },
-          {
-            //need to switch or merge with dashboard the trip(test from the inidian guy)
-            path: "/createTrip/view-trip/:tripID",
-            element:<Viewtrip/>
-          },
 
           {
             path:"/dashboard/chats/:id",
-            element: <ChatPage/>
+            element: (
+              <div>
+                <ChatPage />
+                <ViewTripData /> {/* מציגים את המפה לצד הצ'אט */}
+              </div>
+            ),
+            
           }
 
         ]

@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom';
 import './createTrip.css';
 import InfoSection from '../view-trip/compo/InfoSelection2';
+import ViewMap from '../view-trip/compo/ViewMap';
 
 
 const ViewTripData = () => {
@@ -8,9 +9,14 @@ const ViewTripData = () => {
   
   
   return (
-    <div className="CreateTrip p-10 md:px-20 lg:px-44 xl:px-56 h-screen overflow-y-scroll">
-      {/* Information section */}
-      <InfoSection />
+    <div >
+      <div >
+        <ViewMap/>
+
+      </div>
+
+      {/* Information section <InfoSection/>*/}
+      
 
       {/* hotel section <Hotels trip={trip}/>*/}
       

@@ -77,40 +77,90 @@ const NewPromt = ({data})=>{
 
     const [loading,setloading] = useState(false);
     const navigate = useNavigate();
+    const [userOBJ,setUserOBJ] = useState({});
 
     //this is the main model (model_1)
     const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
 
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      systemInstruction: `You are a knowledgeable and friendly travel agent called 'Meller-AI' and named it at the begininng,im specializing in planning customized trips.
-        Your task is to assist the user with any travel-related questions, whether it's about a destination, 
-        activity, local culture, or recommendations for hotels, attractions, and dining options.
- 
-        Please analyze the user's input and return a JSON object with the following structure:
-        {
-          "mode": "Advice" or "Trip-Building",
-          "status": "Complete" or "Incomplete",
-          "response": "Your detailed response here",
-          "data": {
-            "vacation_location": "string",
-            "duration": "integer",
-            "constraints": {
-              "travel_type": "string",
-              "preferred_activity": "string",
-              "budget": "string"
-            }
-          }
-        }
-        `,
-    });
+      systemInstruction: `
+      You are a highly intelligent travel agent called 'Meller-AI'. Your primary goal is to analyze user input, classify it into a structured format, and respond accordingly as a knowledgeable travel assistant.
 
+      ### Tasks:
+      1. **Input Analysis**:
+        - Classify the user's input into one of two modes:
+          - "Advice": For general travel-related queries or advice.
+          - "Trip-Building": For requests requiring a detailed travel plan.
+        - Determine if the input provides complete information or if additional details are required.
+        - Return a structured JSON object with the analyzed input details.
+
+      2. **Responding to User**:
+        - If the mode is "Advice":
+          - Provide detailed and relevant travel advice.
+          - Ask clarifying questions if the input is incomplete.
+        - If the mode is "Trip-Building":
+          - Use the structured data to create or continue a personalized travel plan.
+          - If data is incomplete, ask targeted questions to fill in missing information.
+
+      ### Response Format:
+      Return a JSON object structured as follows:
+      \`\`\`json
+      {
+        "mode": "Advice" or "Trip-Building",
+        "status": "Complete" or "Incomplete",
+        "response": "Your detailed response here if clarification is needed",
+        "data": {
+          "vacation_location": "string",
+          "duration": "integer",
+          "constraints": {
+            "travel_type": "string",
+            "preferred_activity": "string",
+            "budget": "string",
+            "special_requirements": [
+              "Eco-Friendly",
+              "Accessible for Disabilities",
+              "Kid-Friendly",
+              "Pet-Friendly",
+              "Avoid long walks",
+              "Close to transportation",
+              "Vegetarian/Vegan dining"
+            ]
+          },
+          "preferences": {
+            "hotel_preferences": "string",
+            "dining_preferences": "string",
+            "transportation_mode": "string"
+          },
+          "notes": "string"
+        }
+      }
+      \`\`\`
+
+      ### Guidelines:
+      - Always maintain context based on the conversation history.
+      - Respond in a professional, concise, and friendly manner.
+      - Use user-provided constraints and preferences to enhance responses.
+    `,
+    });
+    const generationConfig = {
+      temperature: 1,
+      topP: 0.95,
+      topK: 40,
+      maxOutputTokens: 1200,
+      responseMimeType: "application/json",
+    };
+    //responseMimeType: "application/json" חשובבבב
+    //{ role: "user", parts: [{ text: "Updated context based on the latest analysis." }] },
+    //{ role: "model", parts: [{ text: userOBJ?.response || "Awaiting user input." }] },
     const chat = model.startChat({
+      generationConfig,
       history: [
           ...(data?.history?.map(({ role, parts }) => ({
               role,
               parts: [{ text: parts[0].text }],
-          })) || []) // התוצאה המתקבלת תהיה מערך ריק במקרה ש-data או data.history אינם קיימים
+          })) || []), // התוצאה המתקבלת תהיה מערך ריק במקרה ש-data או data.history אינם קיימים
+
       ],
       
     });
@@ -164,9 +214,8 @@ const NewPromt = ({data})=>{
     
 
 
-    ///not in use!!!
+
     //////////////////////test func 1
-    //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
     // model_2
     //analyze the user promt and extract the relevant data variables and then send in generic structure for ai genrate trip  
     const anlayze_UserPrompt1 = async (UserPrompt) => {
@@ -180,7 +229,7 @@ const NewPromt = ({data})=>{
       const modela = genAI.getGenerativeModel({ 
         model: "gemini-1.5-flash",
         systemInstruction: `
-        You are a smart travel agent called 'Meller-AI'. Analyze the user's input and classify it into a structured format to prepare for detailed trip planning.
+        You are a smart travel agent called 'Meller-AI model 2'. Analyze the user's input and classify it into a structured format to prepare for detailed trip planning.
 
         Return a JSON object with the following structure:
         {
@@ -213,23 +262,6 @@ const NewPromt = ({data})=>{
           }
         }`,
       });
-      /*
-       systemInstruction: `
-          You are smart travel agent called 'Meller-AI' . so Please analyze the user's input and return a JSON object with the following structure:
-          {
-            "mode": "Advice" or "Trip-Building",
-            "status": "Complete" or "Incomplete",
-            "response": "Your detailed response here",
-            "data": {
-              "vacation_location": "string",
-              "duration": "integer",
-              "constraints": {
-                "travel_type": "string",
-                "preferred_activity": "string",
-                "budget": "string"
-              }
-            }
-          } ` */
 
       try {
         setloading(true);
@@ -244,7 +276,7 @@ const NewPromt = ({data})=>{
 
         console.log("result: \n"+ result.stream.toString());
 
-        setAnswer(FINAL_TEXT_ANS);
+        //setAnswer(FINAL_TEXT_ANS);
 
         ///NEED TO THINK ABOUT SAVING STATE WHEN WE HAVE ALL THE DATA WE CAN MOVE ON TO DISPLAY TRIPdata-
 
@@ -289,20 +321,7 @@ const NewPromt = ({data})=>{
 
           //else ---> we dont get back json format(jsonmatch==null) and that means we didnt fully data trip so we need to ask again
           console.log("in jsonmatch else statement:\n");//object
-
-          
-          //console.log("Cleaned Response Text: \n", cleanedResponseText);
-          //console.log(typeof parsedResponseText);
-          // Use parsed data as a structured JSON object
-
-            //const parsedData = JSON.parse(cleanedResponseText);
-    
-            // Use parsed data as a structured JSON object
-            //console.log("Parsed JSON Data: \n", parsedData);
-            //console.log(typeof parsedData);
-    
-    
-            //EditText_toGenericPrompt(parsedData);
+          //EditText_toGenericPrompt(parsedData);
           
         } catch (error) {
           console.error("Invalid JSON format:", error);
@@ -360,31 +379,7 @@ const NewPromt = ({data})=>{
           `;
 
         //const GenericPrompt = "Generate Travel Plan for Location: {location}, for {duration} days, for {travel_type} with a {budget} budget. Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for {duration} days with each day plan with best time to visit in JSON format.";
-        //here i can create a self object with defult null (phone)
 
-        /*
-        const vacation_location = parsedData?.data?.vacation_location || "destination not specified";
-        const duration = parsedData?.duration || "duration not specified";
-        const travel_type = parsedData.constraints?.travel_type || "not specified";
-        const preferred_activity = parsedData.constraints?.preferred_activity || "not specified";
-        const budget = parsedData.constraints?.budget || "not specified";
-        //if vacation_location =="destination not specified: enter locationwhile"
-        if(parsedData?.vacation_location=="destination not specified"){
-          console.log("Please enter location while generating the Travel Plan.");
-          return "Please enter location while generating the Travel Plan boyy";
-        }
-
-        if(parsedData?.duration=="duration not specified"){
-          console.log("Please enter duration while generating the Travel Plan.");
-          return "Please enter duration while generating the Travel Plan boyy";
-        }
-
-        //console.log("Destenation: " + vacation_location);
-        //console.log("Duration: " + duration);
-        //console.log("Travel Type: " + travel_type);
-        //console.log("Preferred Activity: " + preferred_activity);
-        //console.log("Budget: " + budget);
-        */
         //const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.data?.vacation_location).replace(`{duration}`,parsedData?.data?.duration).replace(`{travel_type}`,parsedData?.data?.constraints?.travel_type).replace(`{budget}`,parsedData?.data?.constraints?.budget).replace(`{duration}`,parsedData?.data?.duration);
 
         
@@ -409,7 +404,7 @@ const NewPromt = ({data})=>{
 
     };
     const [isLoading, setIsLoading] = useState(false);
-    /////Original build plan ai  func 3!!!
+    /////Original build plan ai  func 3!!! not the new one
     const BuildPlanAI_1= async(finalPromt_str,parsedData)=>{
       console.log("IN textTOgeneric FUNCTION");
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
@@ -477,30 +472,14 @@ const NewPromt = ({data})=>{
       }finally {
         //setIsLoading(false); // סיים טעינה
         
-        //console.log("in (finally) try after finished the mess");
 
-
-
-        //cleanedText = result.response.text().replace(/```json|```/g, "").trim();
-        //if (!cleanedText.startsWith("{") || !cleanedText.endsWith("}")) {
-          //console.error("Invalid JSON format: Missing curly braces.");
-          
-        //}
-        //console.log("in finally after cleanedText replacement");
-        //console.log(cleanedText);
-
-        //console.log("before parsing data\n");
-       // const jsonObject = JSON.parse(cleanedText);
-       // console.log("after parsing data");
-        //console.log(jsonObject);
-        //console.log(typeof jsonObject);
       }
 
       //console.log("before save function called");
       //SaveTrips(parsedData,result?.response?.text());
       console.log("after save function called");
     };
-    /////my test build plan ai  func 3!!!
+    /////my test build plan ai  func 3!!! my new builder function
     const BuildPlanAI_2= async(finalPromt_str,parsedData)=>{
       console.log("BuildPlanAI_2 FUNCTION");
 
@@ -584,8 +563,6 @@ const NewPromt = ({data})=>{
     };
 
 
-
-
     /////test func 4!!
     const SaveTrips = async (parsedData,tripData)=>{
       console.log("try to save trip data packs:");
@@ -624,94 +601,86 @@ const NewPromt = ({data})=>{
       //maybe to remove this setquest
       if (!isInitial) setQuestion(text);
 
-    try {
-      console.log(text);
-      ////here i can send my extracted trip data and do present them to the user AND add to DB
+      try {
+      console.log("User Input:", text);
+      //console.log("Analysis Result:", analysisResultOBJ);
+
       const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
+      let accuumltedtext="";
+      for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          accuumltedtext+=chunkText;
+          //setAnswer(accuumltedtext);
+      }
+      console.log("Model Response: \n", accuumltedtext);
+
+      const jsonMatch = accuumltedtext.match(/{[\s\S]*}/);
+      
+      if(jsonMatch){
+        const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
+        console.log("jsonMatch[0]: \n" + jsonString +"\n"+ typeof jsonString);//string
+        const jsonObject = JSON.parse(jsonString); // המרה לאובייקט JSON
+        console.log("after parsing\n", jsonObject);
+
+
+        // טיפול במצב ייעוץ או בניית טיול
+        if (jsonObject.mode === "Advice") {
+          console.log("Advie mode detected..  \n", jsonObject.mode);
+          setAnswer(jsonObject.response);
+          //mutation.mutate();
+          return jsonObject;
+        }
+        
+        else if (jsonObject.mode === "Trip-Building") {
+          if(jsonObject.status === "Incomplete"){
+            setAnswer(jsonObject.response); // שאלות להשלמת פרטים
+          }
+          else {
+            console.log("Trip Details Complete. Proceed to build trip plan...");
+          }
+          return jsonObject;
+        }
+        else {
+          console.error("Failed to parse model response.");
+        }
+
+
+      }
+      
+      /*
+
+      
+      // הכנת ההודעה שתשלח למודל 1
+      const chatInput = `
+      User Input: ${text}.
+      Context:
+      Mode: ${analysisResultOBJ?.mode || "Unknown"}.
+      Status: ${analysisResultOBJ?.status || "Unknown"}.
+      System Response: ${analysisResultOBJ?.response || "No additional information."}
+      Data: ${JSON.stringify(analysisResultOBJ?.data || {}, null, 2)} 
+     `;
+
+     console.log("My chatInput: " + chatInput);
+      ////here i can send my extracted trip data and do present them to the user AND add to DB
+      //const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,chatInput] : [chatInput]);
       //console.log(result.response.text);
       let accuumltedtext="";
       for await (const chunk of result.stream) {
           const chunkText = chunk.text();
           accuumltedtext+=chunkText;
-          setAnswer(accuumltedtext);
+          //setAnswer(accuumltedtext);
       }
       
-      console.log(accuumltedtext);
+      console.log("Final ans from model 1: " + accuumltedtext);
       console.log("Try parsing my test: \n");
-          
-
-     // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
-      const jsonMatch = accuumltedtext.match(/{[\s\S]*}/);
-
-      console.log("after match on text: \n" + jsonMatch +"\n"+ typeof jsonMatch);//object
-      console.log("Vacation location: "+ jsonMatch?.mode);
-
-
+      */
 
       //mutation.mutate();
-        
+      
     } catch (error) {
       console.error(error);   
     } 
     };
-
-    const sendMessageWithRetry = async (chat, text, retries = 3, delay = 2000) => {
-      for (let attempt = 0; attempt < retries; attempt++) {
-          try {
-              const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData, text] : [text]);
-              return result; // Success: return the result
-          } catch (error) {
-              console.error(`Error on attempt ${attempt + 1}:`, error.message);
-  
-              // Check if the error is a 503 and retryable
-              if (attempt < retries - 1 && error.message.includes("503")) {
-                  console.warn(`Retrying in ${delay}ms...`);
-                  await new Promise((resolve) => setTimeout(resolve, delay)); // Delay before retrying
-              } else {
-                  throw error; // If not retryable or last attempt, rethrow the error
-              }
-          }
-      }
-  };
-
-    const add22 = async (text,isInitial) => {
-      console.log("IN ADD22 FUNC");
-      //maybe to remove this setquest
-      if (!isInitial) setQuestion(text);
-
-    try {
-      console.log(text);
-
-      // שימוש במנגנון ה-Retry
-      const result22 = await sendMessageWithRetry(chat, text);
-      ////here i can send my extracted trip data and do present them to the user AND add to DB
-      //const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
-      //console.log(result.response.text);
-      let accuumltedtext="";
-      for await (const chunk of result22.stream) {
-          const chunkText = chunk.text();
-          accuumltedtext+=chunkText;
-          setAnswer(accuumltedtext);
-      }
-      console.log(accuumltedtext);
-      //console.log("Try parsing my test: \n");
-          
-
-     // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
-      //const jsonMatch = accuumltedtext.match(/{[\s\S]*}/);
-
-      //console.log("after match on text: \n" + jsonMatch +"\n"+ typeof jsonMatch);//object
-      //console.log("Vacation location: "+ jsonMatch?.mode);
-
-
-
-      //mutation.mutate();
-        
-    } catch (error) {
-      console.error(error);   
-    } 
-    };
-
 
     const handleSubmit = async (e) => {
       e.preventDefault();
@@ -719,24 +688,49 @@ const NewPromt = ({data})=>{
       const text= e.target.text.value;
       if(!text) return;
 
-      //anlayze_varPROMT(text);
+
+
+      const addOBJ = await add(text, false);
+
+      if (!addOBJ) {
+        console.error("Failed to analyze input.");
+        return;
+      }
+      console.log("ADD object:", addOBJ);
+      //add(text, false); // הוסף את הקלט למודל הראשי וענה תשובה
+    
+  
       // use of model_2 in anlayze_UserPrompt1 function for analyzing the user request
+      /*
       const analysisResult = await anlayze_UserPrompt1(text);
       if (!analysisResult) {
         console.error("Failed to analyze input.");
         return;
       }
-      
-      
       console.log("Analysis Result:", analysisResult);
+      
       /// need to add object trip with use state hook to keep track of dynamic trip object
       // need to to build manganon for retry and 503 error
-
       
+      // set the response from model_2 in useState hook for model 1 instructions
+      //setUserOBJ(analysisResult)
       if (analysisResult.mode === "Advice") {
+
         console.log("Advice mode detected");
-        //add(text, false); // הוסף את הקלט למודל הראשי וענה תשובה
+
+        const addOBJ = await add(text, false,analysisResult);
+        if (!addOBJ) {
+          console.error("Failed to analyze input.");
+          return;
+        }
+        console.log("ADD object:", addOBJ);
+        console.log("data: ", addOBJ?.data);
+
+        console.log("advice: ", addOBJ?.advice);
+        console.log("system_response: ", addOBJ?.system_response);
+
       } else if (analysisResult.mode === "Trip-Building") {
+
         console.log("Trip-Building mode detected");
         //test -change func name
 
@@ -751,6 +745,7 @@ const NewPromt = ({data})=>{
           requests: "- Include vegan-friendly restaurants\n- Prefer cultural activities",
         };
         
+        const addOBJ = await add(text, false,analysisResult);
         // use of model_3 in generatePromptFromObject function for generating trip plan 
         const UserPromt= generatePromptFromObject(analysisResult);
         if (analysisResult.status === "Incomplete") {
@@ -764,19 +759,11 @@ const NewPromt = ({data})=>{
         
       }
       
-      // try tune model + tunemodel.jsx file
-      try {
-        //const result = await sendTunedRequest(text);
-
-
-      } catch (error) {
-        console.log(error.message);
-      }
-      //anlayze_varPROMT(chat,text);
 
       //add22(text, false);
       //add(text, false);
       
+      */
       
     };
 
