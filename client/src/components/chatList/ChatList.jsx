@@ -47,7 +47,7 @@ const ChatList = () =>{
             <span className="title"><MdOutlineMenuBook />
             Menu</span>
             <Link to="/dashboard">Create a new chat</Link>        
-            <Link to="/">Explore Meller AI</Link>  
+            <Link to="/">Explore DreamTrip-AI</Link>  
             <Link to="/">Contact</Link>  
             <Link to="/">My Trips <MdTravelExplore /></Link> 
             <hr/>
@@ -64,7 +64,7 @@ const ChatList = () =>{
             <div className="upgrade">
                 <img src="/logo.png" alt="" />
                 <div className="text">   
-                    <span >Upgrade to Meller Ai</span>
+                    <span >Upgrade to PRO DreamTrip-AI</span>
                     <span>Get unlimited access</span>
                 </div>
             </div>

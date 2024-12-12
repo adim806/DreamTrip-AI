@@ -64,7 +64,7 @@ const RootLayout = () => {
           <header>
             <Link to="/" className="logo">
               <img src="/logo.png" alt="" />
-              <span> MELLER AI</span>
+              <span> DreamTrip-AI</span>
             </Link>
             <div className= "user">
               <SignedIn>
