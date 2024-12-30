@@ -28,53 +28,52 @@ Before proceeding, ensure you have the following installed on your machine:
 
 1. Create a `.env` file in the root directory of the project.
 2. Add the following variables to the `.env` file (replace placeholders with actual values):
-   ```
-##env.server
 
-ImageKit API keys
+### `.env.server`
+```
+# ImageKit API keys
 IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/ula6wme9r
 IMAGE_KIT_PUBLIC_KEY=public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
 IMAGE_KIT_PRIVATE_KEY=private_1Sxplsxl+jLklEdO6ZrBDiYDsfU=
 
-URL של הלקוח
+# Client URL
 CLIENT_URL=http://localhost:5173/
 
-MongoDB
+# MongoDB
 MONGO=mongodb+srv://adim806:adim806@cluster0.l3boy.mongodb.net/aichat?retryWrites=true&w=majority&appName=Cluster0
 
-Clerk API keys
+# Clerk API keys
 CLERK_PUBLISHABLE_KEY=pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
 CLERK_SECRET_KEY=sk_test_Jdg1ofwlGhOCiOjYsGKNBarOBUXlP3aPD9zSCJe24T
 ```
+
+### `.env.client`
 ```
-##env.client
-Clerk
+# Clerk
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
 
-ImageKit
+# ImageKit
 VITE_IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/ula6wme9r
 VITE_IMAGE_KIT_PUBLIC_KEY=public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
 
-Gemini API
+# Gemini API
 VITE_GEMINI_PUBLIC_KEY=AIzaSyCDxzwWuQEk-0-YforMIVDp33J-mZaGV9g
 
-API בסיסי
+# Base API
 VITE_API_URL=http://localhost:3000/
 
-Google Places
+# Google Places
 VITE_GOOGLE_PLACE_API_KEY=***REMOVED***
 
-Mapbox
+# Mapbox
 VITE_MAPBOX_TOKEN=pk.eyJ1IjoiYWRpbTgwNiIsImEiOiJjbTNrMndrdXowN2IxMnFxejk2eWd3ZHk1In0.CQ3v2jo0DCBsgNgt3raS1g
 
-OpenWeather
+# OpenWeather
 VITE_OPENWEATHER_API_KEY=e240b46cf715142953c2d07d2476fa06
 
-Foursquare
+# Foursquare
 VITE_FOUR_SQUARE_API_KEY=fsq3k6aPMxVzonJJhdAClLku7ueAzXBZkRUKkkGdvNozHO8=
-
-
-   ```
+```
 
 ## 3. Installing Dependencies
 
@@ -173,3 +172,4 @@ For production, you can use the following steps:
 - For issues or questions, contact the project maintainer at [your-email@example.com](mailto:your-email@example.com).
 
 Enjoy using the project!
+
