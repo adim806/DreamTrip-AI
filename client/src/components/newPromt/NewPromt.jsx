@@ -341,9 +341,9 @@ const NewPromt = ({data})=>{
 
     // displays in the info secction
     //new trick to get same data
-    const { setTripDetails , setallTripData} = useContext(TripContext);
+    const { setTripDetails , setallTripData } = useContext(TripContext);
 
-
+    
     
     /////////////test func 2!!
     const generatePromptFromObject = async(tripDetails) => {
@@ -596,6 +596,7 @@ const NewPromt = ({data})=>{
 
 
 
+    
     const add = async (text,isInitial) => {
       console.log("IN ADD FUNC");
       //maybe to remove this setquest
@@ -625,7 +626,7 @@ const NewPromt = ({data})=>{
 
         // טיפול במצב ייעוץ או בניית טיול
         if (jsonObject.mode === "Advice") {
-          console.log("Advie mode detected..  \n", jsonObject.mode);
+          console.log("Advcie mode detected..  \n", jsonObject.mode);
           setAnswer(jsonObject.response);
           //mutation.mutate();
           return jsonObject;
@@ -633,6 +634,20 @@ const NewPromt = ({data})=>{
         
         else if (jsonObject.mode === "Trip-Building") {
           if(jsonObject.status === "Incomplete"){
+            console.log("Trip-Building mode detected..  \n", jsonObject.mode);
+            console.log(jsonObject?.data); 
+
+
+            ///my newwwwwwwww test
+
+            //setallTripData(jsonObject?.data);
+
+            setTripDetails(jsonObject?.data);
+            
+            //console.log("set trip", tripDetails);
+            //console.log("set trip", allTripData);
+            //console.log("setallTripData\n", allTripData);
+            
             setAnswer(jsonObject.response); // שאלות להשלמת פרטים
           }
           else {
@@ -697,6 +712,14 @@ const NewPromt = ({data})=>{
         return;
       }
       console.log("ADD object:", addOBJ);
+
+
+      //setallTripData(addOBJ);
+
+      //setTripDetails(addOBJ);
+      
+      //console.log("setallTripData\n", tripDetails);
+      //console.log("setallTripData\n", allTripData);
       //add(text, false); // הוסף את הקלט למודל הראשי וענה תשובה
     
   
