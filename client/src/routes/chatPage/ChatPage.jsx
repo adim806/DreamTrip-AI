@@ -5,12 +5,11 @@ import { useLocation } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { IKImage } from 'imagekitio-react';
 import React, { useContext, useEffect, useState } from 'react';
-import InfoSection from '../view-trip/compo/infoSection';
 import { TripContext } from '@/components/tripcontext/TripProvider';
 import { FcAssistant } from "react-icons/fc";
 import { FaMinus } from "react-icons/fa";
 import { FaPlus } from "react-icons/fa";
-import ViewMap from '../view-trip/compo/ViewMap';
+
 
 const ChatPage = () => {
   const path = useLocation().pathname;

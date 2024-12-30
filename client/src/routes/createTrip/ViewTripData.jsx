@@ -1,6 +1,5 @@
-import { useParams } from 'react-router-dom';
+
 import './createTrip.css';
-import InfoSection from '../view-trip/compo/InfoSelection2';
 import ViewMap from '../view-trip/compo/ViewMap';
 import { TripContext, TripProvider } from '@/components/tripcontext/TripProvider';
 import { useContext, useEffect } from 'react';

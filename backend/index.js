@@ -5,9 +5,10 @@ import mongoose from "mongoose";
 import Chat from "./models/chat.js";
 import UserChats from "./models/userChats.js";
 import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
-
+import dotenv from "dotenv";
 const port = process.env.PORT || 3000; // Define server port
 const app = express(); // Create Express application
+dotenv.config();
 
 // Enable CORS with credentials, restricting origins to CLIENT_URL environment variable
 app.use(
@@ -30,11 +31,15 @@ const connect = async () => {
 };
 
 // Configure ImageKit for image handling and authentication
-const imagekit = new ImageKit({
-  urlEndpoint: process.env.IMAGE_KIT_ENDPOINT, // ImageKit URL endpoint
-  publicKey: process.env.IMAGE_KIT_PUBLIC_KEY, // ImageKit public key
-  privateKey: process.env.IMAGE_KIT_PRIVATE_KEY, // ImageKit private key
-});
+try {
+  const imagekit = new ImageKit({
+    publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
+    privateKey: process.env.IMAGE_KIT_PRIVATE_KEY,
+    urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
+  });
+} catch (error) {
+  console.error("Error initializing ImageKit:", error.message);
+}
 
 // Endpoint to provide ImageKit authentication parameters
 app.get("/api/upload", (req, res) => {
