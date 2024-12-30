@@ -3,19 +3,15 @@ import './newPromt.css'
 import { useRef, useEffect} from 'react';
 import  Upload from '../upload/Upload';
 import { IKImage } from 'imagekitio-react';
-//import model from '../../lib/gemini';
+
 import Markdown from 'react-markdown';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Button } from '../ui/button';
-//import { Button } from "@/components/ui/button";
-import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from '@/service/firebaseConfig';
+
+
 import { useNavigate } from 'react-router-dom';
-import InfoSection from '@/routes/view-trip/compo/InfoSelection2';
 import { TripContext } from '../tripcontext/TripProvider';
-import { sendTunedRequest } from '../tunemodel/TuneModel';
+
 
 /**
  * NewPromt Component
@@ -561,40 +557,6 @@ const NewPromt = ({data})=>{
       //SaveTrips(parsedData,result?.response?.text());
       //console.log("after save function called");
     };
-
-
-    /////test func 4!!
-    const SaveTrips = async (parsedData,tripData)=>{
-      console.log("try to save trip data packs:");
-      
-      console.log(parsedData);
-      console.log(tripData);
-     
-      console.log(data._id);
-
-      const docID=Date.now().toString();
-      console.log(docID);
-      try {
-        await setDoc(doc(db, "AiTrips", docID), {
-          userSelection: parsedData,
-          tripData: JSON.parse(tripData),
-          userID: data._id,
-          id:docID,
-        });
-        setloading(false);
-        navigate('/createTrip/view-trip/'+ docID);
-        
-        
-      } catch (error) {
-        console.log(error);
-      }
-
-
-    };
-
-
-
-
 
     
     const add = async (text,isInitial) => {

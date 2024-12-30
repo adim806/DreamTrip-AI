@@ -5,17 +5,13 @@ import { createBrowserRouter ,RouterProvider } from "react-router-dom";
 import HomePage from "./routes/homepage/Homepage";
 import DashboardPage from "./routes/dashboardPage/DashboardPage";
 import ChatPage from "./routes/chatPage/ChatPage";
-
 import SigninPage from "./routes/signinPage/SigninPage";
 import SignUpPage from "./routes/signUpPage/SignUpPage";
-
 import RootLayout from './layouts/rootLayout/RootLayout';
 import DashboardLayout from './layouts/dashboardLayout/DashboardLayout';
 import './index.css';
-import CreateTrip from './routes/createTrip/ViewTripData';
-import Viewtrip from './routes/view-trip/[tripID]';
 import ViewTripData from './routes/createTrip/ViewTripData';
-import ViewMap from './routes/view-trip/compo/ViewMap';
+
 
 /**
  * Main entry point for the React application using Vite and React Router DOM.

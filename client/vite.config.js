@@ -14,4 +14,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    host: "0.0.0.0", // מאפשר גישה מחוץ ל-Docker או ל-localhost
+    port: 5173, // עדיף לוודא שאין קונפליקט עם פורטים אחרים
+    open: true, // פותח אוטומטית את הדפדפן
+    cors: true, // מאפשר גישה עם בקשות CORS
+  },
 });
