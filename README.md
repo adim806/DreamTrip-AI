@@ -28,7 +28,10 @@ Before proceeding, ensure you have the following installed on your machine:
 
 1. Create a `.env` file in the root directory of the project.
 2. Add the following variables to the `.env` file (replace placeholders with actual values):
-   ```ImageKit API keys
+   ```
+##env.server
+
+ImageKit API keys
 IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/ula6wme9r
 IMAGE_KIT_PUBLIC_KEY=public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
 IMAGE_KIT_PRIVATE_KEY=private_1Sxplsxl+jLklEdO6ZrBDiYDsfU=
@@ -43,8 +46,8 @@ Clerk API keys
 CLERK_PUBLISHABLE_KEY=pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
 CLERK_SECRET_KEY=sk_test_Jdg1ofwlGhOCiOjYsGKNBarOBUXlP3aPD9zSCJe24T
 ```
-
-env.client
+```
+##env.client
 Clerk
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
 
