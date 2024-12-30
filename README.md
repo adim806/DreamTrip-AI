@@ -37,7 +37,7 @@ IMAGE_KIT_PUBLIC_KEY=public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
 IMAGE_KIT_PRIVATE_KEY=private_1Sxplsxl+jLklEdO6ZrBDiYDsfU=
 
 # Client URL
-CLIENT_URL=http://localhost:5173/
+CLIENT_URL=http://localhost:5173
 
 # MongoDB
 MONGO=mongodb+srv://adim806:adim806@cluster0.l3boy.mongodb.net/aichat?retryWrites=true&w=majority&appName=Cluster0
@@ -60,7 +60,7 @@ VITE_IMAGE_KIT_PUBLIC_KEY=public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
 VITE_GEMINI_PUBLIC_KEY=AIzaSyCDxzwWuQEk-0-YforMIVDp33J-mZaGV9g
 
 # Base API
-VITE_API_URL=http://localhost:3000/
+VITE_API_URL=http://localhost:3000
 
 # Google Places
 VITE_GOOGLE_PLACE_API_KEY=***REMOVED***
