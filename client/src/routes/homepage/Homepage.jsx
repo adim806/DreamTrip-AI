@@ -1,49 +1,66 @@
-import './homepage.css'
-import { Link } from 'react-router-dom';
-/**
- * Homepage component that serves as the main entry point to the Meller AI application.
- *
- * This component:
- * 1. Displays a welcome message with headings that introduce Meller AI.
- * 2. Provides a **Get Started** link for users to navigate to the Dashboard.
- * 3. Arranges a stylized layout with two main sections:
- *    - **Left Section**: Contains text elements for welcome and introduction.
- *    - **Right Section**: Includes decorative and visual elements, such as images and backgrounds.
- *
- * ### CSS Styling:
- * - The `homepage.css` file manages styling for layout, positioning, and animations.
- *
- * ### Visual Elements:
- * - **orbital.png**: Main background or theme image.
- * - **bot.png**: Represents a visual character or icon, enhancing the interface appeal.
- *
- * <Homepage />
- */
+import { Parallax, ParallaxLayer } from '@react-spring/parallax';
+import './homepage.css';
 
- const Homepage = () => {
-
+const Homepage = () => {
   return (
-    <div className="homepage">
-      <img src="/orbital.png" alt="" className="orbital"/>
-
-      <div className="left">
-        <h1>Welcome to TRAVEL AI</h1>
-        <h2>Supercharge your creativity and productivity</h2>
-        <h3>This is the homepage of Meller AI, Enjoy boy..</h3>
-        <Link to="/dashboard">Get Start</Link>
-      </div>
-
-      <div className="right">
-        <div className="imgContainer"> 
-          <div className="bgContainer">
-            <div className="bg"></div>
-
-          </div>
-          <img src="/travel_logo.jpeg" alt="" className="bott" />
+    <Parallax pages={2}>
+      {/* עמוד 1: תמונת הרקע הראשונה */}
+      <ParallaxLayer
+        offset={0}
+        speed={0.5}
+        factor={1} /* גורם לפיזור רקע מלא */
+        style={{
+          backgroundImage: 'url(/A11.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center top',
+          zIndex: 1,
+        }}
+      >
+        <div className="content-layer">
+          <h1 className="main-title">Welcome to DreamTrip-AI</h1>
+          <p className="subtitle">Your personalized travel assistant</p>
+          <button className="cta-btn">Get Started</button>
         </div>
-      </div>
-    </div>
-  )
-}
+      </ParallaxLayer>
+
+      {/* עמוד 2: ABOUT DreamTrip-AI */}
+      <ParallaxLayer
+        offset={1}
+        speed={0.5}
+        factor={1} /* התאמה לתמונת הרקע השנייה */
+        style={{
+          backgroundImage: 'url(/D1.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center top',
+          zIndex: 2,
+        }}
+      >
+        <div className="about-section">
+          <h2>About DreamTrip-AI</h2>
+          <p>
+            DreamTrip-AI is your ultimate travel assistant, offering AI-driven personalized itineraries. We help you explore the world effortlessly with features tailored to your preferences, budget, and schedule.
+          </p>
+          <div className="features">
+            <div className="feature-item">
+              <img src="/icons/personalized.png" alt="Personalized Trips" />
+              <h3>Personalized Itineraries</h3>
+              <p>Crafted just for you.</p>
+            </div>
+            <div className="feature-item">
+              <img src="/icons/eco-friendly.png" alt="Eco-Friendly" />
+              <h3>Eco-Friendly Travel</h3>
+              <p>Focus on sustainability.</p>
+            </div>
+            <div className="feature-item">
+              <img src="/icons/real-time.png" alt="Real-Time Updates" />
+              <h3>Real-Time Assistance</h3>
+              <p>Stay informed while you travel.</p>
+            </div>
+          </div>
+        </div>
+      </ParallaxLayer>
+    </Parallax>
+  );
+};
 
 export default Homepage;
