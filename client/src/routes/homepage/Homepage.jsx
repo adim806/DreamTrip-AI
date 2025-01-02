@@ -1,65 +1,136 @@
-import { Parallax, ParallaxLayer } from '@react-spring/parallax';
-import './homepage.css';
+import { Parallax, ParallaxLayer } from "@react-spring/parallax";
+import { useSpring, animated } from "react-spring";
+import { useInView } from "react-intersection-observer";
+import "./homepage.css";
+import Footer from "@/components/footer/Footer";
+
+const AnimatedTitle = ({ children }) => {
+  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.5 });
+  const animation = useSpring({
+    opacity: inView ? 1 : 0,
+    transform: inView ? "translateY(0)" : "translateY(50px)",
+  });
+
+  return (
+    <animated.h1
+      style={animation}
+      ref={ref}
+      className="main-title animated-title"
+    >
+      {children}
+    </animated.h1>
+  );
+};
+
+const AnimatedSubtitle = ({ children }) => {
+  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.5 });
+  const animation = useSpring({
+    opacity: inView ? 1 : 0,
+    transform: inView ? "translateY(0)" : "translateY(30px)",
+  });
+
+  return (
+    <animated.p
+      style={animation}
+      ref={ref}
+      className="subtitle animated-subtitle"
+    >
+      {children}
+    </animated.p>
+  );
+};
+
+const AnimatedFeature = ({ icon, title, description }) => {
+  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.5 });
+  const animation = useSpring({
+    opacity: inView ? 1 : 0,
+    transform: inView ? "scale(1)" : "scale(0.8)",
+  });
+
+  return (
+    <animated.div ref={ref} style={animation} className="feature-item">
+      <img src={icon} alt={title} className="feature-icon" />
+      <h3>{title}</h3>
+      <p>{description}</p>
+    </animated.div>
+  );
+};
 
 const Homepage = () => {
   return (
     <Parallax pages={2}>
-      {/* עמוד 1: תמונת הרקע הראשונה */}
+      {/* Page 1: First Background */}
       <ParallaxLayer
         offset={0}
         speed={0.5}
-        factor={1} /* גורם לפיזור רקע מלא */
+        factor={1}
         style={{
-          backgroundImage: 'url(/A11.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          zIndex: 1,
+          backgroundImage: "url(/A11.png)",
+          backgroundSize: "cover",
+          backgroundPosition: "center center",
+          backgroundRepeat: "no-repeat",
+          height: "100vh",
+          width: "100vw",
         }}
       >
         <div className="content-layer">
-          <h1 className="main-title">Welcome to DreamTrip-AI</h1>
-          <p className="subtitle">Your personalized travel assistant</p>
-          <button className="cta-btn">Get Started</button>
+          <AnimatedTitle>Welcome to DreamTrip-AI</AnimatedTitle>
+          <AnimatedSubtitle>
+            Your personalized travel assistant
+          </AnimatedSubtitle>
+          <animated.button className="cta-btn">Plan Your Journey</animated.button>
         </div>
+        <div className="layer-fade"></div>
       </ParallaxLayer>
 
-      {/* עמוד 2: ABOUT DreamTrip-AI */}
+      {/* Page 2: About Section */}
       <ParallaxLayer
         offset={1}
         speed={0.5}
-        factor={1} /* התאמה לתמונת הרקע השנייה */
+        factor={1}
         style={{
-          backgroundImage: 'url(/D1.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          zIndex: 2,
+          backgroundImage: "url(/D1.jpg)",
+          backgroundSize: "cover",
+          backgroundPosition: "center center",
+          backgroundRepeat: "no-repeat",
+          height: "100vh",
+          width: "100vw",
         }}
       >
         <div className="about-section">
-          <h2>About DreamTrip-AI</h2>
-          <p>
-            DreamTrip-AI is your ultimate travel assistant, offering AI-driven personalized itineraries. We help you explore the world effortlessly with features tailored to your preferences, budget, and schedule.
-          </p>
+          <AnimatedTitle>About DreamTrip-AI</AnimatedTitle>
+          <AnimatedSubtitle>
+            DreamTrip-AI helps you explore destinations effortlessly with AI-driven personalized itineraries tailored to your needs.
+          </AnimatedSubtitle>
           <div className="features">
-            <div className="feature-item">
-              <img src="/icons/personalized.png" alt="Personalized Trips" />
-              <h3>Personalized Itineraries</h3>
-              <p>Crafted just for you.</p>
-            </div>
-            <div className="feature-item">
-              <img src="/icons/eco-friendly.png" alt="Eco-Friendly" />
-              <h3>Eco-Friendly Travel</h3>
-              <p>Focus on sustainability.</p>
-            </div>
-            <div className="feature-item">
-              <img src="/icons/real-time.png" alt="Real-Time Updates" />
-              <h3>Real-Time Assistance</h3>
-              <p>Stay informed while you travel.</p>
-            </div>
+            <AnimatedFeature
+              icon="/personalization.png"
+              title="Personalized Trips"
+              description="Tailored experiences crafted just for you."
+            />
+            <AnimatedFeature
+              icon="/environmentalism.png"
+              title="Eco-Friendly Travel"
+              description="Sustainability at the core of every journey."
+            />
+            <AnimatedFeature
+              icon="/real-time.png"
+              title="Real-Time Updates"
+              description="Stay informed with live suggestions."
+            />
+            <AnimatedFeature
+              icon="/cyber-security.png"
+              title="Secure Bookings"
+              description="Book with confidence and ease."
+            />
           </div>
+          <Footer/>
         </div>
+        
       </ParallaxLayer>
+      
     </Parallax>
+    
   );
 };
 

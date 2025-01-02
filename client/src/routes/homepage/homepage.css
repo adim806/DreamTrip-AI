@@ -1,3 +1,4 @@
+/* General Styles */
 body {
   margin: 0;
   font-family: "Arial", sans-serif;
@@ -5,7 +6,7 @@ body {
   background: black;
 }
 
-/* עמוד 1 */
+/* Content Layer: Page 1 */
 .content-layer {
   display: flex;
   flex-direction: column;
@@ -47,7 +48,7 @@ body {
   box-shadow: 0 0 20px #ff6f61, 0 0 40px #ff6f61;
 }
 
-/* עמוד 2 */
+/* About Section: Page 2 */
 .about-section {
   display: flex;
   flex-direction: column;
@@ -55,43 +56,41 @@ body {
   align-items: center;
   height: 100%;
   text-align: center;
-  color: white;
   padding: 40px;
-  background: rgba(0, 0, 0, 0.7); /* שכבת כהות קלה */
-}
-
-.about-section h2 {
-  font-size: 2.5rem;
-  margin-bottom: 20px;
-  text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
-}
-
-.about-section p {
-  font-size: 1.2rem;
-  line-height: 1.6;
-  max-width: 800px;
-  margin-bottom: 30px;
+  color: white;
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .features {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 20px;
-  flex-wrap: wrap;
+  margin-top: 20px;
 }
 
 .feature-item {
   text-align: center;
-  max-width: 200px;
+  max-width: 250px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.feature-item img {
+.feature-item:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.feature-icon {
   width: 80px;
   margin-bottom: 10px;
 }
 
 .feature-item h3 {
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   margin-bottom: 10px;
 }
 
