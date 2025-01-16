@@ -30,7 +30,7 @@
                 background: linear-gradient(to right, #217bfe, #e55571);
                 background-clip: text;
                 -webkit-background-clip: text;
-                color: transparent;
+                color: white;
             }
         }
         .options{

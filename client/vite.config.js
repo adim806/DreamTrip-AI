@@ -9,6 +9,9 @@ const __dirname = path.dirname(__filename); // התיקייה שבה הקובץ 
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ["@react-three/fiber", "three"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

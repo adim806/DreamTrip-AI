@@ -58,12 +58,12 @@ const AnimatedFeature = ({ icon, title, description }) => {
 
 const Homepage = () => {
   return (
-    <Parallax pages={2}>
+    <Parallax pages={4}>
       {/* Page 1: First Background */}
       <ParallaxLayer
         offset={0}
         speed={0.5}
-        factor={1}
+        factor={2}
         style={{
           backgroundImage: "url(/A11.png)",
           backgroundSize: "cover",
@@ -83,9 +83,12 @@ const Homepage = () => {
         <div className="layer-fade"></div>
       </ParallaxLayer>
 
+
+      
+
       {/* Page 2: About Section */}
       <ParallaxLayer
-        offset={1}
+        offset={3}
         speed={0.5}
         factor={1}
         style={{
@@ -124,7 +127,7 @@ const Homepage = () => {
               description="Book with confidence and ease."
             />
           </div>
-          <Footer/>
+          
         </div>
         
       </ParallaxLayer>
