@@ -27,11 +27,10 @@ import { MdOutlineMenuBook } from "react-icons/md";
  * <ChatList />
  * ```
  * 
- * @returns {JSX.Element} ChatList component with navigation and recent chat links
  */
 
 const ChatList = () =>{
-    
+
     const { isPending, error, data } = useQuery({
         queryKey: ['userChats'],
         queryFn: () =>

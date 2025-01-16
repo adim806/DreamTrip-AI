@@ -69,7 +69,7 @@ import { useNavigate } from 'react-router-dom';
       <div className="texts">
         <div className="logo">
           <img src="logo.png" alt="" />
-          <h1>MELLER AI</h1>
+          <h1>DreamTrip-AI</h1>
         </div>
         <div className="options">
           <div className="option">

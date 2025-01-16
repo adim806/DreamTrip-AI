@@ -1,0 +1,172 @@
+/* הגדרות כלליות */
+html,
+body,
+#root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1e1e2f, #0f0f1e);
+  color: #fff;
+  font-family: 'Roboto', sans-serif;
+}
+
+/* כותרת */
+.App-header {
+  background-color: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+  padding: 40px;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  z-index: 1;
+}
+
+.App-header::before {
+  content: '';
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  height: 300px;
+  background: linear-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+  pointer-events: none;
+  z-index: -1;
+}
+
+.App-logo {
+  width: 60px;
+  height: auto;
+  animation: spin 5s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* טקסט מודגש */
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-family: 'Italiana', serif;
+  color: #fff;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.8), 0 4px 10px rgba(0, 0, 0, 0.5);
+  margin-bottom: 32px !important;
+}
+
+h1 {
+  font-size: 80px !important;
+  font-weight: bold;
+
+}
+
+h2 {
+  font-size: 50px !important;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 40px !important;
+}
+
+p {
+  font-family: 'Roboto', sans-serif;
+  color: #fff;
+  font-weight: 300;
+  font-size: 20px;
+  line-height: 1.8em;
+}
+
+/* כפתורים */
+button {
+  background: linear-gradient(45deg, #000786, #066aad);
+  border: none;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 18px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.4);
+}
+
+button:hover {
+  background: linear-gradient(45deg, #173590, #00000a);
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+}
+
+/* אפקטים עבור Sparkles */
+.sparkles {
+  animation: fadeIn 2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* footer */
+footer {
+  position: fixed;
+  height: 200px;
+  bottom: 0px;
+  left: 0px;
+  right: 0px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 1));
+  pointer-events: none;
+  z-index: 9;
+}
+
+/* אפקטים נוספים */
+.row {
+  margin: 20px 0;
+}
+
+h1::after {
+  content: '';
+  display: block;
+  width: 50px;
+  height: 5px;
+  background: #000000;
+  margin: 20px auto;
+  border-radius: 5px;
+}
+/* Remove all animations, transitions and smooth scroll for people that prefer not to see them */
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+   scroll-behavior: auto;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
