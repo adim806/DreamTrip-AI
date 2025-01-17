@@ -32,47 +32,21 @@ Before proceeding, ensure you have the following installed on your machine:
 ### `.env.server`
 ```
 # ImageKit API keys
-IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/ula6wme9r
-IMAGE_KIT_PUBLIC_KEY=public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
-IMAGE_KIT_PRIVATE_KEY=private_1Sxplsxl+jLklEdO6ZrBDiYDsfU=
+
 
 # Client URL
-CLIENT_URL=http://localhost:5173
+
 
 # MongoDB
-MONGO=mongodb+srv://adim806:adim806@cluster0.l3boy.mongodb.net/aichat?retryWrites=true&w=majority&appName=Cluster0
+
 
 # Clerk API keys
-CLERK_PUBLISHABLE_KEY=pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
-CLERK_SECRET_KEY=sk_test_Jdg1ofwlGhOCiOjYsGKNBarOBUXlP3aPD9zSCJe24T
+
 ```
 
 ### `.env.client`
 ```
-# Clerk
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
 
-# ImageKit
-VITE_IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/ula6wme9r
-VITE_IMAGE_KIT_PUBLIC_KEY=public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
-
-# Gemini API
-VITE_GEMINI_PUBLIC_KEY=AIzaSyCDxzwWuQEk-0-YforMIVDp33J-mZaGV9g
-
-# Base API
-VITE_API_URL=http://localhost:3000
-
-# Google Places
-VITE_GOOGLE_PLACE_API_KEY=AIzaSyDz83d6gwqubeCNQGJDh_M6skJnP2Dn_hs
-
-# Mapbox
-VITE_MAPBOX_TOKEN=pk.eyJ1IjoiYWRpbTgwNiIsImEiOiJjbTNrMndrdXowN2IxMnFxejk2eWd3ZHk1In0.CQ3v2jo0DCBsgNgt3raS1g
-
-# OpenWeather
-VITE_OPENWEATHER_API_KEY=e240b46cf715142953c2d07d2476fa06
-
-# Foursquare
-VITE_FOUR_SQUARE_API_KEY=fsq3k6aPMxVzonJJhdAClLku7ueAzXBZkRUKkkGdvNozHO8=
 ```
 
 ## 3. Installing Dependencies
