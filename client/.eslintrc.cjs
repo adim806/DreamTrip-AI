@@ -31,6 +31,8 @@ module.exports = {
           "morphTargetDictionary",
           "morphTargetInfluences",
           "visible",
+          "skeleton",
+          "object",
         ],
       },
     ],

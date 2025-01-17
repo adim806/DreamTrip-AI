@@ -13,40 +13,6 @@ body,
   font-family: 'Roboto', sans-serif;
 }
 
-/* כותרת */
-.App-header {
-  background-color: transparent;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-  padding: 40px;
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  right: 0px;
-  z-index: 1;
-}
-
-.App-header::before {
-  content: '';
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  right: 0px;
-  height: 300px;
-  background: linear-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
-  pointer-events: none;
-  z-index: -1;
-}
-
-.App-logo {
-  width: 60px;
-  height: auto;
-  animation: spin 5s linear infinite;
-}
 
 @keyframes spin {
   0% {
@@ -64,14 +30,14 @@ h3,
 h4,
 h5 {
   font-family: 'Italiana', serif;
-  color: #fff;
+  color: #3f5d76;
   text-shadow: 0 2px 5px rgba(0, 0, 0, 0.8), 0 4px 10px rgba(0, 0, 0, 0.5);
   margin-bottom: 32px !important;
 }
 
 h1 {
-  font-size: 80px !important;
-  font-weight: bold;
+  font-size: 60px !important;
+
 
 }
 
@@ -127,21 +93,7 @@ button:hover {
   }
 }
 
-/* footer */
-footer {
-  position: fixed;
-  height: 200px;
-  bottom: 0px;
-  left: 0px;
-  right: 0px;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 1));
-  pointer-events: none;
-  z-index: 9;
-}
 
-/* אפקטים נוספים */
 .row {
   margin: 20px 0;
 }

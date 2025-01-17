@@ -7,7 +7,8 @@ import {
 } from '@react-three/postprocessing';
 import { Sparkles, Environment } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { dark, neobrutalism, shadesOfPurple } from '@clerk/themes'
+import { dark, neobrutalism, shadesOfPurple } from '@clerk/themes';
+import { Butterfly2 } from "@/models/Butterfly2";
 const SigninPage = () => {
   return (
     <div className="relative w-screen h-screen">
@@ -33,7 +34,7 @@ const SigninPage = () => {
           <Vignette eskil={false} offset={0.001} darkness={1.0} />
         </EffectComposer>
         <color attach="background" args={['#000']} />
-        <ambientLight intensity={2} />
+        <ambientLight intensity={4} />
         <spotLight
           position={[0, 25, 0]}
           angle={1.3}
@@ -43,13 +44,23 @@ const SigninPage = () => {
           shadow-bias={-0.0001}
         />
         <Environment preset="warehouse" />
+        <Butterfly2
+              rotation-x={Math.PI * 0.05}
+              scale={1}
+              position={[-5, -2, 0]}
+            />
+             <Butterfly2
+              rotation-x={Math.PI * 0.05}
+              scale={1}
+              position={[5, 0, 0]}
+            />
         <Sparkles
           noise={0}
           count={1000}
           speed={0.01}
           size={0.6}
           color={'#FFD2BE'}
-          opacity={1.6}
+          opacity={0.5}
           scale={[100, 100, 100]}
         />
         <Sparkles
@@ -58,9 +69,10 @@ const SigninPage = () => {
           speed={0.02}
           size={1}
           color={'#FFF'}
-          opacity={1.6}
+          opacity={0.5}
           scale={[50, 50, 50]}
         />
+
       </Canvas>
 
       {/* SignIn container */}
