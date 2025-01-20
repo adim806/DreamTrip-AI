@@ -171,8 +171,8 @@ const ViewMap = ({ trip }) => {
 
   
   const updateDestination = async () => {
-    if (trip && trip.vacation_location) {
-      const coordinates = await fetchCoordinates(trip.vacation_location);
+    if (trip && trip?.vacation_location) {
+      const coordinates = await fetchCoordinates(trip?.vacation_location);
       if (coordinates) {
         mapRef.current.flyTo({
           center: coordinates,
@@ -217,57 +217,56 @@ const ViewMap = ({ trip }) => {
 
   return (
     <div className="relative flex justify-end">
-      {/* Container for Map and Buttons */}
-      <div
-        className="relative"
-        style={{ width: "600px", height: "87vh", position: "absolute", right: 0 }}
+  <div
+    className="relative"
+    style={{ width: "600px", height: "87vh", position: "absolute", right: 0 }}
+  >
+    {/* Buttons Section */}
+    <div className="absolute top-4 w-full flex flex-col items-center gap-4 z-10 bg-opacity-90 rounded-lg shadow-md">
+      <button
+        className={`px-6 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
+          currentLayer === "restaurants"
+            ? "bg-gradient-to-r from-blue-500 to-blue-700 scale-105"
+            : "bg-gradient-to-r from-blue-300 to-blue-500"
+        } hover:scale-110`}
+        onClick={() => toggleLayer("restaurants")}
       >
-        {/* Buttons Section */}
-        <div className="absolute top-4 w-full flex flex-col items-center gap-4 z-10 bg-opacity-90  rounded-lg shadow-md">
-          <button
-            className={`px-6 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
-              currentLayer === "restaurants"
-                ? "bg-gradient-to-r from-blue-500 to-blue-700 scale-105"
-                : "bg-gradient-to-r from-blue-300 to-blue-500"
-            } hover:scale-110`}
-            onClick={() => toggleLayer("restaurants")}
-          >
-            🍽 Restaurants
-          </button>
-          <button
-            className={`px-6 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
-              currentLayer === "attractions"
-                ? "bg-gradient-to-r from-green-500 to-green-700 scale-105"
-                : "bg-gradient-to-r from-green-300 to-green-500"
-            } hover:scale-110`}
-            onClick={() => toggleLayer("attractions")}
-          >
-            🎡 Attractions
-          </button>
-          <button
-            className={`px-6 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
-              currentLayer === "weather"
-                ? "bg-gradient-to-r from-yellow-500 to-yellow-700 scale-105"
-                : "bg-gradient-to-r from-yellow-300 to-yellow-500"
-            } hover:scale-110`}
-            onClick={() => toggleLayer("weather")}
-          >
-            🌦 Weather
-          </button>
-        </div>
-  
-        {/* Map Container */}
-        <div
-          ref={mapContainerRef}
-          className="absolute bottom-0"
-          style={{
-            width: "100%",
-            height: "calc(100%-50px)",
-            marginTop: "5px",
-          }}
-        ></div>
-      </div>
+        🍽 Restaurants
+      </button>
+      <button
+        className={`px-6 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
+          currentLayer === "attractions"
+            ? "bg-gradient-to-r from-green-500 to-green-700 scale-105"
+            : "bg-gradient-to-r from-green-300 to-green-500"
+        } hover:scale-110`}
+        onClick={() => toggleLayer("attractions")}
+      >
+        🎡 Attractions
+      </button>
+      <button
+        className={`px-6 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
+          currentLayer === "weather"
+            ? "bg-gradient-to-r from-yellow-500 to-yellow-700 scale-105"
+            : "bg-gradient-to-r from-yellow-300 to-yellow-500"
+        } hover:scale-110`}
+        onClick={() => toggleLayer("weather")}
+      >
+        🌦 Weather
+      </button>
     </div>
+
+    {/* Map Container */}
+    <div
+      ref={mapContainerRef}
+      style={{
+        width: "100%",
+        height: "100%",
+        visibility: "visible",
+      }}
+    ></div>
+  </div>
+</div>
+
   );
   
   
