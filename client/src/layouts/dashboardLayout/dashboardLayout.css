@@ -1,7 +1,7 @@
 .DashboardLayout {
   display: flex;
   gap: 50px;
-  padding-top: 20px;
+  padding-top: 3px;
   height: 100%;
 
   .menu {
@@ -9,7 +9,7 @@
     width: 10%;
   }
   .content {
-    flex: 4;
+    flex: 7;
     background-color: #13172a;
   }
 }

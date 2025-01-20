@@ -28,7 +28,7 @@ export function Butterfly2(props) {
           actions.Flying.timeScale = 0.15;
           actions.Flying.play();
         } else {
-          console.warn("Animation 'Flying' לא קיימת.");
+          console.warn("Animation 'Flying' doesnt exist");
         }
       }, [actions]);
   return (
