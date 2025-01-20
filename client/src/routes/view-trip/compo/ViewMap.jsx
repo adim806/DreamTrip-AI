@@ -187,8 +187,8 @@ const ViewMap = ({ trip }) => {
   };
 
   const updateDestination = async () => {
-    if (trip && trip.vacation_location) {
-      const coordinates = await fetchCoordinates(trip.vacation_location);
+    if (trip && trip?.vacation_location) {
+      const coordinates = await fetchCoordinates(trip?.vacation_location);
       if (coordinates) {
         mapRef.current.flyTo({
           center: coordinates,
