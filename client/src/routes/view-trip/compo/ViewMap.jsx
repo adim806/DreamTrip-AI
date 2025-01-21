@@ -235,13 +235,19 @@ const ViewMap = ({ trip }) => {
     <div
       style={{
         flex: 1, // Take up half the width
-        height: "100%", // Full height of parent
+        height: "99%", // Full height of parent
         boxSizing: "border-box", // Ensure borders are included in dimensions
         background: "black",
       }}
     >
       {/* Buttons Section */}
-      <div className="top-4 w-full flex flex-col items-center gap-4 z-10 bg-opacity-90 rounded-lg shadow-md">
+      <div
+        className="top-4 w-full flex items-center gap-4 z-10 bg-opacity-90 rounded-lg shadow-md bg-black"
+        style={{
+          flexDirection: "row", // Set buttons in a row
+          justifyContent: "center", // Center align buttons horizontally
+        }}
+      >
         <button
           className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
             currentLayer === "restaurants"

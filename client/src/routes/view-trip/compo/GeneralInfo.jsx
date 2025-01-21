@@ -7,6 +7,7 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 const GeneralInfo = ({ trip }) => {
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  console.log("test", trip?.vacation_location);
 
   const fetchCoordinates = async (locationName) => {
     try {
@@ -66,21 +67,62 @@ const GeneralInfo = ({ trip }) => {
 
   return (
     <div
-        className="p-6 shadow-md rounded-lg ">
-      <h2 className="text-2xl font-bold text-blue-600 mb-4">
+      className="p-6 rounded-lg bg-white overflow-auto min-h-screen"
+      style={{
+        maxHeight: "100%", // מגביל את גובה הקונטיינר
+        maxWidth: "100%", // מגביל את רוחב הקונטיינר
+        boxSizing: "border-box", // מוודא שכל תוכן כולל Padding נלקח בחשבון
+      }}
+    >
+      <h1
+        className="text-2xl font-bold text-blue-600 mb-4 leading-tight"
+        style={{
+          wordBreak: "break-word", // מחלק מילים ארוכות לשורות
+          overflow: "hidden", // מונע גלישה של הטקסט מחוץ לקונטיינר
+          textOverflow: "ellipsis", // מוסיף שלוש נקודות בסוף במידת הצורך
+          display: "-webkit-box", // מאפשר חיתוך שורות בטקסט
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: 2, // מצמצם לכמות מקסימלית של שורות
+        }}
+      >
         {trip?.vacation_location}
-      </h2>
-      <h4 className="text-gray-700 mb-6 ">{info?.extract}</h4>
+      </h1>
+      <p
+        className="text-gray-700 mb-6 leading-relaxed"
+        style={{
+          wordBreak: "break-word", // מחלק טקסט ארוך לשורות
+          overflow: "hidden", // מונע גלישה של הטקסט מחוץ לקונטיינר
+          textOverflow: "ellipsis", // מוסיף שלוש נקודות בסוף במידת הצורך
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: 4, // מגביל את כמות השורות לטקסט
+        }}
+      >
+        {info?.extract}
+      </p>
       <img
-        src={info?.thumbnail?.source || "/placeholder.jpg"}
+        src={
+          info?.thumbnail?.source
+            ? `${info.thumbnail.source.replace(/\/\d+px-/, "/600px-")}`
+            : "/placeholder.jpg"
+        }
         alt={trip?.vacation_location}
         className="w-full h-auto rounded-lg mb-4"
+        style={{
+          maxWidth: "100%", // מוודא שהתמונה לא תחרוג מגבולות הקונטיינר
+          maxHeight: "300px", // מגביל את גובה התמונה
+          objectFit: "cover", // מתאימה את התמונה למיכל
+        }}
       />
+
       <a
         href={info.content_urls?.desktop?.page}
         target="_blank"
         rel="noopener noreferrer"
         className="text-blue-500 underline hover:text-blue-700"
+        style={{
+          wordBreak: "break-word", // מונע גלישה של הטקסט בקישור
+        }}
       >
         קרא עוד על {trip?.vacation_location} בוויקיפדיה
       </a>

@@ -2,9 +2,9 @@
 .chat-container {
   position: fixed;
   bottom: 10%;
-  left: 50%;
+  left: 0;
   transform: translateX(-50%);
-  width: 500px;
+  width: 300px;
   background: rgba(30, 30, 46, 0.95);
   backdrop-filter: blur(10px);
   border-radius: 12px;
@@ -22,7 +22,7 @@
 
 /* Minimized Chat */
 .chat-container.closed {
-  height: 60px;
+  height: 40px;
   animation: slideOut 0.4s ease forwards;
 }
 @keyframes slideIn {
@@ -75,7 +75,7 @@
   color: #fff;
   border: none;
   border-radius: 5px;
-  padding: 8px 12px;
+  padding: 30px 90px;
   cursor: pointer;
   transition: all 0.3s ease;
 }

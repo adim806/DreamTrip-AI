@@ -10,9 +10,8 @@ body,
   overflow: hidden;
   background: linear-gradient(135deg, #1e1e2f, #0f0f1e);
   color: #fff;
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
 }
-
 
 @keyframes spin {
   0% {
@@ -29,7 +28,7 @@ h2,
 h3,
 h4,
 h5 {
-  font-family: 'Italiana', serif;
+  font-family: "Italiana", serif;
   color: #3f5d76;
   text-shadow: 0 2px 5px rgba(0, 0, 0, 0.8), 0 4px 10px rgba(0, 0, 0, 0.5);
   margin-bottom: 32px !important;
@@ -37,8 +36,6 @@ h5 {
 
 h1 {
   font-size: 60px !important;
-
-
 }
 
 h2 {
@@ -51,7 +48,7 @@ h3 {
 }
 
 p {
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
   color: #fff;
   font-weight: 300;
   font-size: 20px;
@@ -93,13 +90,12 @@ button:hover {
   }
 }
 
-
 .row {
   margin: 20px 0;
 }
 
 h1::after {
-  content: '';
+  content: "";
   display: block;
   width: 50px;
   height: 5px;
@@ -110,9 +106,9 @@ h1::after {
 /* Remove all animations, transitions and smooth scroll for people that prefer not to see them */
 @media (prefers-reduced-motion: reduce) {
   html:focus-within {
-   scroll-behavior: auto;
+    scroll-behavior: auto;
   }
-  
+
   *,
   *::before,
   *::after {
