@@ -26,7 +26,7 @@ const LeftContainer = ({ trip }) => {
         // *{<Hotels trip={trip} }*
         return <Hotels trip={trip} />;
       case "restaurants":
-        return null ;
+        return null;
       case "attractions":
         return null;
       case "events":
@@ -42,25 +42,43 @@ const LeftContainer = ({ trip }) => {
     <div
       style={{
         flex: 1,
-        height: "100%",
+        height: "110%",
         boxSizing: "border-box",
         background: "blue",
         color: "red",
       }}
     >
-      <div className="trip-details">
-        <nav className="tabs">
+      <div
+        className="trip-details"
+        style={{
+          height: "100%",
+        }}
+      >
+        <nav
+          className="tabs flex justify-center items-center gap-4 p-4 bg-opacity-90 rounded-lg shadow-md"
+          style={{
+            background: "blue", // Set a white background for better contrast
+          }}
+        >
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              className={`tab ${activeTab === tab.id ? "active" : ""}`}
+              className={`tab flex justify-center items-center px-6 py-3 rounded-lg shadow-lg font-bold text-sm  text-blue-700 transition-transform duration-300 transform ${
+                activeTab === tab.id
+                  ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white scale-105"
+                  : "bg-gray-200 hover:scale-105 hover:bg-gray-300"
+              }`}
               onClick={() => setActiveTab(tab.id)}
+              style={{
+                minWidth: "120px", // Set a minimum width for all buttons
+                height: "60px", // Set a fixed height for consistency
+              }}
             >
               {tab.icon} {tab.label}
             </button>
           ))}
         </nav>
-        <div className="content">{renderContent()}</div>
+        <div className="">{renderContent()}</div>
       </div>
     </div>
   );

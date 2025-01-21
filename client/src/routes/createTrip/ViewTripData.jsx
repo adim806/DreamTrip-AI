@@ -23,7 +23,7 @@ const ViewTripData = () => {
       }}
     >
       {/* Left Container */}
-      <LeftContainer />
+      <LeftContainer trip={tripDetails} />
 
       {/* Right Container */}
       <ViewMap trip={tripDetails} />

@@ -75,11 +75,7 @@ const router = createBrowserRouter([
             element: (
               <div>
                 <ChatPage />
-        
                 <ViewTripData /> {/* מציגים את המפה לצד הצ'אט */}
-     
-          
-                
               </div>
               
             ),
