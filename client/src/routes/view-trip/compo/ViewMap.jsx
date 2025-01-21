@@ -216,15 +216,21 @@ const ViewMap = ({ trip }) => {
   }, [trip]);
 
   return (
-    <div className="relative flex justify-end">
-  <div
-    className="relative"
-    style={{ width: "600px", height: "87vh", position: "absolute", right: 0 }}
+    
+    <div
+    style={{
+      flex: 1,
+      height: "100%",
+      boxSizing: "border-box",
+      backgroundImage: "url('/S1.jpg')", // Replace with an actual URL
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    }}
   >
     {/* Buttons Section */}
-    <div className="absolute top-4 w-full flex flex-col items-center gap-4 z-10 bg-opacity-90 rounded-lg shadow-md">
+    <div className="top-4 w-full flex flex-col items-center gap-4 z-10 bg-opacity-90 rounded-lg shadow-md">
       <button
-        className={`px-6 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
+        className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
           currentLayer === "restaurants"
             ? "bg-gradient-to-r from-blue-500 to-blue-700 scale-105"
             : "bg-gradient-to-r from-blue-300 to-blue-500"
@@ -234,7 +240,7 @@ const ViewMap = ({ trip }) => {
         🍽 Restaurants
       </button>
       <button
-        className={`px-6 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
+        className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
           currentLayer === "attractions"
             ? "bg-gradient-to-r from-green-500 to-green-700 scale-105"
             : "bg-gradient-to-r from-green-300 to-green-500"
@@ -244,7 +250,7 @@ const ViewMap = ({ trip }) => {
         🎡 Attractions
       </button>
       <button
-        className={`px-6 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
+        className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
           currentLayer === "weather"
             ? "bg-gradient-to-r from-yellow-500 to-yellow-700 scale-105"
             : "bg-gradient-to-r from-yellow-300 to-yellow-500"
@@ -254,19 +260,16 @@ const ViewMap = ({ trip }) => {
         🌦 Weather
       </button>
     </div>
-
-    {/* Map Container */}
+    {/* Map Section */}
     <div
       ref={mapContainerRef}
+      className="absolute bottom-0"
       style={{
         width: "100%",
         height: "100%",
-        visibility: "visible",
       }}
     ></div>
   </div>
-</div>
-
   );
   
   
