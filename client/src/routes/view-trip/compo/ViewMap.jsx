@@ -28,8 +28,14 @@ const ViewMap = ({ trip }) => {
   const fetchGooglePlaces = async (location, type) => {
     try {
       const corsProxy = "https://corsproxy.io/?";
-      const googleApiUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${location.lat},${location.lng}&radius=10000&type=${type}&key=${import.meta.env.VITE_GOOGLE_PLACE_API_KEY}`;
-      const response = await axios.get(`${corsProxy}${encodeURIComponent(googleApiUrl)}`);
+      const googleApiUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${
+        location.lat
+      },${location.lng}&radius=10000&type=${type}&key=${
+        import.meta.env.VITE_GOOGLE_PLACE_API_KEY
+      }`;
+      const response = await axios.get(
+        `${corsProxy}${encodeURIComponent(googleApiUrl)}`
+      );
       return response.data.results || [];
     } catch (error) {
       console.error("Error fetching Google Places:", error);
@@ -39,7 +45,11 @@ const ViewMap = ({ trip }) => {
 
   const fetchWeather = async (coordinates) => {
     try {
-      const weatherApiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${coordinates.lat}&lon=${coordinates.lng}&appid=${import.meta.env.VITE_OPENWEATHER_API_KEY}&units=metric`;
+      const weatherApiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${
+        coordinates.lat
+      }&lon=${coordinates.lng}&appid=${
+        import.meta.env.VITE_OPENWEATHER_API_KEY
+      }&units=metric`;
       const response = await axios.get(weatherApiUrl);
       return response.data;
     } catch (error) {
@@ -81,7 +91,7 @@ const ViewMap = ({ trip }) => {
           15,
           0,
           15.05,
-          ["coalesce",["get", "min_height"], 0],
+          ["coalesce", ["get", "min_height"], 0],
         ],
         "fill-extrusion-opacity": 0.6,
       },
@@ -105,7 +115,8 @@ const ViewMap = ({ trip }) => {
     clearMarkers();
 
     if (layerType === "restaurants" || layerType === "attractions") {
-      const type = layerType === "restaurants" ? "restaurant" : "tourist_attraction";
+      const type =
+        layerType === "restaurants" ? "restaurant" : "tourist_attraction";
       const places = await fetchGooglePlaces(location, type);
       if (places.length === 0) {
         alert(`No ${layerType} found in this area.`);
@@ -114,14 +125,20 @@ const ViewMap = ({ trip }) => {
       places.forEach((place) => {
         const photoUrl =
           place.photos?.[0]?.photo_reference &&
-          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${place.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_PLACE_API_KEY}`;
-        const marker = new mapboxgl.Marker({ color: layerType === "restaurants" ? "blue" : "green" })
+          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${
+            place.photos[0].photo_reference
+          }&key=${import.meta.env.VITE_GOOGLE_PLACE_API_KEY}`;
+        const marker = new mapboxgl.Marker({
+          color: layerType === "restaurants" ? "blue" : "green",
+        })
           .setLngLat([place.geometry.location.lng, place.geometry.location.lat])
           .setPopup(
             new mapboxgl.Popup({ offset: 25 }).setHTML(
               `<div style="text-align:center;">
                 <h3 style="font-size:1.2em; color:gray;">${place.name}</h3>
-                <p style="color:gray;">${place.vicinity || "No address available"}</p>
+                <p style="color:gray;">${
+                  place.vicinity || "No address available"
+                }</p>
                 ${
                   photoUrl
                     ? `<img src="${photoUrl}" alt="${place.name}" style="width:100%; height:auto; margin-top:10px; border-radius:8px;" />`
@@ -169,7 +186,6 @@ const ViewMap = ({ trip }) => {
     setCurrentLayer(layerType);
   };
 
-  
   const updateDestination = async () => {
     if (trip && trip?.vacation_location) {
       const coordinates = await fetchCoordinates(trip?.vacation_location);
@@ -180,12 +196,12 @@ const ViewMap = ({ trip }) => {
           speed: 1.8,
           curve: 1.5,
         });
-              // בדוק אם יש שכבה תלת מימדית. אם לא, הוסף אותה
-      if (!mapRef.current.getLayer("3d-buildings")) {
-        add3DLayers();
-      }
-      //mapRef.current.setStyle("mapbox://styles/mapbox/streets-v11");
-      //mapRef.current.once("style.load", add3DLayers);
+        // בדוק אם יש שכבה תלת מימדית. אם לא, הוסף אותה
+        if (!mapRef.current.getLayer("3d-buildings")) {
+          add3DLayers();
+        }
+        //mapRef.current.setStyle("mapbox://styles/mapbox/streets-v11");
+        //mapRef.current.once("style.load", add3DLayers);
       }
     }
   };
@@ -216,63 +232,59 @@ const ViewMap = ({ trip }) => {
   }, [trip]);
 
   return (
-    
     <div
-    style={{
-      flex: 1,
-      height: "100%",
-      boxSizing: "border-box",
-      backgroundImage: "url('/S1.jpg')", // Replace with an actual URL
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-    }}
-  >
-    {/* Buttons Section */}
-    <div className="top-4 w-full flex flex-col items-center gap-4 z-10 bg-opacity-90 rounded-lg shadow-md">
-      <button
-        className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
-          currentLayer === "restaurants"
-            ? "bg-gradient-to-r from-blue-500 to-blue-700 scale-105"
-            : "bg-gradient-to-r from-blue-300 to-blue-500"
-        } hover:scale-110`}
-        onClick={() => toggleLayer("restaurants")}
-      >
-        🍽 Restaurants
-      </button>
-      <button
-        className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
-          currentLayer === "attractions"
-            ? "bg-gradient-to-r from-green-500 to-green-700 scale-105"
-            : "bg-gradient-to-r from-green-300 to-green-500"
-        } hover:scale-110`}
-        onClick={() => toggleLayer("attractions")}
-      >
-        🎡 Attractions
-      </button>
-      <button
-        className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
-          currentLayer === "weather"
-            ? "bg-gradient-to-r from-yellow-500 to-yellow-700 scale-105"
-            : "bg-gradient-to-r from-yellow-300 to-yellow-500"
-        } hover:scale-110`}
-        onClick={() => toggleLayer("weather")}
-      >
-        🌦 Weather
-      </button>
-    </div>
-    {/* Map Section */}
-    <div
-      ref={mapContainerRef}
-      className="absolute bottom-0"
       style={{
-        width: "100%",
-        height: "100%",
+        flex: 1, // Take up half the width
+        height: "100%", // Full height of parent
+        boxSizing: "border-box", // Ensure borders are included in dimensions
+        background: "black",
       }}
-    ></div>
-  </div>
+    >
+      {/* Buttons Section */}
+      <div className="top-4 w-full flex flex-col items-center gap-4 z-10 bg-opacity-90 rounded-lg shadow-md">
+        <button
+          className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
+            currentLayer === "restaurants"
+              ? "bg-gradient-to-r from-blue-500 to-blue-700 scale-105"
+              : "bg-gradient-to-r from-blue-300 to-blue-500"
+          } hover:scale-110`}
+          onClick={() => toggleLayer("restaurants")}
+        >
+          🍽 Restaurants
+        </button>
+        <button
+          className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
+            currentLayer === "attractions"
+              ? "bg-gradient-to-r from-green-500 to-green-700 scale-105"
+              : "bg-gradient-to-r from-green-300 to-green-500"
+          } hover:scale-110`}
+          onClick={() => toggleLayer("attractions")}
+        >
+          🎡 Attractions
+        </button>
+        <button
+          className={`px-6 py-2 rounded-lg shadow-lg font-bold text-white transition-transform duration-300 transform ${
+            currentLayer === "weather"
+              ? "bg-gradient-to-r from-yellow-500 to-yellow-700 scale-105"
+              : "bg-gradient-to-r from-yellow-300 to-yellow-500"
+          } hover:scale-110`}
+          onClick={() => toggleLayer("weather")}
+        >
+          🌦 Weather
+        </button>
+      </div>
+
+      {/* Map Section */}
+      <div
+        ref={mapContainerRef}
+        className="absolute bottom-0"
+        style={{
+          width: "100%",
+          height: "100%",
+        }}
+      ></div>
+    </div>
   );
-  
-  
 };
 
 export default ViewMap;

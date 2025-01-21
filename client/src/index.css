@@ -1,3 +1,7 @@
+/* index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 /* Box sizing rules */
 *,
 *::before,
@@ -43,4 +47,5 @@ textarea,
 select {
   font: inherit;
 }
+
 
