@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import mapboxgl from "mapbox-gl";
-
+import { LampContainer, LampDemo } from "@/components/ui/lamp";
+import { motion } from "framer-motion";
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const GeneralInfo = ({ trip }) => {
@@ -67,39 +68,52 @@ const GeneralInfo = ({ trip }) => {
 
   return (
     <div
-      className="p-6 rounded-lg bg-white overflow-auto min-h-screen"
+      className="rounded-lg bg-white overflow-auto min-h-screen"
       style={{
         maxHeight: "100%", // מגביל את גובה הקונטיינר
         maxWidth: "100%", // מגביל את רוחב הקונטיינר
         boxSizing: "border-box", // מוודא שכל תוכן כולל Padding נלקח בחשבון
       }}
     >
-      <h1
-        className="text-2xl font-bold text-blue-600 mb-4 leading-tight"
-        style={{
-          wordBreak: "break-word", // מחלק מילים ארוכות לשורות
-          overflow: "hidden", // מונע גלישה של הטקסט מחוץ לקונטיינר
-          textOverflow: "ellipsis", // מוסיף שלוש נקודות בסוף במידת הצורך
-          display: "-webkit-box", // מאפשר חיתוך שורות בטקסט
-          WebkitBoxOrient: "vertical",
-          WebkitLineClamp: 2, // מצמצם לכמות מקסימלית של שורות
-        }}
-      >
-        {trip?.vacation_location}
-      </h1>
-      <p
-        className="text-gray-700 mb-6 leading-relaxed"
-        style={{
-          wordBreak: "break-word", // מחלק טקסט ארוך לשורות
-          overflow: "hidden", // מונע גלישה של הטקסט מחוץ לקונטיינר
-          textOverflow: "ellipsis", // מוסיף שלוש נקודות בסוף במידת הצורך
-          display: "-webkit-box",
-          WebkitBoxOrient: "vertical",
-          WebkitLineClamp: 4, // מגביל את כמות השורות לטקסט
-        }}
-      >
-        {info?.extract}
-      </p>
+    <LampContainer       style={{
+        width: "100%", // התאמת הרוחב לקונטיינר האב
+        height: "100%", // התאמת הגובה לקונטיינר האב
+        minHeight: "0", // מניעת הגדרות מינימום שמונעות התאמה
+        minWidth: "0", // כנ"ל
+        boxSizing: "border-box", // שמירת ריווח בתוך גבולות הקונטיינר
+       
+      }}
+    >
+          <motion.h1
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="text-6xl font-extrabold text-white"
+          >
+           {trip?.vacation_location}
+          </motion.h1>
+
+                <motion.h6 >
+                <h6
+                  className="text-gray-700 mb-6 leading-relaxed"
+                  style={{
+                    wordBreak: "break-word", // מחלק טקסט ארוך לשורות
+                    overflow: "hidden", // מונע גלישה של הטקסט מחוץ לקונטיינר
+                    textOverflow: "ellipsis", // מוסיף שלוש נקודות בסוף במידת הצורך
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical",
+                    WebkitLineClamp: 4, // מגביל את כמות השורות לטקסט
+                  }}
+                >
+                  {info?.extract}
+                </h6>
+          
+                </motion.h6>
+        </LampContainer>
+
+
+      
+
       <img
         src={
           info?.thumbnail?.source

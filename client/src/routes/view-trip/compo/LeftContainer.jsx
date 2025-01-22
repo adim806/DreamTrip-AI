@@ -78,10 +78,10 @@ const LeftContainer = ({ trip }) => {
         style={{
           flex: 1,
           overflowY: "auto", // Enable vertical scrolling if content overflows
-          padding: "16px",
+
           background: "white",
           borderRadius: "8px",
-          margin: "8px",
+
           boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
         }}
       >
