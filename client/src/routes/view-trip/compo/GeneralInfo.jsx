@@ -75,7 +75,7 @@ const GeneralInfo = ({ trip }) => {
         boxSizing: "border-box", // מוודא שכל תוכן כולל Padding נלקח בחשבון
       }}
     >
-    <LampContainer       style={{
+    <LampContainer      style={{
         width: "100%", // התאמת הרוחב לקונטיינר האב
         height: "100%", // התאמת הגובה לקונטיינר האב
         minHeight: "0", // מניעת הגדרות מינימום שמונעות התאמה
@@ -85,20 +85,21 @@ const GeneralInfo = ({ trip }) => {
       }}
     >
           <motion.h1
+            
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="text-6xl font-extrabold text-white"
+            className="text-6xl font-extrabold text-white "
           >
-           {trip?.vacation_location}
+            <p className="text-cyan-600 text-5xl mb-5 leading-relaxed -translate-y-48 font-extrabold ">{trip?.vacation_location}</p>
+
           </motion.h1>
 
                 <motion.h6 >
-                <h6
-                  className="text-gray-700 mb-6 leading-relaxed"
+                <p
+                  className="text-gray-400 font-serif mb-8 leading-relaxed -translate-y-10"
                   style={{
                     wordBreak: "break-word", // מחלק טקסט ארוך לשורות
-                    overflow: "hidden", // מונע גלישה של הטקסט מחוץ לקונטיינר
                     textOverflow: "ellipsis", // מוסיף שלוש נקודות בסוף במידת הצורך
                     display: "-webkit-box",
                     WebkitBoxOrient: "vertical",
@@ -106,9 +107,10 @@ const GeneralInfo = ({ trip }) => {
                   }}
                 >
                   {info?.extract}
-                </h6>
+                </p>
           
                 </motion.h6>
+                
         </LampContainer>
 
 

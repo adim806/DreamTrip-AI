@@ -1,13 +1,16 @@
 .DashboardLayout {
   display: flex;
-  gap: 50px;
+  gap: 1px;
   padding-top: 3px;
   height: 100%;
 
   .menu {
     flex: 1;
     width: 10%;
-
+    max-height: 100vh; /* מגביל את הגובה ל-100% מגובה חלון הדפדפן */
+    overflow-y: auto; /* מאפשר גלילה אנכית */
+    overflow-x: hidden; /* מונע גלילה אופקית */
+    border-right: 1px solid #00093b; /* קו מפריד */
   }
   .content {
     flex: 7;
