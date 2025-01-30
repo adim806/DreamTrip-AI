@@ -342,139 +342,91 @@ const NewPromt = ({data})=>{
     
     
     /////////////test func 2!!
-    const generatePromptFromObject = async(tripDetails) => {
-      
-      ////i need to add use affect maybe when action ON SERVER change
-      //need to sync the tripDATA that return from the analayzed model
-      console.log("In generatePromptFromObject function: \n");
-      // מגדירים ברירות מחדל עבור השדות במקרה שהם חסרים באובייקט
-      const {
-        destination = "Unknown Destination",
-        duration = 1,
-        travelType = "General",
-        budget = "Moderate",
-        mode = "Regular",
-        constraints = "",
-        requests = ""
-      } = tripDetails;
-      try {
-        return `
-        Generate a detailed travel plan for the following trip:
-
-        - **Location**: ${destination}.
-        - **Duration**: ${duration} Days.
-        - **Travel Type**: ${travelType}.
-        - **Budget**: ${budget}.
-        - **Mode (Trip Type)**: ${mode}.
-
-        ### Special Constraints:
-        ${constraints ? constraints : "No specific constraints provided."}
-
-        ### Additional Requests:
-        ${requests ? requests : "No additional requests provided."}
-          `;
-
-        //const GenericPrompt = "Generate Travel Plan for Location: {location}, for {duration} days, for {travel_type} with a {budget} budget. Give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for {duration} days with each day plan with best time to visit in JSON format.";
-
-        //const finalPromt=GenericPrompt.replace(`{location}`,parsedData?.data?.vacation_location).replace(`{duration}`,parsedData?.data?.duration).replace(`{travel_type}`,parsedData?.data?.constraints?.travel_type).replace(`{budget}`,parsedData?.data?.constraints?.budget).replace(`{duration}`,parsedData?.data?.duration);
-
-        
-
-
-        //console.log(finalPromt);
-        ///////////
-
-        //BuildPlanAI(finalPromt,parsedData);
-        //return finalPromt
-        //const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-        //const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        //setAnswer(finalPromt);
-        //maybe to add mutaion to here 
-
-        
-        
-      } catch (error) {
-        console.log(error);
+    const generatePromptFromObject = (tripDetails) => {
+      // בדיקה אם האובייקט מכיל מידע
+      if (!tripDetails || typeof tripDetails !== "object") {
+        return "No valid trip details provided.";
       }
-
-
-    };
-    const [isLoading, setIsLoading] = useState(false);
-    /////Original build plan ai  func 3!!! not the new one
-    const BuildPlanAI_1= async(finalPromt_str,parsedData)=>{
-      console.log("IN textTOgeneric FUNCTION");
-      const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-      });
-      const generationConfig = {
-        temperature: 1,
-        topP: 0.95,
-        topK: 64,
-        maxOutputTokens: 8192,
-        responseMimeType: "application/json",
-      };
-
-      const chatSession = model.startChat({
-        generationConfig,
-        history: [
-          {
-            role: "user",
-            parts: [
-              {text: "Generate Travel Plan for Location: Las Vegas, for 3 Days for Couple with a Cheap budget,first give me the Hotels options list with Hotel Name, Hotel address, Price, hotel image Url, Geo Coordinates, Rating, description and suggest itinerary with place Name, place Details, place Image Url , Geo Coordinates ,ticket Pricing, Rating, Time travel each of the location for 3 days with each day plan with best time to visit in JSON format."},
-            ],
-          },
-          {
-            role: "model",
-            parts: [
-              {text: "```json\n{\n  \"hotels\": [\n    {\n      \"name\": \"The D Las Vegas\",\n      \"address\": \"301 Fremont Street, Las Vegas, NV 89101\",\n      \"price\": \"$50 - $100 per night\",\n      \"image_url\": \"https://images.trvl-media.com/media/content/hotels/2000000/1968000/1967600/1967649/1967649_1200x900.jpg\",\n      \"geo_coordinates\": \"36.1699,-115.1422\",\n      \"rating\": 4.0,\n      \"description\": \"A historic hotel on Fremont Street with a retro vibe, offering affordable rooms, a casino, and live entertainment.\"\n    },\n    {\n      \"name\": \"Golden Gate Hotel & Casino\",\n      \"address\": \"1 Fremont Street, Las Vegas, NV 89101\",\n      \"price\": \"$60 - $120 per night\",\n      \"image_url\": \"https://images.trvl-media.com/media/content/hotels/2000000/1968000/1967600/1967651/1967651_1200x900.jpg\",\n      \"geo_coordinates\": \"36.1696,-115.1428\",\n      \"rating\": 4.0,\n      \"description\": \"A historic hotel with a classic casino and a convenient location in downtown Las Vegas.\"\n    },\n    {\n      \"name\": \"Circus Circus Hotel & Casino\",\n      \"address\": \"2880 Las Vegas Blvd S, Las Vegas, NV 89109\",\n      \"price\": \"$40 - $80 per night\",\n      \"image_url\": \"https://images.trvl-media.com/media/content/hotels/2000000/1970000/1969300/1969394/1969394_1200x900.jpg\",\n      \"geo_coordinates\": \"36.1143,-115.1711\",\n      \"rating\": 3.5,\n      \"description\": \"A family-friendly hotel known for its circus acts, amusement park, and affordable rates.\"\n    },\n    {\n      \"name\": \"The Strat Hotel, Casino & SkyPod\",\n      \"address\": \"2000 S Las Vegas Blvd, Las Vegas, NV 89104\",\n      \"price\": \"$60 - $120 per night\",\n      \"image_url\": \"https://images.trvl-media.com/media/content/hotels/2000000/1969000/1968600/1968664/1968664_1200x900.jpg\",\n      \"geo_coordinates\": \"36.1104,-115.1646\",\n      \"rating\": 4.0,\n      \"description\": \"A high-rise hotel with a casino, an observation deck, and a variety of dining options.\"\n    }\n  ],\n  \"itinerary\": [\n    {\n      \"day\": 1,\n      \"title\": \"Downtown Delights & Fremont Street\",\n      \"plan\": [\n        {\n          \"time\": \"10:00 AM\",\n          \"place\": \"Fremont Street Experience\",\n          \"details\": \"Walk under the iconic canopy, check out the street performers, and enjoy the free light shows.\",\n          \"image_url\": \"https://www.vegasexperience.com/sites/default/files/styles/slideshow_large/public/slideshows/freemont-street-experience-9.jpg?itok=tD1G0F4u\",\n          \"geo_coordinates\": \"36.1699,-115.1422\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.5,\n          \"time_to_spend\": \"2 hours\"\n        },\n        {\n          \"time\": \"12:00 PM\",\n          \"place\": \"Heart Attack Grill\",\n          \"details\": \"Enjoy a fun and unique dining experience at this quirky burger joint, known for its 'calorie-laden' meals.\",\n          \"image_url\": \"https://www.heartattackgrill.com/images/heart-attack-grill-downtown-las-vegas-las-vegas-nv.jpg\",\n          \"geo_coordinates\": \"36.1683,-115.1429\",\n          \"ticket_pricing\": \"Varies\",\n          \"rating\": 3.5,\n          \"time_to_spend\": \"1.5 hours\"\n        },\n        {\n          \"time\": \"2:00 PM\",\n          \"place\": \"Neon Museum\",\n          \"details\": \"Explore the history of Las Vegas through its iconic neon signs.\",\n          \"image_url\": \"https://cdn.vox-cdn.com/thumbor/V0l8K69Nq_2iH_kO90ZqC2T53s=/0x0:2000x1333/1200x800/filters:focal(840x502:1160x822)/cdn.vox-cdn.com/uploads/chorus_image/image/67096548/neon_museum_neon_signs.0.jpg\",\n          \"geo_coordinates\": \"36.1748,-115.1453\",\n          \"ticket_pricing\": \"$25 - $35\",\n          \"rating\": 4.5,\n          \"time_to_spend\": \"2 hours\"\n        },\n        {\n          \"time\": \"6:00 PM\",\n          \"place\": \"El Cortez Hotel & Casino\",\n          \"details\": \"Enjoy happy hour drinks and snacks in the classic casino atmosphere.\",\n          \"image_url\": \"https://www.elcortezhotelcasino.com/images/hotel/hotel-gallery/el-cortez-hotel-casino-las-vegas-exterior.jpg\",\n          \"geo_coordinates\": \"36.1678,-115.1433\",\n          \"ticket_pricing\": \"Varies\",\n          \"rating\": 4.0,\n          \"time_to_spend\": \"2 hours\"\n        }\n      ]\n    },\n    {\n      \"day\": 2,\n      \"title\": \"Strip Exploration & Free Entertainment\",\n      \"plan\": [\n        {\n          \"time\": \"10:00 AM\",\n          \"place\": \"Bellagio Conservatory & Botanical Garden\",\n          \"details\": \"Admire the beautiful floral displays and take stunning photos.\",\n          \"image_url\": \"https://www.bellagio.com/content/dam/mgmresorts/bellagio/images/hotel/things-to-do/conservatory/conservatory-home.jpg\",\n          \"geo_coordinates\": \"36.1049,-115.1736\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.5,\n          \"time_to_spend\": \"1 hour\"\n        },\n        {\n          \"time\": \"11:00 AM\",\n          \"place\": \"The LINQ Promenade\",\n          \"details\": \"Stroll along the outdoor shopping and dining area with a unique atmosphere.\",\n          \"image_url\": \"https://www.caesars.com/content/dam/caesars/linq/images/linq-promenade-home.jpg\",\n          \"geo_coordinates\": \"36.1082,-115.1706\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.0,\n          \"time_to_spend\": \"2 hours\"\n        },\n        {\n          \"time\": \"1:00 PM\",\n          \"place\": \"Fountains of Bellagio\",\n          \"details\": \"Enjoy the spectacular water and music show at the Bellagio.\",\n          \"image_url\": \"https://www.bellagio.com/content/dam/mgmresorts/bellagio/images/hotel/things-to-do/fountains/fountains-home.jpg\",\n          \"geo_coordinates\": \"36.1049,-115.1736\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.5,\n          \"time_to_spend\": \"1 hour\"\n        },\n        {\n          \"time\": \"2:00 PM\",\n          \"place\": \"The Venetian and The Palazzo\",\n          \"details\": \"Walk through the Grand Canal Shoppes and admire the replica of Venice.\",\n          \"image_url\": \"https://www.venetian.com/content/dam/mgmresorts/venetian/images/hotel/venetian-home.jpg\",\n          \"geo_coordinates\": \"36.1005,-115.1742\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.5,\n          \"time_to_spend\": \"2 hours\"\n        },\n        {\n          \"time\": \"6:00 PM\",\n          \"place\": \"Caesars Palace\",\n          \"details\": \"Watch the free \"The Colosseum\" show featuring a variety of entertainers.\",\n          \"image_url\": \"https://www.caesars.com/content/dam/caesars/caesars-palace/images/caesars-palace-home.jpg\",\n          \"geo_coordinates\": \"36.1079,-115.1725\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.0,\n          \"time_to_spend\": \"1 hour\"\n        }\n      ]\n    },\n    {\n      \"day\": 3,\n      \"title\": \"Red Rock Canyon & Local Delights\",\n      \"plan\": [\n        {\n          \"time\": \"9:00 AM\",\n          \"place\": \"Red Rock Canyon National Conservation Area\",\n          \"details\": \"Drive through the scenic canyon, hike to the iconic Calico Tanks, and admire the rock formations.\",\n          \"image_url\": \"https://www.nps.gov/redr/learn/nature/images/red-rock-canyon-2-724.jpg\",\n          \"geo_coordinates\": \"36.1844,-115.2678\",\n          \"ticket_pricing\": \"$15 per vehicle\",\n          \"rating\": 4.5,\n          \"time_to_spend\": \"3 hours\"\n        },\n        {\n          \"time\": \"12:00 PM\",\n          \"place\": \"In-N-Out Burger\",\n          \"details\": \"Enjoy a classic American burger and fries for lunch.\",\n          \"image_url\": \"https://www.in-n-out.com/assets/images/header-images/in-n-out-burger.jpg\",\n          \"geo_coordinates\": \"36.1225,-115.1759\",\n          \"ticket_pricing\": \"Varies\",\n          \"rating\": 4.0,\n          \"time_to_spend\": \"1 hour\"\n        },\n        {\n          \"time\": \"2:00 PM\",\n          \"place\": \"Downtown Container Park\",\n          \"details\": \"Explore unique shops and restaurants housed in repurposed shipping containers.\",\n          \"image_url\": \"https://www.downtowncontainerpark.com/wp-content/uploads/2019/09/hero-banner.jpg\",\n          \"geo_coordinates\": \"36.1680,-115.1467\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.0,\n          \"time_to_spend\": \"2 hours\"\n        },\n        {\n          \"time\": \"6:00 PM\",\n          \"place\": \"The Peppermill Restaurant\",\n          \"details\": \"Enjoy a delicious dinner and cocktails in the iconic retro dining spot.\",\n          \"image_url\": \"https://www.thepeppermill.com/wp-content/uploads/2021/12/Peppermill-Exterior-Night.jpg\",\n          \"geo_coordinates\": \"36.1304,-115.1686\",\n          \"ticket_pricing\": \"Varies\",\n          \"rating\": 4.5,\n          \"time_to_spend\": \"2 hours\"\n        }\n      ]\n    }\n  ]\n}\n```\n\n**Explanation:**\n\nThis JSON file provides a 3-day budget-friendly travel plan for a couple visiting Las Vegas. It includes a list of hotel options with details like price, images, ratings, and descriptions. The itinerary is divided into daily plans with specific times, places to visit, descriptions, image URLs, ticket pricing, ratings, and estimated time to spend at each location.\n\n**Key Features:**\n\n* **Hotel Options:** Presents affordable hotel choices with diverse styles and features.\n* **Itinerary:** Organizes a 3-day schedule for exploring various attractions in Las Vegas.\n* **Place Details:** Provides information about each attraction, including its location, image, pricing, and rating.\n* **Time Management:** Suggests a realistic time allocation for each activity.\n* **Cheap Budget Focus:** Emphasizes free or budget-friendly options for activities and dining.\n\n**Note:** Prices and opening hours may vary. It's recommended to check for the most up-to-date information before your trip. \n"},
-            ],
-          },
-        ],
-      });
-      console.log("Creating chatSession for final promt");
-      //const [isLoading, setIsLoading] = useState(false);
-      /// the text is sending in parts and we can fix it here when we can wait to get the all ans from the api
-      
-      try {
-        setIsLoading(true); // התחל טעינה
-        const result = await chatSession.sendMessage(finalPromt_str);
-        
-        // פעולה לאחר סיום שליחת ההודעה
-        console.log("Message sent successfully:", result.response.text());
-        //console.log(result.response.text());
-        //console.log(typeof result.response.text());
-
-        setIsLoading(false); // סיים טעינה
-        console.log("in  try after finished the mess:\n");
-
-        // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
-        const jsonMatch = result.response.text().match(/{[\s\S]*}/);
-        const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
     
-        const jsonTripObject = JSON.parse(jsonString); // המרה לאובייקט JSON
-        console.log("after parsing testttt\n"+ jsonTripObject);
-
-        ///my newwwwwwwww test
-        //setallTripData(jsonTripObject);
-                //test
-        // עדכון ה-Context עם פרטי הטיול testtttt!!!
-        //setTripDetails(parsedData);
-
-        console.log("after parsing in try\n"+ jsonTripObject);
-        //console.log("Vacation location:);
-      } catch (error) {
-        console.error("Failed to send message:", error);
-      }finally {
-        //setIsLoading(false); // סיים טעינה
-        
-
+      const {
+        vacation_location,
+        duration,
+        constraints = {},
+        preferences = {},
+        notes,
+      } = tripDetails;
+    
+      // שליפת מידע מתוך constraints
+      const {
+        travel_type = "Not specified",
+        preferred_activity = "Not specified",
+        budget = "Not specified",
+        special_requirements = [],
+      } = constraints;
+    
+      // שליפת מידע מתוך preferences
+      const {
+        hotel_preferences = "Not specified",
+        dining_preferences = "Not specified",
+        transportation_mode = "Not specified",
+      } = preferences;
+    
+      // טיפול בדרישות מיוחדות
+      const specialRequirementsText =
+        special_requirements.length > 0
+          ? special_requirements.join(", ")
+          : "No specific requirements provided.";
+    
+      // יצירת המחרוזת הסופית
+      let result = `Generate a detailed travel plan for the following trip:\n`;
+    
+      if (vacation_location) {
+        result += `- **Location**: ${vacation_location}\n`;
       }
-
-      //console.log("before save function called");
-      //SaveTrips(parsedData,result?.response?.text());
-      console.log("after save function called");
+    
+      if (duration) {
+        result += `- **Duration**: ${duration} days\n`;
+      }
+    
+      if (travel_type !== "Not specified") {
+        result += `- **Travel Type**: ${travel_type}\n`;
+      }
+    
+      if (preferred_activity !== "Not specified") {
+        result += `- **Preferred Activity**: ${preferred_activity}\n`;
+      }
+    
+      if (budget !== "Not specified") {
+        result += `- **Budget**: ${budget}\n`;
+      }
+    
+      if (hotel_preferences !== "Not specified") {
+        result += `- **Hotel Preferences**: ${hotel_preferences}\n`;
+      }
+    
+      if (dining_preferences !== "Not specified") {
+        result += `- **Dining Preferences**: ${dining_preferences}\n`;
+      }
+    
+      if (transportation_mode !== "Not specified") {
+        result += `- **Transportation Mode**: ${transportation_mode}\n`;
+      }
+    
+      if (specialRequirementsText !== "No specific requirements provided.") {
+        result += `- **Special Requirements**: ${specialRequirementsText}\n`;
+      }
+    
+      if (notes) {
+        result += `- **Additional Notes**: ${notes}\n`;
+      }
+    
+      return result.trim();
     };
+    
+    
+    
+    const [isLoading, setIsLoading] = useState(false);
+
     /////my test build plan ai  func 3!!! my new builder function
     const BuildPlanAI_2= async(finalPromt_str,parsedData)=>{
       console.log("BuildPlanAI_2 FUNCTION");
@@ -483,7 +435,7 @@ const NewPromt = ({data})=>{
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
       const model_3 = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
-        systemInstruction: "You are a highly skilled travel planner specializing in creating personalized travel itineraries. Your goal is to generate a structured travel plan based on user input, including dynamic constraints and preferences.\n\n### Instructions:\n1. Always prioritize the user's preferences and constraints when generating the plan. These may include:\n   - **Location**: The travel destination.\n   - **Duration**: The number of days for the trip.\n   - **Travel Type**: (e.g., Couple, Family, Solo Traveler, Adventure, etc.).\n   - **Budget**: (e.g., Cheap, Moderate, Luxury).\n   - **Special Constraints**: \n     - Eco-friendly options (e.g., walking routes, green hotels).\n     - Accessibility for disabilities (e.g., wheelchair-friendly routes).\n     - Kid-friendly activities (e.g., amusement parks, playgrounds).\n   - **Specific User Requests**:\n     - Dining preferences (e.g., vegetarian/vegan options).\n     - Avoiding certain activities (e.g., \"Avoid long walking distances\").\n     - Hotel preferences (e.g., \"Close to city center\").\n\n2. **Structure the Travel Plan**:\n   - **Hotels**:\n     - Provide a list of 5-8 recommended hotels with the following details:\n       - Hotel_Name\n       - Hotel_Address\n       - Price_range\n       - Hotel_Image URL\n       - Geo_Coordinates\n       - Hotel_Rating (out of 5)\n       - Short description (e.g., unique features or benefits)\n   - **Daily Itinerary**:\n     - Divide each day into **morning**, **afternoon**, and **evening** activities.\n     - For each activity, include:\n       - Name of the activity or attraction\n       - Detailed description\n       - Recommended start time and duration\n       - Image URL\n       - Geo Coordinates\n       - Ticket pricing (if applicable)\n       - Rating (out of 5)\n     - Include dining recommendations for lunch and dinner with:\n       - Restaurant Name\n       - Address\n       - Cuisine Type\n       - Price Range (e.g., Cheap, Moderate, Expensive)\n   - **Additional Details**:\n     - Best time to visit each location (if season-specific).\n     - Estimated travel time between activities (by car, public transport, or walking).\n     - Special tips for the user (e.g., \"Arrive early to avoid crowds\").\n\n3. **Dynamic Handling**:\n   - If user constraints or preferences are incomplete, provide a follow-up question to clarify missing details.\n   - If no constraints are provided, assume standard recommendations based on popular trends and budget.\n   - If conflicts exist between constraints (e.g., eco-friendly but luxury travel), prioritize the user’s stated **preferences**.\n\n4. **Return Format**:\nReturn all information in the following **JSON structure**:\n```json\n{\n  \"hotels\": [\n    {\n      \"Hotel_Name\": \"string\",\n      \"Hotel_address\": \"string\",\n      \"price_range\": \"string\",\n      \"image_url\": \"string\",\n      \"geo_coordinates\": \"string\",\n      \"Hotel_rating\": \"float\",\n      \"Hotel_description\": \"string\"\n    }\n  ],\n  \"itinerary\": [\n    {\n      \"day\": 1,\n      \"morning\": [\n        {\n          \"activity_name\": \"string\",\n          \"description\": \"string\",\n          \"start_time\": \"string\",\n          \"duration\": \"string\",\n          \"image_url\": \"string\",\n          \"geo_coordinates\": \"string\",\n          \"ticket_pricing\": \"string\",\n          \"rating\": \"float\"\n        }\n      ],\n      \"afternoon\": [\n        // same structure as morning\n      ],\n      \"evening\": [\n        // same structure as morning\n      ]\n    }\n  ],\n  \"additional_details\": {\n    \"best_time_to_visit\": \"string\",\n    \"estimated_travel_times\": \"string\",\n    \"accessibility_options\": \"string\",\n    \"eco_friendly_options\": \"string\"\n  }\n}\n",
+        systemInstruction: "\nYou are a highly skilled travel planner specializing in creating personalized travel itineraries. Your goal is to generate a detailed and structured travel plan based on user input, focusing exclusively on activities and user constraints.\n\n### Instructions:\n\n1. **User Preferences**:\n   Always prioritize the user's preferences and constraints when generating the plan. Key inputs include:\n   - **Location**: The travel destination.\n   - **Duration**: The number of days for the trip.\n   - **Travel Type**: (e.g., Couple, Family, Solo Traveler, Adventure, etc.).\n   - **Budget**: (e.g., Cheap, Moderate, Luxury).\n   - **Special Constraints**: \n     - Eco-friendly options (e.g., walking routes, green transportation).\n     - Accessibility for disabilities (e.g., wheelchair-friendly routes).\n     - Kid-friendly activities (e.g., amusement parks, playgrounds).\n   - **Specific Requests**:\n     - Avoiding certain activities (e.g., \"Avoid long walking distances\").\n     - Cultural experiences (e.g., local workshops, festivals).\n     - Active vs. Relaxing activities based on user preferences.\n\n2. **Structure of the Travel Plan**:\n   For each day in the trip, create a detailed itinerary divided into **morning**, **afternoon**, and **evening**. Provide the following details for each activity:\n   - **Activity Name**: The name of the location or event.\n   - **Description**: A short description of what the activity includes.\n   - **Geo Coordinates**: Latitude and longitude of the activity location.\n   - **Start Time**: Recommended starting time.\n   - **Duration**: Expected duration of the activity.\n   - **Image URL**: A link to an image representing the activity.\n   - **Ticket Pricing**: Costs associated with the activity, if applicable.\n   - **Rating**: User ratings or popularity score (out of 5).\n\n3. **Additional Details**:\n   Include supporting information to enhance the itinerary and assist with navigation:\n   - **Estimated Travel Time**: Time to travel between activities (walking, car, or public transport).\n   - **Best Time to Visit**: Season-specific recommendations for each location.\n   - **Special Tips**: Suggestions to enhance the experience (e.g., \"Arrive early to avoid crowds\").\n   - **Accessibility Options**: Notes on wheelchair/stroller-friendly paths or activities.\n\n4. **Dynamic Handling**:\n   - If user constraints or preferences are incomplete, suggest follow-up questions to gather more details.\n   - If conflicting preferences exist (e.g., eco-friendly but luxury travel), prioritize user preferences and explain compromises if necessary.\n   - Assume popular trends and budget-friendly options if no constraints are provided.\n\n5. **Return Format**:\n   Return all information in the following JSON structure:\n```json\n{\n  \"itinerary\": [\n    {\n      \"day\": 1,\n      \"morning\": [\n        {\n          \"activity_name\": \"string\",\n          \"description\": \"string\",\n          \"geo_coordinates\": \"string\",\n          \"start_time\": \"string\",\n          \"duration\": \"string\",\n          \"image_url\": \"string\",\n          \"ticket_pricing\": \"string\",\n          \"rating\": \"float\",\n           \"notes\": \"לא לשכוח לבדוק את המונה ליזה\",\n        }\n      ],\n      \"afternoon\": [\n        // same structure as morning\n      ],\n      \"evening\": [\n        // same structure as morning\n      ]\n    }\n  ],\n  \"additional_details\": {\n    \"best_time_to_visit\": \"string\",\n    \"estimated_travel_times\": [\n      {\n        \"from\": \"string\",\n        \"to\": \"string\",\n        \"time\": \"string\"\n      }\n    ],\n    \"accessibility_options\": \"string\",\n    \"eco_friendly_options\": \"string\"\n  }\n}\n",
       });
 
       const generationConfig = {
@@ -494,19 +446,20 @@ const NewPromt = ({data})=>{
         responseMimeType: "application/json",
       };
 
-      const chatSession = model.startChat({
+      const chatSession = model_3.startChat({
         generationConfig,
         history: [
           {
             role: "user",
             parts: [
-              {text: "Generate a detailed travel plan for the following trip:\n\n-Location: Kyoto, Japan.\n\n-Duration: 7 Days.\n\n-Travel Type: Family.\n\n-Budget: Moderate.\n\n-Mode (Trip Type): Kid-Friendly.\n\n-Special Constraints:\nInclude stroller-friendly attractions.\n\nPrioritize destinations with short walking distances.\n\nAccommodations close to train stations.\n\nAdditional Requests:\nInclude activities suitable for children, such as parks and museums with interactive exhibits.\n\nRecommend family-friendly dining options with kid-friendly menus.\n\nHighlight cultural experiences, such as tea ceremonies or traditional crafts workshops."},
+              {text: "Generate a detailed travel plan for the following trip:\n\n-Location: Kyoto, Japan.\n\n-Duration: 3 Days.\n\n-Travel Type: Family.\n\n-Budget: Moderate.\n\n-Mode (Trip Type): Kid-Friendly.\n\n-Special Constraints:\nInclude stroller-friendly attractions.\n\nPrioritize destinations with short walking distances.\n\nAccommodations close to train stations.\n\nAdditional Requests:\nInclude activities suitable for children, such as parks and museums with interactive exhibits.\n\nRecommend family-friendly dining options with kid-friendly menus.\n\nHighlight cultural experiences, such as tea ceremonies or traditional crafts workshops."},
+              {text: " "},
             ],
           },
           {
             role: "model",
             parts: [
-              {text: "```json\n{\n  \"hotels\": [\n    {\n      \"Hotel_Name\": \"Kyoto Granbell Hotel\",\n      \"Hotel_address\": \"Shiokoji-sagaru, Kawaramachi-dori, Nakagyo-ku, Kyoto, 604-8191, Japan\",\n      \"price_range\": \"Moderate\",\n      \"image_url\": \"https://www.kyotogranbell.com/images/top/top_img.jpg\",\n      \"geo_coordinates\": \"35.0117° N, 135.7690° E\",\n      \"Hotel_rating\": 4.2,\n      \"Hotel_description\": \"Family-friendly hotel near Kyoto Station with excellent transport links.\"\n    },\n    {\n      \"Hotel_Name\": \"Hotel Gracery Kyoto Sanjo\",\n      \"Hotel_address\": \"525 Sanjo-dori, Nakagyo-ku, Kyoto 604-0922, Japan\",\n      \"price_range\": \"Moderate\",\n      \"image_url\": \"https://expedia.mediacdn.com/media/a6d96514/63a82784/f6819957/7a018583/e4669e04/5b16b2a9/130832793.jpg?impolicy=fcrop&w=1200&h=630&q=80\",\n      \"geo_coordinates\": \"35.0207° N, 135.7665° E\",\n      \"Hotel_rating\": 4.0,\n      \"Hotel_description\": \"Modern hotel near Sanjo Station, offering comfortable rooms and family-friendly amenities.\"\n    },\n    {\n      \"Hotel_Name\": \"Richmond Hotel Premier Kyoto Shijo-Karasuma\",\n      \"Hotel_address\": \"494-1, Shimogyo-ku, Karasuma-dori, Gojo-sagaru, Kyoto, 600-8216, Japan\",\n      \"price_range\": \"Moderate\",\n      \"image_url\": \"https://www.richmondhotels.jp/premier-kyoto-shijo-karasuma/img/top/top_kv_pc_sp.jpg\",\n      \"geo_coordinates\": \"34.9889° N, 135.7551° E\",\n      \"Hotel_rating\": 4.3,\n      \"Hotel_description\": \"Convenient location near Karasuma Station, featuring spacious rooms and family plans.\"\n    }\n    // Add 3 more hotels with similar details.\n  ],\n  \"itinerary\": [\n    {\n      \"day\": 1,\n      \"morning\": [\n        {\n          \"activity_name\": \"Arrival in Kyoto & Check-in\",\n          \"description\": \"Settle into your hotel and leave your luggage.\",\n          \"start_time\": \"10:00 AM\",\n          \"duration\": \"1 hour\",\n          \"image_url\": null,\n          \"geo_coordinates\": null,\n          \"ticket_pricing\": null,\n          \"rating\": null\n        }\n      ],\n      \"afternoon\": [\n        {\n          \"activity_name\": \"Kyoto Railway Museum\",\n          \"description\": \"Interactive exhibits and real train cars, perfect for kids!\",\n          \"start_time\": \"1:00 PM\",\n          \"duration\": \"3 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Kyoto_Railway_Museum.jpg/1280px-Kyoto_Railway_Museum.jpg\",\n          \"geo_coordinates\": \"35.0339° N, 135.7676° E\",\n          \"ticket_pricing\": \"Adult: ¥1200, Child: ¥600\",\n          \"rating\": 4.5\n        }\n      ],\n      \"evening\": [\n        {\n          \"activity_name\": \"Dinner at Musashi Sushi\",\n          \"description\": \"Family-friendly sushi restaurant with a kid's menu.\",\n          \"start_time\": \"6:00 PM\",\n          \"duration\": \"1.5 hours\",\n          \"image_url\": null,\n          \"geo_coordinates\": null,\n          \"ticket_pricing\": \"Moderate\",\n          \"rating\": 4.0\n        }\n      ]\n    },\n    {\n      \"day\": 2,\n      \"morning\": [\n        {\n          \"activity_name\": \"Maruyama Park\",\n          \"description\": \"Stroller-friendly park with a pond and beautiful scenery.\",\n          \"start_time\": \"9:00 AM\",\n          \"duration\": \"2 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Maruyama-park-kyoto-cherry-blossom.jpg/1280px-Maruyama-park-kyoto-cherry-blossom.jpg\",\n          \"geo_coordinates\": \"34.9983° N, 135.7828° E\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.5\n        }\n      ],\n      \"afternoon\": [\n        {\n          \"activity_name\": \"Kyoto National Museum\",\n          \"description\": \"Explore Japanese art and history; some interactive exhibits for kids.\",\n          \"start_time\": \"1:00 PM\",\n          \"duration\": \"3 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Kyoto_National_Museum_%281%29.jpg/1280px-Kyoto_National_Museum_%281%29.jpg\",\n          \"geo_coordinates\": \"35.0180° N, 135.7604° E\",\n          \"ticket_pricing\": \"Adult: ¥620, Child: ¥310\",\n          \"rating\": 4.2\n        }\n      ],\n      \"evening\": [\n        // Add dinner and other activities.\n      ]\n    }\n    // Add days 3-7 with similar structure.  Include Arashiyama Bamboo Grove (stroller friendly paths available),  Fushimi Inari Shrine (many steps, might not be fully stroller-friendly, but parts are accessible),  and a traditional tea ceremony.\n  ],\n  \"additional_details\": {\n    \"best_time_to_visit\": \"Spring (cherry blossoms) or Autumn (fall foliage)\",\n    \"estimated_travel_times\": \"Mostly short distances, easily accessible by public transport.\",\n    \"accessibility_options\": \"Many attractions are stroller-friendly, but check individual websites for details.\",\n    \"eco_friendly_options\": \"Utilize public transport; consider walking or cycling for shorter distances.\"\n  }\n}\n```\n"},
+              {text: "```json\n{\n  \"itinerary\": [\n    {\n      \"day\": 1,\n      \"morning\": [\n        {\n          \"activity_name\": \"Kyoto Railway Museum\",\n          \"description\": \"Explore Japan's railway history with interactive exhibits perfect for kids.\",\n          \"geo_coordinates\": \"35.0215° N, 135.7564° E\",\n          \"start_time\": \"9:00 AM\",\n          \"duration\": \"3 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Kyoto_Railway_Museum_exterior.jpg/1280px-Kyoto_Railway_Museum_exterior.jpg\",\n          \"ticket_pricing\": \"Adult: ¥1200, Child: ¥600\",\n          \"rating\": 4.5,\n          \"notes\": \"Stroller-friendly.  Allow ample time to explore all exhibits.\"\n        }\n      ],\n      \"afternoon\": [\n        {\n          \"activity_name\": \"Nijo Castle\",\n          \"description\": \"Explore the stunning castle grounds.  While some areas may have stairs, the main courtyards are stroller-accessible.\",\n          \"geo_coordinates\": \"35.0298° N, 135.7353° E\",\n          \"start_time\": \"12:30 PM\",\n          \"duration\": \"2 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Nijo-jo_castle.jpg/1280px-Nijo-jo_castle.jpg\",\n          \"ticket_pricing\": \"Adult: ¥600, Child: ¥300\",\n          \"rating\": 4.2,\n          \"notes\": \"Check for stroller accessibility on specific routes within the castle beforehand.\"\n        }\n      ],\n      \"evening\": [\n        {\n          \"activity_name\": \"Dinner at %ARASHI%\",\n          \"description\": \"Family-friendly restaurant with a kid's menu and traditional Japanese dishes. \",\n          \"geo_coordinates\": \"35.0110° N, 135.7685° E\",\n          \"start_time\": \"6:00 PM\",\n          \"duration\": \"1.5 hours\",\n          \"image_url\": \"https://example.com/arashi_restaurant.jpg\",  // Replace with actual image URL\n          \"ticket_pricing\": \"Moderate\",\n          \"rating\": 4.0,\n          \"notes\": \"Reservations recommended.\"\n        }\n      ]\n    },\n    {\n      \"day\": 2,\n      \"morning\": [\n        {\n          \"activity_name\": \"Kyoto Botanical Garden\",\n          \"description\": \"Beautiful gardens with stroller-friendly paths, perfect for a relaxing morning.\",\n          \"geo_coordinates\": \"35.0022° N, 135.7649° E\",\n          \"start_time\": \"9:00 AM\",\n          \"duration\": \"2 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Kyoto_Botanical_Garden.jpg/1280px-Kyoto_Botanical_Garden.jpg\",\n          \"ticket_pricing\": \"Adult: ¥500, Child: ¥250\",\n          \"rating\": 4.6,\n          \"notes\": \"Plenty of space for kids to run around.\"\n        }\n      ],\n      \"afternoon\": [\n        {\n          \"activity_name\": \"Fushimi Inari Shrine\",\n          \"description\": \"Iconic shrine with thousands of red gates.  While some paths are steep, the initial area near the entrance is stroller-friendly.\",\n          \"geo_coordinates\": \"34.9687° N, 135.7682° E\",\n          \"start_time\": \"11:30 AM\",\n          \"duration\": \"2 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Fushimiinari_december_2016_2.jpg/1280px-Fushimiinari_december_2016_2.jpg\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.8,\n          \"notes\": \"Limited stroller accessibility beyond the initial area.  Consider a carrier for more extensive exploration.\"\n        }\n      ],\n      \"evening\": [\n        {\n          \"activity_name\": \"Traditional Tea Ceremony\",\n          \"description\": \"Experience a traditional Japanese tea ceremony, a unique cultural experience suitable for kids.\",\n          \"geo_coordinates\": \"35.0110° N, 135.7685° E\", //  Place holder, needs specific location based on booking\n          \"start_time\": \"6:00 PM\",\n          \"duration\": \"1 hour\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Traditional_Japanese_Tea_Ceremony.jpg/1280px-Traditional_Japanese_Tea_Ceremony.jpg\",\n          \"ticket_pricing\": \"Varies depending on location\",\n          \"rating\": 4.5,\n          \"notes\": \"Book in advance.\"\n        }\n      ]\n    },\n    {\n      \"day\": 3,\n      \"morning\": [\n        {\n          \"activity_name\": \"Kyoto National Museum\",\n          \"description\": \"While not entirely interactive, the museum has sections that will appeal to children, and the grounds are mostly stroller-friendly.\",\n          \"geo_coordinates\": \"35.0244° N, 135.7704° E\",\n          \"start_time\": \"9:00 AM\",\n          \"duration\": \"2 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Kyoto_National_Museum_exterior.jpg/1280px-Kyoto_National_Museum_exterior.jpg\",\n          \"ticket_pricing\": \"Adult: ¥620, Child: Free\",\n          \"rating\": 4.0,\n          \"notes\": \"Focus on sections with visually appealing exhibits.\"\n        }\n      ],\n      \"afternoon\": [\n        {\n          \"activity_name\": \"Maruyama Park\",\n          \"description\": \"Large park with plenty of space for children to play.  Stroller-friendly paths are available.\",\n          \"geo_coordinates\": \"34.9999° N, 135.7796° E\",\n          \"start_time\": \"11:30 AM\",\n          \"duration\": \"2 hours\",\n          \"image_url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Maruyama_Park_in_Kyoto%2C_Japan.jpg/1280px-Maruyama_Park_in_Kyoto%2C_Japan.jpg\",\n          \"ticket_pricing\": \"Free\",\n          \"rating\": 4.4,\n          \"notes\": \"Enjoy the beautiful scenery and relaxing atmosphere.\"\n        }\n      ],\n      \"evening\": [\n        {\n          \"activity_name\": \"Dinner at %Gonpachi Nishiki%\",\n          \"description\": \"Family-friendly restaurant with a casual atmosphere and a varied menu.\",\n          \"geo_coordinates\": \"35.0099° N, 135.7603° E\",\n          \"start_time\": \"6:00 PM\",\n          \"duration\": \"1.5 hours\",\n          \"image_url\": \"https://example.com/gonpachi.jpg\", // Replace with actual image URL\n          \"ticket_pricing\": \"Moderate\",\n          \"rating\": 4.2,\n          \"notes\": \"Check for kid-friendly options on their menu.\"\n        }\n      ]\n    }\n  ],\n  \"additional_details\": {\n    \"best_time_to_visit\": \"Spring (cherry blossoms) or Autumn (foliage)\",\n    \"estimated_travel_times\": [\n      {\n        \"from\": \"Kyoto Railway Museum\",\n        \"to\": \"Nijo Castle\",\n        \"time\": \"30 minutes (taxi or train)\"\n      },\n      {\n        \"from\": \"Nijo Castle\",\n        \"to\": \"ARASHI Restaurant\",\n        \"time\": \"20 minutes (taxi)\"\n      },\n      {\n        \"from\": \"Kyoto Botanical Garden\",\n        \"to\": \"Fushimi Inari Shrine\",\n        \"time\": \"45 minutes (train)\"\n      },\n       {\n        \"from\": \"Fushimi Inari Shrine\",\n        \"to\": \"Tea Ceremony Location\",\n        \"time\": \"30 minutes (taxi/train)\"\n      },\n      {\n        \"from\": \"Kyoto National Museum\",\n        \"to\": \"Maruyama Park\",\n        \"time\": \"20 minutes (taxi/bus)\"\n      }\n    ],\n    \"accessibility_options\": \"Most locations are largely stroller-friendly, but check specific accessibility details for each location beforehand.  Some areas may have stairs or uneven terrain.\",\n    \"eco_friendly_options\": \"Utilize public transport (trains and buses) for travel between locations.  Consider walking in areas with stroller-friendly paths.\"\n  }\n}\n```"},
             ],
           },
         ],
@@ -514,18 +467,24 @@ const NewPromt = ({data})=>{
       console.log("Creating chatSession for Trip promt");
       //const [isLoading, setIsLoading] = useState(false);
       /// the text is sending in parts and we can fix it here when we can wait to get the all ans from the api
-      
+
       try {
         setIsLoading(true); // התחל טעינה
         const result = await chatSession.sendMessage(finalPromt_str);
         
-        // פעולה לאחר סיום שליחת ההודעה
         console.log("Message sent successfully:", result.response.text());
-        console.log(result.response.text());
+  
         console.log(typeof result.response.text());
+        // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
+        const jsonMatch = result.response.text().match(/{[\s\S]*}/);
+        const jsonString = jsonMatch[0]; // מציאת חלק ה-JSON בלבד
+        const jsonTripObject = JSON.parse(jsonString); // המרה לאובייקט JSON
+        if(jsonTripObject){
+          console.log("after parsing testttt\n"+ jsonTripObject);
+          setIsLoading(false); // סיים טעינה
+          console.log("in  try after finished the mess:\n");
+        }
 
-        setIsLoading(false); // סיים טעינה
-        console.log("in  try after finished the mess:\n");
 
         // חפש את התוכן שבין הסוגריים המסולסלים הראשונים והאחרונים
         //const jsonMatch = result.response.text().match(/{[\s\S]*}/);
@@ -542,13 +501,15 @@ const NewPromt = ({data})=>{
 
         //console.log("after parsing in try\n"+ jsonTripObject);
         //i can return the jsonObject according to the response of the model_3 
-        //return jsonObject
+       
       } catch (error) {
         console.error("Failed to send message:", error);
       }finally {
         //setIsLoading(false); // סיים טעינה
-        
-        //console.log("in (finally) try after finished the mess");
+                // פעולה לאחר סיום שליחת ההודעה
+ 
+        console.log("in  finally buildFUNC 3:\n");
+
 
 
       }
@@ -567,7 +528,7 @@ const NewPromt = ({data})=>{
       try {
       console.log("User Input:", text);
       //console.log("Analysis Result:", analysisResultOBJ);
-
+      //my main model
       const result = await chat.sendMessageStream(Object.entries(img.aiData).length ? [img.aiData,text] : [text]);
       let accuumltedtext="";
       for await (const chunk of result.stream) {
@@ -611,6 +572,11 @@ const NewPromt = ({data})=>{
             //console.log("setallTripData\n", allTripData);
             
             setAnswer(jsonObject.response); // שאלות להשלמת פרטים
+
+            const promtTRIP= generatePromptFromObject(jsonObject?.data);
+            console.log("promtTRIP:", promtTRIP);
+            //BuildPlanAI_2(promtTRIP,jsonObject?.data);
+            //console.log("TripItenrary:", TripItenrary);
           }
           else {
             console.log("Trip Details Complete. Proceed to build trip plan...");

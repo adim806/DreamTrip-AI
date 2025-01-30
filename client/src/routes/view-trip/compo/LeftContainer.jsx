@@ -41,15 +41,15 @@ const LeftContainer = ({ trip }) => {
         flex: 1,
         height: "100%",
         boxSizing: "border-box",
-        background: "blue",
-        color: "red",
+
+
       }}
     >
       {/* Navigation Tabs */}
       <nav
-        className="tabs flex justify-center items-center gap-4 p-4 bg-opacity-90 rounded-lg shadow-md"
+        className="tabs flex justify-center items-center gap-4 p-4 bg-opacity-90 rounded-lg shadow-md bg-gradient-to-t from-cyan-950 to-slate-950" 
         style={{
-          background: "blue",
+       
           flexShrink: 0, // Ensure tabs don't shrink
         }}
       >
@@ -78,10 +78,7 @@ const LeftContainer = ({ trip }) => {
         style={{
           flex: 1,
           overflowY: "auto", // Enable vertical scrolling if content overflows
-
-          background: "white",
           borderRadius: "8px",
-
           boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
         }}
       >
