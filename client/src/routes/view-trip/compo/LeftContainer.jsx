@@ -1,16 +1,22 @@
-import React, { useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import GeneralInfo from "./GeneralInfo";
 import Hotels from "./Hotels";
+import { TripContext } from "@/components/tripcontext/TripProvider";
 //import Restaurants from "./Restaurants";
 //import Attractions from "./Attractions";
 //import Events from "./Events";
 //import CustomRoute from "./CustomRoute";
 
 const LeftContainer = ({ trip }) => {
-  const [activeTab, setActiveTab] = useState("general");
+  const { activeLayer, setActiveLayer, defaultTab } = useContext(TripContext);
+
+  const [activeTab, setActiveTab] = useState("generalInfo");
+  useEffect(() => {
+    setActiveTab(defaultTab); // ✅ קביעת הלשונית הראשונה כברירת מחדל
+  }, [defaultTab]);
 
   const tabs = [
-    { id: "general", label: "מידע כללי", icon: "🌍" },
+    { id: "generalInfo", label: "מידע כללי", icon: "🌍" },
     { id: "hotels", label: "מלונות", icon: "🏨" },
     { id: "restaurants", label: "מסעדות", icon: "🍽" },
     { id: "attractions", label: "אטרקציות", icon: "🎡" },
@@ -20,7 +26,7 @@ const LeftContainer = ({ trip }) => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case "general":
+      case "generalInfo":
         return <GeneralInfo trip={trip} />;
       case "hotels":
         return <Hotels trip={trip} />;
@@ -61,7 +67,7 @@ const LeftContainer = ({ trip }) => {
                 ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white scale-105"
                 : "bg-gray-200 hover:scale-105 hover:bg-gray-300"
             }`}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {setActiveTab(tab.id);setActiveLayer(tab.id);}}
             style={{
               minWidth: "120px",
               height: "60px",
