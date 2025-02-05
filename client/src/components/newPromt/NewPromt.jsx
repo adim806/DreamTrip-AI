@@ -70,6 +70,7 @@ const NewPromt = ({data})=>{
         dbData: {},
         aiData: {},
     });
+    console.log("API Key:", import.meta.env.VITE_GEMINI_PUBLIC_KEY);
 
     const [loading,setloading] = useState(false);
     const navigate = useNavigate();
