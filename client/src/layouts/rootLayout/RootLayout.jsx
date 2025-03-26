@@ -1,10 +1,10 @@
-import { Link,Outlet } from 'react-router-dom';
-import './rootLayout.css';
-import { ClerkProvider } from '@clerk/clerk-react';
+import { Link, Outlet } from "react-router-dom";
+import "./rootLayout.css";
+import { ClerkProvider } from "@clerk/clerk-react";
 import { SignedIn, UserButton } from "@clerk/clerk-react";
-import {QueryClient,QueryClientProvider} from '@tanstack/react-query'
-import Footer from '@/components/footer/Footer';
-
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import Footer from "@/components/footer/Footer";
 
 /**
  * Root layout component that defines the overall structure and global providers of the application.
@@ -35,50 +35,47 @@ import Footer from '@/components/footer/Footer';
  * Throws an error if not provided.
  * @constant
  */
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 if (!PUBLISHABLE_KEY) {
-  throw new Error("Missing Publishable Key")
+  throw new Error("Missing Publishable Key");
 }
 
 // Initializes a new QueryClient instance to manage React Query caching and data fetching
-const queryClient = new QueryClient()
+const queryClient = new QueryClient();
 
 /**
  * RootLayout Component
- * 
+ *
  * Provides a foundational layout for the application, including:
  * - Clerk authentication with `ClerkProvider`.
  * - Query management with `QueryClientProvider`.
  * - A header with a logo and user icon.
  * - An outlet to render nested routes.
- * 
+ *
  * @component
  * @returns {JSX.Element} The root layout structure with navigation and user context.
  */
 const RootLayout = () => {
-
   return (
-
     <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
       <QueryClientProvider client={queryClient}>
-        <div className='rootLayout'>
+        <div className="rootLayout">
           <header>
             <Link to="/" className="logo">
               <img src="/LOGO.jpg" alt="" />
               <span> DreamTrip-AI</span>
             </Link>
-            <div className= "user">
+            <div className="user">
               <SignedIn>
                 <UserButton />
               </SignedIn>
             </div>
           </header>
           <main>
-            <Outlet/>
+            <Outlet />
           </main>
-          
         </div>
-        
+        <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>
     </ClerkProvider>
   );
