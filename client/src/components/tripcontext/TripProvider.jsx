@@ -1,5 +1,5 @@
 // src/contexts/TripContext.js
-import React, { createContext, useState } from 'react';
+import React, { createContext, useState } from "react";
 
 export const TripContext = createContext();
 
@@ -18,6 +18,8 @@ export function TripProvider({ children }) {
 
   // משתנה לניהול המלון הנבחר
   const [selectedHotel, setSelectedHotel] = useState(null);
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
+  const [selectedAttraction, setSelectedAttraction] = useState(null);
 
   return (
     <TripContext.Provider
@@ -40,6 +42,10 @@ export function TripProvider({ children }) {
         setDefaultTab,
         selectedHotel,
         setSelectedHotel,
+        selectedRestaurant,
+        setSelectedRestaurant,
+        selectedAttraction,
+        setSelectedAttraction,
       }}
     >
       {children}

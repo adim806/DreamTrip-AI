@@ -1,108 +1,126 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect } from "react";
 import axios from "axios";
 import mapboxgl from "mapbox-gl";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TripContext } from "@/components/tripcontext/TripProvider";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+
+const fetchHotelsData = async (vacation_location) => {
+  if (!vacation_location) return [];
+  // קבלת קואורדינטות מהיעד באמצעות Mapbox
+  const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+    vacation_location
+  )}.json?access_token=${mapboxgl.accessToken}`;
+  const geoResponse = await axios.get(geocodingUrl);
+  const { features } = geoResponse.data;
+  if (!features?.length) {
+    throw new Error("לא נמצאו קואורדינטות ליעד.");
+  }
+  const [lng, lat] = features[0].center;
+
+  // שימוש ב-CORS Proxy לעקיפת חסימות
+  const corsProxy = "https://corsproxy.io/?";
+  const googlePlacesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=10000&type=lodging&key=${
+    import.meta.env.VITE_GOOGLE_PLACE_API_KEY
+  }`;
+
+  let allHotels = [];
+  let response = await axios.get(
+    `${corsProxy}${encodeURIComponent(googlePlacesUrl)}`
+  );
+  allHotels = allHotels.concat(response.data.results);
+
+  // טיפול בדפי תוצאות נוספים (עד 60 מלונות)
+  while (response.data.next_page_token && allHotels.length < 60) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    response = await axios.get(
+      `${corsProxy}${encodeURIComponent(googlePlacesUrl)}&pagetoken=${
+        response.data.next_page_token
+      }`
+    );
+    allHotels = allHotels.concat(response.data.results);
+  }
+
+  const hotelsDataa = allHotels.slice(0, 60).map((hotel) => ({
+    id: hotel.place_id,
+    name: hotel.name,
+    rating: hotel.rating || "לא זמין",
+    address: hotel.vicinity || "לא ידוע",
+    price: hotel.price_level ? `רמת מחיר: ${hotel.price_level}` : "לא זמין",
+    thumbnail: hotel.photos
+      ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${
+          hotel.photos[0].photo_reference
+        }&key=${import.meta.env.VITE_GOOGLE_PLACE_API_KEY}`
+      : "https://via.placeholder.com/300",
+    link: `https://www.google.com/maps/search/?api=1&query=${hotel.geometry.location.lat},${hotel.geometry.location.lng}`,
+    lat: hotel.geometry.location.lat,
+    lng: hotel.geometry.location.lng,
+  }));
+
+  return hotelsDataa;
+};
 
 const Hotels = ({ trip }) => {
   const {
     hotelsData,
     setHotelsData,
     setActiveLayer,
-    activeLayer,
     selectedHotel,
     setSelectedHotel,
+    activeLayer,
   } = useContext(TripContext);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
 
+  // שימוש ב-React Query עם הגדרות cacheTime של 30 שניות
+  const { data, error, isLoading } = useQuery({
+    queryKey: ["hotels", trip?.vacation_location],
+    queryFn: () => fetchHotelsData(trip?.vacation_location),
+    enabled: !!trip?.vacation_location,
+    staleTime: 0, // הנתונים נחשבים stale מיד
+    cacheTime: 1000 * 30, // 30 שניות במטמון אם אין שימוש פעיל
+  });
+
+  // עדכון Context כאשר מתקבלים הנתונים
   useEffect(() => {
-    if (!trip?.vacation_location) return;
+    if (data) {
+      setHotelsData(data);
+      // עדכון activeLayer עם טיימסטמפ כדי להכריח עדכון במפה
+      setActiveLayer("hotels_" + Date.now());
+    }
+  }, [data, setHotelsData, setActiveLayer]);
 
-    const fetchHotels = async () => {
-      setLoading(true);
-      setError("");
-
-      try {
-        // שליפת קואורדינטות מהיעד באמצעות Mapbox
-        const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-          trip.vacation_location
-        )}.json?access_token=${mapboxgl.accessToken}`;
-
-        const geoResponse = await axios.get(geocodingUrl);
-        const { features } = geoResponse.data;
-
-        if (!features?.length) {
-          setError("לא נמצאו קואורדינטות ליעד.");
-          setLoading(false);
-          return;
-        }
-
-        const [lng, lat] = features[0].center;
-
-        // שימוש ב-CORS Proxy לעקיפת החסימה
-        const corsProxy = "https://corsproxy.io/?";
-
-        // חיפוש מלונות באמצעות Google Places API עם Proxy
-        const googlePlacesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=10000&type=lodging&key=${import.meta.env.VITE_GOOGLE_PLACE_API_KEY}`;
-        
-        const response = await axios.get(
-          `${corsProxy}${encodeURIComponent(googlePlacesUrl)}`
-        );
-
-        if (!response.data.results.length) {
-          setError("לא נמצאו מלונות באזור זה.");
-          setLoading(false);
-          return;
-        }
-
-        // עיבוד הנתונים להצגה ברשימה – כולל הוספת id ייחודי ושדות גאוגרפיים
-        const hotelsDataa = response.data.results.map((hotel) => ({
-          id: hotel.place_id,
-          name: hotel.name,
-          rating: hotel.rating || "לא זמין",
-          address: hotel.vicinity || "לא ידוע",
-          price: hotel.price_level ? `רמת מחיר: ${hotel.price_level}` : "לא זמין",
-          thumbnail: hotel.photos
-            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${hotel.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_PLACE_API_KEY}`
-            : "https://via.placeholder.com/300",
-          link: `https://www.google.com/maps/search/?api=1&query=${hotel.geometry.location.lat},${hotel.geometry.location.lng}`,
-          lat: hotel.geometry.location.lat,
-          lng: hotel.geometry.location.lng,
-        }));
-
-        setHotelsData(hotelsDataa);
-        setActiveLayer("hotels");
-        console.log("hotelsData:", hotelsDataa);
-      } catch (err) {
-        setError("שגיאה בטעינת המלונות. נסה שוב מאוחר יותר.");
-      }
-
-      setLoading(false);
-    };
-
-    fetchHotels();
-  }, [trip?.vacation_location, setActiveLayer, setHotelsData]);
-
+  // useEffect לניקוי השאילתה כאשר activeLayer משתנה לקטגוריה אחרת
   useEffect(() => {
-    console.log("🔹 Updated hotelsData:", hotelsData);
-  }, [hotelsData]);
-  
+    let timeoutId;
+    // אם activeLayer אינו מתחיל ב-"hotels", נרצה להסיר את ה-query לאחר 30 שניות
+    if (!activeLayer?.startsWith("hotels")) {
+      timeoutId = setTimeout(() => {
+        queryClient.removeQueries({
+          queryKey: ["hotels", trip?.vacation_location],
+          exact: true,
+        });
+      }, 1000 * 30);
+    }
+    return () => clearTimeout(timeoutId);
+  }, [activeLayer, queryClient, trip?.vacation_location]);
+
   if (!trip?.vacation_location) {
-    return <p className="text-center text-gray-600">בחר יעד כדי להציג מלונות.</p>;
+    return (
+      <p className="text-center text-gray-600">בחר יעד כדי להציג מלונות.</p>
+    );
   }
 
-  if (loading) {
+  if (isLoading) {
     return <p className="text-center text-blue-600">טוען מלונות...</p>;
   }
 
   if (error) {
-    return <p className="text-center text-red-500">{error}</p>;
+    return <p className="text-center text-red-500">שגיאה בטעינת המלונות.</p>;
   }
 
-  const hotelsList = hotelsData || [];
+  const hotelsList = hotelsData || data || [];
 
   if (hotelsList.length === 0) {
     return (

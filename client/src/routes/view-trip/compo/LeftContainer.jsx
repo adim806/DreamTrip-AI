@@ -1,9 +1,12 @@
 import React, { useContext, useEffect, useState } from "react";
 import GeneralInfo from "./GeneralInfo";
-import Hotels from "./Hotels";
+
 import { TripContext } from "@/components/tripcontext/TripProvider";
-//import Restaurants from "./Restaurants";
-//import Attractions from "./Attractions";
+
+import Hotels from "./Hotels";
+import Restaurants from "./Restaurants";
+import Attractions from "./Attractions";
+
 //import Events from "./Events";
 //import CustomRoute from "./CustomRoute";
 
@@ -31,7 +34,9 @@ const LeftContainer = ({ trip }) => {
       case "hotels":
         return <Hotels trip={trip} />;
       case "restaurants":
+        return <Restaurants trip={trip} />;
       case "attractions":
+        return <Attractions trip={trip} />;
       case "events":
       case "customRoute":
       default:
@@ -47,15 +52,12 @@ const LeftContainer = ({ trip }) => {
         flex: 1,
         height: "100%",
         boxSizing: "border-box",
-
-
       }}
     >
       {/* Navigation Tabs */}
       <nav
-        className="tabs flex justify-center items-center gap-4 p-4 bg-opacity-90 rounded-lg shadow-md bg-gradient-to-t from-cyan-950 to-slate-950" 
+        className="tabs flex justify-center items-center gap-4 p-4 bg-opacity-90 rounded-lg shadow-md bg-gradient-to-t from-cyan-950 to-slate-950"
         style={{
-       
           flexShrink: 0, // Ensure tabs don't shrink
         }}
       >
@@ -67,7 +69,10 @@ const LeftContainer = ({ trip }) => {
                 ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white scale-105"
                 : "bg-gray-200 hover:scale-105 hover:bg-gray-300"
             }`}
-            onClick={() => {setActiveTab(tab.id);setActiveLayer(tab.id);}}
+            onClick={() => {
+              setActiveTab(tab.id);
+              setActiveLayer(tab.id);
+            }}
             style={{
               minWidth: "120px",
               height: "60px",
