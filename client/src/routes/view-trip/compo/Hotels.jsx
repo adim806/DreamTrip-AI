@@ -73,42 +73,44 @@ const Hotels = ({ trip }) => {
 
   const queryClient = useQueryClient();
 
-  // שימוש ב-React Query עם הגדרות cacheTime של 30 שניות
+  // שימוש ב-React Query:
+  // - staleTime: 0 => הנתונים נחשבים מיד ל-stale
+  // - cacheTime: 300000 => הנתונים יישמרו במטמון למשך 5 דקות כאשר אין observers
   const { data, error, isLoading } = useQuery({
     queryKey: ["hotels", trip?.vacation_location],
     queryFn: () => fetchHotelsData(trip?.vacation_location),
     enabled: !!trip?.vacation_location,
-    staleTime: 0, // הנתונים נחשבים stale מיד
-    cacheTime: 1000 * 30, // 30 שניות במטמון אם אין שימוש פעיל
+    staleTime: 20000,
+    //cacheTime: 21000 ,
   });
 
-  // עדכון Context כאשר מתקבלים הנתונים
+  // עדכון Context כאשר מתקבלים הנתונים מה-query
   useEffect(() => {
     if (data) {
       setHotelsData(data);
-      // עדכון activeLayer עם טיימסטמפ כדי להכריח עדכון במפה
-      setActiveLayer("hotels_" + Date.now());
+      setActiveLayer("hotels");
     }
   }, [data, setHotelsData, setActiveLayer]);
 
-  // useEffect לניקוי השאילתה כאשר activeLayer משתנה לקטגוריה אחרת
+  // useEffect לניקוי השאילתה מהמטמון כאשר activeLayer אינו "hotels"
   useEffect(() => {
     let timeoutId;
-    // אם activeLayer אינו מתחיל ב-"hotels", נרצה להסיר את ה-query לאחר 30 שניות
     if (!activeLayer?.startsWith("hotels")) {
       timeoutId = setTimeout(() => {
         queryClient.removeQueries({
           queryKey: ["hotels", trip?.vacation_location],
           exact: true,
         });
-      }, 1000 * 30);
+      }, 10000 ); // 5 דקות
     }
     return () => clearTimeout(timeoutId);
   }, [activeLayer, queryClient, trip?.vacation_location]);
 
   if (!trip?.vacation_location) {
     return (
-      <p className="text-center text-gray-600">בחר יעד כדי להציג מלונות.</p>
+      <p className="text-center text-gray-600">
+        בחר יעד כדי להציג מלונות.
+      </p>
     );
   }
 

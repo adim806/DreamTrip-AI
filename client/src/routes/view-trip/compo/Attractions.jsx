@@ -70,6 +70,7 @@ const Attractions = ({ trip }) => {
     queryFn: () => fetchAttractionsData(trip?.vacation_location),
     enabled: !!trip?.vacation_location,
     staleTime: 1000 * 10,
+    //cacheTime: 10000, // 10 שניות
   });
 
   // עדכון Context כאשר מתקבלים הנתונים
