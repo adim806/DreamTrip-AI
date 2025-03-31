@@ -1,10 +1,10 @@
 /* General Chat Container */
 .chat-container {
   position: fixed;
-  bottom: 10%;
-  left: 0;
+  bottom: 8%;
+  left: 38%;
   transform: translateX(-50%);
-  width: 500px;
+  width: 600px;
   background: rgba(30, 30, 46, 0.95);
   backdrop-filter: blur(10px);
   border-radius: 12px;
@@ -16,13 +16,13 @@
 
 /* Open Chat */
 .chat-container.open {
-  height: 80vh;
+  height: 75vh;
   animation: slideIn 0.4s ease forwards;
 }
 
 /* Minimized Chat */
 .chat-container.closed {
-  height: 60px;
+  height: 68px;
   animation: slideOut 0.4s ease forwards;
 }
 @keyframes slideIn {
@@ -60,7 +60,7 @@
 }
 
 .chat-header h3 {
-  margin: 0;
+  margin: 5;
   display: flex;
   align-items: center;
   font-size: 1.2rem;
@@ -75,7 +75,7 @@
   color: #fff;
   border: none;
   border-radius: 10px;
-  padding: 20px 60px;
+  padding: 17px 33px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -89,14 +89,14 @@
 .chatPage {
   display: flex;
   flex-direction: column;
-  height: calc(100% - 50px);
+  height: calc(100% - 85px);
   overflow-y: auto;
   background: #292945;
 }
 
 .chatPage .wrapper {
   flex: 1;
-  padding: 10px;
+  padding: 15px;
   overflow-y: auto;
 }
 

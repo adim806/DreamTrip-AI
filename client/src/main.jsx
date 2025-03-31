@@ -74,7 +74,7 @@ const router = createBrowserRouter([
             path: "/dashboard/chats/:id",
             element: (
               <div>
-                <ChatPage />
+                
                 <ViewTripData /> {/* מציגים את המפה לצד הצ'אט */}
               </div>
               

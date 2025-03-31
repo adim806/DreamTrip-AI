@@ -10,7 +10,7 @@ import Attractions from "./Attractions";
 //import Events from "./Events";
 //import CustomRoute from "./CustomRoute";
 
-const LeftContainer = ({ trip }) => {
+const SearchData = ({ trip }) => {
   const { activeLayer, setActiveLayer, defaultTab } = useContext(TripContext);
 
   const [activeTab, setActiveTab] = useState("generalInfo");
@@ -94,9 +94,10 @@ const LeftContainer = ({ trip }) => {
         }}
       >
         {renderContent()}
+ 
       </div>
     </div>
   );
 };
 
-export default LeftContainer;
+export default SearchData;
