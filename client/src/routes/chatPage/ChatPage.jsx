@@ -6,6 +6,7 @@ import Markdown from "react-markdown";
 import { IKImage } from "imagekitio-react";
 import { TripContext } from "@/components/tripcontext/TripProvider";
 import { FcAssistant } from "react-icons/fc";
+import { FaUser, FaRobot } from "react-icons/fa";
 
 const ChatPage = () => {
   const path = useLocation().pathname;
@@ -37,7 +38,7 @@ const ChatPage = () => {
       {/* Chat Header */}
       <div className="flex items-center p-4 bg-gradient-to-r from-[#4d5ee2] to-[#30304b] text-white font-bold text-lg border-b border-[#444]">
         <FcAssistant className="mr-2 text-xl" />
-        <h3>AI-Assistant</h3>
+        <h3>DreamTrip-AI Assistant</h3>
       </div>
 
       {/* Chat Content with History and Input */}
@@ -47,6 +48,7 @@ const ChatPage = () => {
           ref={chatContainerRef}
           id="chat-messages-container"
           className="flex-1 overflow-y-auto p-4 pb-2"
+          style={{ maxHeight: "calc(100vh - 130px)" }}
         >
           <div className="flex flex-col gap-4">
             {isPending ? (
@@ -56,25 +58,40 @@ const ChatPage = () => {
             ) : (
               data?.history?.map((message, i) => (
                 <React.Fragment key={i}>
-                  {message.img && (
-                    <IKImage
-                      urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
-                      path={message.img}
-                      height="300"
-                      width="400"
-                      transformation={[{ height: 300, width: 400 }]}
-                      loading="lazy"
-                      lqip={{ active: true, quality: 20 }}
-                    />
-                  )}
                   <div
-                    className={`px-4 py-3 bg-[#2b3c5a] rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed ${
+                    className={`px-4 py-3 bg-[#2b3c5a] rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 ${
                       message.role === "user"
-                        ? "bg-[#5561c0] text-[#f9f9f9] self-end"
-                        : ""
+                        ? "bg-[#5561c0] text-[#f9f9f9] self-end flex-row-reverse"
+                        : "self-start"
                     }`}
                   >
-                    <Markdown>{message.parts[0].text}</Markdown>
+                    {message.role === "user" ? (
+                      <div className="message-header">
+                        <FaUser className="text-white text-sm" />
+                      </div>
+                    ) : (
+                      <div className="message-header">
+                        <FaRobot className="text-[#8aa2d3] text-sm" />
+                      </div>
+                    )}
+                    
+                    <div className="message-content overflow-wrap-break-word" style={{ maxWidth: "calc(100% - 30px)" }}>
+                      {message.img && (
+                        <div className="image-container mb-2">
+                          <IKImage
+                            urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
+                            path={message.img}
+                            width="100%"
+                            height="auto"
+                            transformation={[{ width: 300 }]}
+                            loading="lazy"
+                            lqip={{ active: true, quality: 20 }}
+                            className="message-image rounded-lg"
+                          />
+                        </div>
+                      )}
+                      <Markdown>{message.parts[0].text}</Markdown>
+                    </div>
                   </div>
                 </React.Fragment>
               ))
@@ -84,7 +101,7 @@ const ChatPage = () => {
         
         {/* Input Component */}
         {data && (
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 border-t border-[#3c3c56]">
             <NewPromt data={data} />
           </div>
         )}
