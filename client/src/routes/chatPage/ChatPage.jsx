@@ -1,4 +1,4 @@
-import React, { useContext, useEffect } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import NewPromt from "../../components/newPromt/NewPromt";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
@@ -11,6 +11,7 @@ const ChatPage = () => {
   const path = useLocation().pathname;
   const chatId = path.split("/").pop();
   const { tripDetails } = useContext(TripContext);
+  const chatContainerRef = useRef(null);
 
   const { isPending, error, data } = useQuery({
     queryKey: ["chat", chatId],
@@ -24,6 +25,13 @@ const ChatPage = () => {
     console.log(data);
   }, [data, chatId]);
 
+  // Scroll to bottom whenever data changes
+  useEffect(() => {
+    if (data && chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [data]);
+
   return (
     <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(30,30,46,0.95)] overflow-hidden">
       {/* Chat Header */}
@@ -32,14 +40,21 @@ const ChatPage = () => {
         <h3>AI-Assistant</h3>
       </div>
 
-      {/* Chat Content */}
-      <div className="flex-1 p-4 overflow-y-auto bg-[#292945]">
-        <div className="flex flex-col gap-4">
-          {isPending
-            ? "Loading..."
-            : error
-            ? "Error"
-            : data?.history?.map((message, i) => (
+      {/* Chat Content with History and Input */}
+      <div className="flex-1 flex flex-col bg-[#292945] overflow-hidden">
+        {/* Message History */}
+        <div 
+          ref={chatContainerRef}
+          id="chat-messages-container"
+          className="flex-1 overflow-y-auto p-4 pb-2"
+        >
+          <div className="flex flex-col gap-4">
+            {isPending ? (
+              <div className="text-center p-4">Loading...</div>
+            ) : error ? (
+              <div className="text-center p-4 text-red-500">Error loading chat</div>
+            ) : (
+              data?.history?.map((message, i) => (
                 <React.Fragment key={i}>
                   {message.img && (
                     <IKImage
@@ -62,9 +77,17 @@ const ChatPage = () => {
                     <Markdown>{message.parts[0].text}</Markdown>
                   </div>
                 </React.Fragment>
-              ))}
-          {data && <NewPromt data={data} />}
+              ))
+            )}
+          </div>
         </div>
+        
+        {/* Input Component */}
+        {data && (
+          <div className="flex-shrink-0">
+            <NewPromt data={data} />
+          </div>
+        )}
       </div>
     </div>
   );
