@@ -5,6 +5,7 @@
   position: relative;
   box-sizing: border-box;
   background-color: #292945;
+  max-height: 100%;
 
   .chat-container {
     flex: 1;
@@ -13,6 +14,69 @@
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
+    max-height: calc(100% - 60px); /* Account for input form height */
+  }
+
+  /* Message styling */
+  .message {
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 0;
+    border-radius: 1rem;
+    background-color: #2b3c5a;
+    color: white;
+    max-width: 75%;
+    align-self: flex-start;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    gap: 10px;
+    word-break: break-word;
+
+    &.user {
+      background-color: #5561c0;
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+
+    .message-header {
+      display: flex;
+      align-items: flex-start;
+      padding-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .user-icon {
+      color: #f5f5f5;
+      font-size: 0.9rem;
+      padding: 0.15rem;
+    }
+
+    .ai-icon {
+      color: #8aa2d3;
+      font-size: 0.9rem;
+      padding: 0.15rem;
+    }
+
+    .message-content {
+      flex: 1;
+      overflow-wrap: break-word;
+      max-width: calc(100% - 30px); /* Account for icon width */
+    }
+    
+    .image-container {
+      margin-bottom: 8px;
+      max-width: 300px;
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .message-image {
+      display: block;
+      width: 100%;
+      height: auto;
+      object-fit: cover;
+      max-height: 200px;
+    }
   }
 
   /* Typing indicator styles */
@@ -26,6 +90,8 @@
     align-self: flex-start;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     backdrop-filter: blur(4px);
+    display: flex;
+    gap: 10px;
   }
 
   .typing-indicator-content {
@@ -51,33 +117,56 @@
     border-radius: 50%;
   }
 
-  .message {
+  .loading-message {
+    background-color: rgba(43, 60, 90, 0.6);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(59, 130, 246, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     padding: 0.75rem 1rem;
-    margin: 0.5rem 0;
-    border-radius: 1rem;
-    background-color: #2b3c5a;
-    color: white;
-    max-width: 75%;
-    align-self: flex-start;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-
-    &.user {
-      background-color: #5561c0;
-      align-self: flex-end;
-    }
-
-    &.loading-message {
-      background-color: rgba(43, 60, 90, 0.6);
-      backdrop-filter: blur(4px);
-      border: 1px solid rgba(59, 130, 246, 0.1);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      padding: 0.75rem 1rem;
-      font-size: 0.9rem;
-    }
+    font-size: 0.9rem;
   }
 
   .endChat {
     padding-bottom: 5px;
+  }
+
+  /* Image upload indicator and preview badge */
+  .image-loading-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(85, 97, 192, 0.15);
+    border-radius: 8px;
+    padding: 0 8px;
+    height: 24px;
+    margin-left: 4px;
+  }
+
+  .image-error-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(220, 38, 38, 0.2);
+    border-radius: 8px;
+    padding: 0 8px;
+    height: 24px;
+    margin-left: 4px;
+  }
+
+  .image-preview-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(85, 97, 192, 0.2);
+    border-radius: 8px;
+    padding: 0 8px;
+    height: 24px;
+    margin-left: 4px;
+  }
+
+  .image-status {
+    font-size: 0.9rem;
+    color: #d0d0d0;
   }
 
   .newform {
@@ -87,22 +176,23 @@
     border-radius: 20px 20px 0 0;
     display: flex;
     align-items: center;
-    gap: 20px;
-    padding: 10px 15px;
+    gap: 12px;
+    padding: 8px 15px;
     margin: 0;
     z-index: 10;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
     box-sizing: border-box;
-    min-height: 60px;
+    min-height: 56px;
+    height: 56px;
 
     input {
       flex: 1;
-      padding: 10px 15px;
+      padding: 8px 12px;
       border: none;
       outline: none;
       background-color: transparent;
       color: #ececec;
-      font-size: 1rem;
+      font-size: 0.95rem;
     }
 
     button,
@@ -110,21 +200,24 @@
       border-radius: 50%;
       background-color: #605e68;
       border: none;
-      padding: 10px;
+      padding: 8px;
+      width: 36px;
+      height: 36px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       transition: background-color 0.2s;
+      flex-shrink: 0;
 
       &:hover {
         background-color: #4d4b54;
       }
+    }
 
-      img {
-        width: 16px;
-        height: 16px;
-      }
+    .send-icon {
+      color: #d0d0d0;
+      font-size: 0.9rem;
     }
   }
 }

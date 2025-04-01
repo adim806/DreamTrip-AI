@@ -31,20 +31,30 @@ const connect = async () => {
 };
 
 // Configure ImageKit for image handling and authentication
+let imagekit;
 try {
-  const imagekit = new ImageKit({
+  imagekit = new ImageKit({
     publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
     privateKey: process.env.IMAGE_KIT_PRIVATE_KEY,
     urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
   });
+  console.log("ImageKit initialized successfully");
 } catch (error) {
   console.error("Error initializing ImageKit:", error.message);
 }
 
 // Endpoint to provide ImageKit authentication parameters
-app.get("/api/upload", (req, res) => {
-  const result = imagekit.getAuthenticationParameters(); // Generate authentication parameters
-  res.send(result);
+app.get("/api/upload", ClerkExpressRequireAuth(), (req, res) => {
+  if (!imagekit) {
+    return res.status(500).send("ImageKit is not properly initialized");
+  }
+  try {
+    const result = imagekit.getAuthenticationParameters(); // Generate authentication parameters
+    res.send(result);
+  } catch (error) {
+    console.error("Error generating authentication parameters:", error);
+    res.status(500).send("Failed to generate authentication parameters");
+  }
 });
 
 // Endpoint to create a new chat
@@ -91,7 +101,7 @@ app.post("/api/chats", ClerkExpressRequireAuth(), async (req, res) => {
   }
 });
 
-// Endpoint to get user’s chat list
+// Endpoint to get user's chat list
 app.get("/api/userchats", ClerkExpressRequireAuth(), async (req, res) => {
   const userId = req.auth.userId; // Get authenticated user ID
   try {

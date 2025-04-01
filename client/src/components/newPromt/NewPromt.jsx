@@ -11,6 +11,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { useNavigate } from "react-router-dom";
 import { TripContext } from "../tripcontext/TripProvider";
 import { motion } from "framer-motion";
+import { FaUser, FaRobot } from "react-icons/fa";
+import { IoMdSend } from "react-icons/io";
 
 /**
  * NewPromt Component
@@ -60,6 +62,7 @@ const TypingIndicator = () => {
   return (
     <div className="typing-indicator">
       <div className="typing-indicator-content">
+        <FaRobot className="ai-icon" />
         <span className="typing-text">מקליד</span>
         <div className="typing-dots">
           {[0, 1, 2].map((dot) => (
@@ -430,6 +433,14 @@ const NewPromt = ({ data }) => {
         image: img.dbData?.filePath
       });
       
+      // Reset image state after sending
+      setImg({
+        isLoading: false,
+        error: "",
+        dbData: {},
+        aiData: {},
+      });
+      
       return { success: true };
     } catch (error) {
       console.error("Error processing user input:", error);
@@ -439,6 +450,14 @@ const NewPromt = ({ data }) => {
         role: 'model',
         message: "Sorry, I encountered an error processing your request. Please try again."
       }]);
+      
+      // Reset image state on error too
+      setImg({
+        isLoading: false,
+        error: "",
+        dbData: {},
+        aiData: {},
+      });
       
       return { success: false, error };
     } finally {
@@ -452,7 +471,7 @@ const NewPromt = ({ data }) => {
     const text = e.target.text.value.trim();
     
     if (!text) return;
-
+    
     // Clear input field
     if (inputRef.current) {
       inputRef.current.value = "";
@@ -469,36 +488,72 @@ const NewPromt = ({ data }) => {
           {/* Pending messages (not yet saved to server) */}
           {pendingMessages.map((msg, index) => (
             <div key={`pending-${index}`} className={`message ${msg.role === 'user' ? 'user' : ''}`}>
-              {msg.img && (
-          <IKImage
-            urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
-                  path={msg.img}
-            width="380"
-            transformationPosition={[{ width: 360 }]}
-          />
-        )}
-              <Markdown>{msg.message}</Markdown>
+              {msg.role === 'user' ? (
+                <div className="message-header">
+                  <FaUser className="user-icon text-sm" />
+                </div>
+              ) : (
+                <div className="message-header">
+                  <FaRobot className="ai-icon text-sm" />
+                </div>
+              )}
+              <div className="message-content">
+                {msg.img && (
+                  <div className="image-container">
+                    <IKImage
+                      urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
+                      path={msg.img}
+                      width="100%"
+                      height="auto"
+                      transformation={[{ width: 300 }]}
+                      className="message-image rounded-lg"
+                      loading="lazy"
+                      lqip={{ active: true, quality: 20 }}
+                    />
+                  </div>
+                )}
+                <Markdown>{msg.message}</Markdown>
+              </div>
             </div>
           ))}
           
           {/* Typing indicator */}
           {isTyping && <TypingIndicator />}
-
-        <div className="endChat" ref={endRef}></div>
+          
+          <div className="endChat" ref={endRef}></div>
         </div>
 
         <form className="newform" onSubmit={handleSubmit} ref={formRef}>
           <Upload setImg={setImg} />
+          
+          {img.isLoading && (
+            <div className="image-loading-indicator">
+              <LoadingDots />
+            </div>
+          )}
+          
+          {img.error && (
+            <div className="image-error-indicator" title={img.error}>
+              <div className="image-status">❌</div>
+            </div>
+          )}
+          
+          {img.dbData?.filePath && !img.error && !img.isLoading && (
+            <div className="image-preview-badge" title="Image attached">
+              <div className="image-status">📎</div>
+            </div>
+          )}
+          
           <input id="file" type="file" multiple={false} hidden />
           <input 
             type="text" 
             name="text"
             ref={inputRef}
-            placeholder="Ask Anything boy..." 
+            placeholder="Ask DreamTrip-AI about your next vacation..." 
             onChange={(e) => setCurrentInput(e.target.value)}
           />
-          <button type="submit">
-            <img src="/arrow.png" alt="" />
+          <button type="submit" disabled={img.isLoading}>
+            <IoMdSend className="send-icon" />
           </button>
         </form>
       </div>
