@@ -6,13 +6,8 @@ const publicKey = import.meta.env.VITE_IMAGE_KIT_PUBLIC_KEY;
 
 const authenticator = async () => {
   try {
-    // Changed to include credentials and use the environment variable
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
-      credentials: 'include', // Include cookies for authentication
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
+    // Changed from localhost to the environment variable to ensure correct API endpoint
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`);
 
     if (!response.ok) {
       const errorText = await response.text();

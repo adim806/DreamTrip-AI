@@ -31,30 +31,20 @@ const connect = async () => {
 };
 
 // Configure ImageKit for image handling and authentication
-let imagekit;
 try {
-  imagekit = new ImageKit({
+  const imagekit = new ImageKit({
     publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
     privateKey: process.env.IMAGE_KIT_PRIVATE_KEY,
     urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
   });
-  console.log("ImageKit initialized successfully");
 } catch (error) {
   console.error("Error initializing ImageKit:", error.message);
 }
 
 // Endpoint to provide ImageKit authentication parameters
-app.get("/api/upload", ClerkExpressRequireAuth(), (req, res) => {
-  if (!imagekit) {
-    return res.status(500).send("ImageKit is not properly initialized");
-  }
-  try {
-    const result = imagekit.getAuthenticationParameters(); // Generate authentication parameters
-    res.send(result);
-  } catch (error) {
-    console.error("Error generating authentication parameters:", error);
-    res.status(500).send("Failed to generate authentication parameters");
-  }
+app.get("/api/upload", (req, res) => {
+  const result = imagekit.getAuthenticationParameters(); // Generate authentication parameters
+  res.send(result);
 });
 
 // Endpoint to create a new chat
@@ -127,8 +117,8 @@ app.get("/api/chats/:id", ClerkExpressRequireAuth(), async (req, res) => {
 
 // Endpoint to update chat history with a new conversation
 app.put("/api/chats/:id", ClerkExpressRequireAuth(), async (req, res) => {
-  const userId = req.auth.userId; // Get authenticated user ID
-  const { question, answer, img } = req.body; // Get conversation details from request body
+  const userId = req.auth.userId;
+  const { question, answer, img } = req.body;
 
   // Prepare new conversation items based on question, answer, and optional image
   const newItems = [
@@ -140,19 +130,19 @@ app.put("/api/chats/:id", ClerkExpressRequireAuth(), async (req, res) => {
 
   try {
     const updatedChat = await Chat.updateOne(
-      { _id: req.params.id, userId }, // Update specific chat by ID and user
+      { _id: req.params.id, userId },
       {
         $push: {
           history: {
-            $each: newItems, // Append new conversation items to chat history
+            $each: newItems,
           },
         },
       }
     );
-    res.status(200).send(updatedChat); // Send updated chat in response
+    res.status(200).send(updatedChat);
   } catch (err) {
     console.log(err);
-    res.status(500).send("Error adding conversation!"); // Error handling
+    res.status(500).send("Error adding conversation!");
   }
 });
 
