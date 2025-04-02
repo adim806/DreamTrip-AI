@@ -1,6 +1,6 @@
 import { QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
-import './dashboardPage.css';
 import { useNavigate } from 'react-router-dom';
+import { SplineSceneBasic } from '../../components/ui/spline-scene-demo';
 
 /**
  * DashboardPage Component
@@ -17,82 +17,75 @@ import { useNavigate } from 'react-router-dom';
  * - **useMutation**: For posting new chat requests to the server, invalidating cache for recent chats to stay updated.
  * 
  * ### Navigation:
- * - Redirects the user to the newly created chat’s page after successful chat creation.
+ * - Redirects the user to the newly created chat's page after successful chat creation.
  * 
  * @component
  * @returns {JSX.Element} The rendered component for the Dashboard page.
  */
 
-
- const DashboardPage = () => {
-
-  // Initializes the query client to manage cache and data fetching
+const DashboardPage = () => {
   const queryClient = useQueryClient();
-  
-  // Initializes the navigate function for programmatic routing
   const navigate = useNavigate();
 
-  // Configures the mutation for creating a new chat session
   const mutation = useMutation({
-
-    // Defines the mutation function, which sends a POST request to create a new chat session
-    mutationFn: async(text) =>{
-      return fetch(`${import.meta.env.VITE_API_URL}/api/chats`,{
+    mutationFn: async(text) => {
+      return fetch(`${import.meta.env.VITE_API_URL}/api/chats`, {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({text}),
-      }).then(res=>res.json())
+      }).then(res => res.json())
     },
-    // Defines actions upon successful chat creation
     onSuccess: (id) => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: ["userChats"] });// Invalidates and refetches userChats to update the chat list
-      navigate(`/dashboard/chats/${id}`);// Navigates to the new chat page with the given ID
+      queryClient.invalidateQueries({ queryKey: ["userChats"] });
+      navigate(`/dashboard/chats/${id}`);
     },
-  })
+  });
 
-  const handleSubmit= async (e)=>{
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const text= e.target.text.value;
+    const text = e.target.text.value;
     if(!text) return;
-    console.log("in handle submit on dashbadpage");
-
     mutation.mutate(text);
-
   };
 
   return (
-    <div className="DashboardPage">
-      <div className="texts">
-        <div className="logo">
-          <img src="logo.png" alt="" />
-          <h1>DreamTrip-AI</h1>
-        </div>
-        <div className="options">
-          <div className="option">
-            <img src="/chat.png" alt="" />
-            <span>Create a new Chat</span>
-          </div>
-          <div className="option">
-            <img src="/image.png" alt="" />
-            <span>Analyze Images</span>
-          </div>
-          <div className="option">
-            <img src="/code.png" alt="" />
-            <span>Help me with my code</span>
-          </div>
-        </div>
+    <div className="relative h-full w-full overflow-hidden bg-[#222c31]">
+      {/* Background Spline Scene Container */}
+      <div className="absolute inset-0 w-full h-full">
+        <SplineSceneBasic />
       </div>
-      <div className="formContainer">
-        <form onSubmit={handleSubmit}>
-          <input type="text" name="text" placeholder="Ask me Anything..." />
-          <button>
-            <img src="/arrow.png" alt="" />
-          </button>
-        </form>
+
+      {/* Content Layer */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="relative h-full flex flex-col items-center px-8">
+          <div className="flex-1 flex flex-col items-center w-full max-w-6xl mx-auto pt-6">
+            {/* Logo Section */}
+            <div className="flex items-start gap-4 ml-[-150px] rounded-2xl backdrop-blur-sm pointer-events-auto">
+              <img src="logo.png" alt="" className="w-16 h-16 mt-0" />
+              <h1 className="text-6xl bg-gradient-to-r from-[#217bfe] to-[#e55571] bg-clip-text text-transparent font-bold">
+                DreamTrip-AI
+              </h1>
+            </div>
+          </div>
+
+          {/* Input Section */}
+          <div className="mt-auto w-full max-w-2xl bg-black/40 backdrop-blur-md rounded-2xl shadow-lg mb-20 border border-white/10 pointer-events-auto">
+            <form className="w-full flex items-center justify-between" onSubmit={handleSubmit}>
+              <input 
+                type="text" 
+                name="text" 
+                placeholder="Ask me Anything..." 
+                className="flex-1 py-4 px-6 bg-transparent border-none outline-none text-white text-lg placeholder-gray-400" 
+              />
+              <button className="bg-white/10 hover:bg-white/20 rounded-full border-none cursor-pointer p-4 m-3 flex items-center justify-center transition-all backdrop-blur-sm">
+                <img src="/arrow.png" alt="" className="w-5 h-5" />
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -33,6 +33,21 @@ const ChatPage = () => {
     }
   }, [data]);
 
+  // Add this effect
+  useEffect(() => {
+    // Check if this is a new chat with only one message (the user message)
+    if (data && data.history && data.history.length === 1 && 
+        data.history[0].role === 'user') {
+      // Find the NewPromt component instance and trigger processing
+      const newPromtComponent = document.querySelector('.newPromt');
+      if (newPromtComponent && typeof newPromtComponent.__reactFiber$ !== 'undefined') {
+        // Alternative approach: Add a ref to NewPromt and call a method on it
+        console.log("New chat detected, should auto-process first message");
+        // This is a workaround - ideally you'd use a ref or context to communicate
+      }
+    }
+  }, [data]);
+
   return (
     <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(30,30,46,0.95)] overflow-hidden">
       {/* Chat Header */}

@@ -117,6 +117,10 @@ const NewPromt = ({ data }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [pendingMessages, setPendingMessages] = useState([]);
   
+  // Remove the local processedChatIds state
+  // Instead we'll use a ref that persists between renders
+  const processedChatIdsRef = useRef(new Set());
+  
   // Image handling states
   const [img, setImg] = useState({
     isLoading: false,
@@ -362,6 +366,118 @@ const NewPromt = ({ data }) => {
     return result.trim();
   };
 
+  // Add this function to check if a chat has already been processed
+  const markChatAsProcessed = (chatId) => {
+    // Get the query data from the cache
+    const chatData = queryClient.getQueryData(["chat", chatId]);
+    
+    // If the chat already has model responses, consider it processed
+    if (chatData?.history?.length > 1) {
+      console.log(`Chat ${chatId} already has responses, skipping auto-processing`);
+      return true;
+    }
+    
+    // Check our local ref
+    if (processedChatIdsRef.current.has(chatId)) {
+      console.log(`Chat ${chatId} was already processed in this session`);
+      return true;
+    }
+    
+    // Mark as processed in our local ref
+    processedChatIdsRef.current.add(chatId);
+    console.log(`Marking chat ${chatId} as processed for the first time`);
+    return false;
+  };
+
+  // Fix the auto-processing effect to use both cache and ref check
+  useEffect(() => {
+    if (!data?._id) return;
+    
+    // Only process if the chat has exactly one message and hasn't been processed
+    if (data.history?.length === 1 && 
+        data.history[0].role === 'user' && 
+        !isTyping) {
+      
+      // Check if this chat has already been processed
+      if (markChatAsProcessed(data._id)) {
+        return; // Skip if already processed
+      }
+      
+      const initialMessage = data.history[0].parts[0].text;
+      console.log("Auto-processing initial message:", initialMessage);
+      
+      setIsTyping(true);
+      
+      (async () => {
+        try {
+          // Add a small delay to avoid race conditions
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Recheck to make sure another instance didn't process it
+          if (queryClient.getQueryData(["chat", data._id])?.history?.length > 1) {
+            console.log("Another process already handled this chat, aborting");
+            setIsTyping(false);
+            return;
+          }
+          
+          // Send message to AI
+          const result = await chat.sendMessageStream([initialMessage]);
+          
+          let aiResponse = "";
+          for await (const chunk of result.stream) {
+            aiResponse += chunk.text();
+          }
+          
+          console.log("AI response for initial message:", aiResponse);
+
+          // Process the response
+          let formattedResponse = aiResponse;
+          let tripData = null;
+
+          // Try to extract JSON from response
+          const jsonMatch = aiResponse.match(/{[\s\S]*}/);
+          if (jsonMatch) {
+            try {
+              const jsonObject = JSON.parse(jsonMatch[0]);
+              formattedResponse = jsonObject.response || aiResponse;
+              
+              if (jsonObject.mode === "Trip-Building") {
+                tripData = jsonObject.data;
+                if (tripData) {
+                  setTripDetails(tripData);
+                }
+              }
+            } catch (error) {
+              console.error("Failed to parse JSON:", error);
+            }
+          }
+          
+          // Only add AI response to pending messages
+          setPendingMessages([{
+            role: 'model',
+            message: formattedResponse
+          }]);
+          
+          // Save to server (but don't duplicate the user message)
+          mutation.mutate({ 
+            userMessage: null, // Don't add user message again
+            aiResponse: formattedResponse,
+            image: null
+          });
+          
+        } catch (error) {
+          console.error("Error auto-processing initial message:", error);
+          setPendingMessages([{
+            role: 'model',
+            message: "Sorry, I encountered an error processing your request. Please try again."
+          }]);
+        } finally {
+          setIsTyping(false);
+        }
+      })();
+    }
+  }, [data?._id, data?.history?.length]);
+
   // Process user input
   const processUserInput = async (userMessage) => {
     setIsTyping(true);
@@ -471,7 +587,7 @@ const NewPromt = ({ data }) => {
     const text = e.target.text.value.trim();
     
     if (!text) return;
-    
+
     // Clear input field
     if (inputRef.current) {
       inputRef.current.value = "";
@@ -500,8 +616,8 @@ const NewPromt = ({ data }) => {
               <div className="message-content">
                 {msg.img && (
                   <div className="image-container">
-                    <IKImage
-                      urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
+          <IKImage
+            urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
                       path={msg.img}
                       width="100%"
                       height="auto"
@@ -519,31 +635,22 @@ const NewPromt = ({ data }) => {
           
           {/* Typing indicator */}
           {isTyping && <TypingIndicator />}
-          
-          <div className="endChat" ref={endRef}></div>
+
+        <div className="endChat" ref={endRef}></div>
         </div>
 
         <form className="newform" onSubmit={handleSubmit} ref={formRef}>
           <Upload setImg={setImg} />
-          
           {img.isLoading && (
             <div className="image-loading-indicator">
               <LoadingDots />
             </div>
           )}
-          
-          {img.error && (
-            <div className="image-error-indicator" title={img.error}>
-              <div className="image-status">❌</div>
-            </div>
-          )}
-          
-          {img.dbData?.filePath && !img.error && !img.isLoading && (
+          {img.dbData?.filePath && (
             <div className="image-preview-badge" title="Image attached">
               <div className="image-status">📎</div>
             </div>
           )}
-          
           <input id="file" type="file" multiple={false} hidden />
           <input 
             type="text" 
@@ -552,7 +659,7 @@ const NewPromt = ({ data }) => {
             placeholder="Ask DreamTrip-AI about your next vacation..." 
             onChange={(e) => setCurrentInput(e.target.value)}
           />
-          <button type="submit" disabled={img.isLoading}>
+          <button type="submit">
             <IoMdSend className="send-icon" />
           </button>
         </form>
