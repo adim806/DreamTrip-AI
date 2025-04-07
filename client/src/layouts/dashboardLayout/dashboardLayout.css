@@ -3,18 +3,69 @@
   gap: 1px;
   padding-top: 3px;
   height: 100%;
-
-  .menu {
-    flex: 1;
-    width: 10%;
-    max-height: 100vh; /* מגביל את הגובה ל-100% מגובה חלון הדפדפן */
-    overflow-y: auto; /* מאפשר גלילה אנכית */
-    overflow-x: hidden; /* מונע גלילה אופקית */
-    border-right: 1px solid #00093b; /* קו מפריד */
-  }
+  background-color: #111827;
+  color: #e5e7eb;
+  
   .content {
-    flex: 7;
+    flex: 1;
+    margin-left: 3.05rem; /* Width of the collapsed sidebar */
     height: 100%;
     overflow: auto;
+    transition: margin-left 0.2s ease;
+    background-color: #1f2937;
+    border-radius: 8px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    padding: 16px;
   }
+}
+
+/* Base styling for the dashboard */
+:root {
+  --background: #111827;
+  --foreground: #e5e7eb;
+  --card: #1a202c;
+  --card-foreground: #e5e7eb;
+  --popover: #1a202c;
+  --popover-foreground: #e5e7eb;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1f2937;
+  --secondary-foreground: #e5e7eb;
+  --muted: #1f2937;
+  --muted-foreground: #9ca3af;
+  --accent: #1f2937;
+  --accent-foreground: #e5e7eb;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #374151;
+  --input: #374151;
+  --ring: #3b82f6;
+}
+
+.dark {
+  --background: #111827;
+  --foreground: #e5e7eb;
+  --card: #1a202c;
+  --card-foreground: #e5e7eb;
+  --popover: #1a202c;
+  --popover-foreground: #e5e7eb;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1f2937;
+  --secondary-foreground: #e5e7eb;
+  --muted: #1f2937;
+  --muted-foreground: #9ca3af;
+  --accent: #1f2937;
+  --accent-foreground: #e5e7eb;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #374151;
+  --input: #374151;
+  --ring: #3b82f6;
+}
+
+/* Apply base styles to the body */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
 }

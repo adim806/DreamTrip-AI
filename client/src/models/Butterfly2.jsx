@@ -15,7 +15,7 @@ import { SkeletonUtils } from 'three-stdlib'
 
 export function Butterfly2(props) {
   const group = React.useRef()
-  const { scene, animations } = useGLTF('./models2/butterfly2/scene-transformed.glb')
+  const { scene, animations } = useGLTF('/models2/butterfly2/scene-transformed.glb')
   const clone = React.useMemo(() => SkeletonUtils.clone(scene), [scene])
   const { nodes, materials } = useGraph(clone)
   const { actions } = useAnimations(animations, group)
@@ -43,4 +43,4 @@ export function Butterfly2(props) {
   )
 }
 
-useGLTF.preload('./models2/butterfly2/scene-transformed.glb')
+useGLTF.preload('/models2/butterfly2/scene-transformed.glb')

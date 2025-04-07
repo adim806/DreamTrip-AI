@@ -11,8 +11,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { useNavigate } from "react-router-dom";
 import { TripContext } from "../tripcontext/TripProvider";
 import { motion } from "framer-motion";
-import { FaUser, FaRobot } from "react-icons/fa";
-import { IoMdSend } from "react-icons/io";
+import { RiUser3Fill, RiCompass3Fill } from "react-icons/ri";
+import { IoSend, IoImageOutline } from "react-icons/io5";
 
 /**
  * NewPromt Component
@@ -58,11 +58,16 @@ import { IoMdSend } from "react-icons/io";
  *
  */
 
+// האווטאר של סוכן הטיולים - נשתמש באותו קישור כמו ב-ChatPage
+const TRAVEL_AGENT_AVATAR = "https://img.freepik.com/premium-vector/artificial-intelligence-character-avatar-futuristic-digital-ai-assistant-profile-picture_555042-38.jpg";
+
 const TypingIndicator = () => {
   return (
     <div className="typing-indicator">
       <div className="typing-indicator-content">
-        <FaRobot className="ai-icon" />
+        <div className="ai-avatar-container mr-1">
+          <RiCompass3Fill className="text-blue-400 text-sm" />
+        </div>
         <span className="typing-text">מקליד</span>
         <div className="typing-dots">
           {[0, 1, 2].map((dot) => (
@@ -606,11 +611,13 @@ const NewPromt = ({ data }) => {
             <div key={`pending-${index}`} className={`message ${msg.role === 'user' ? 'user' : ''}`}>
               {msg.role === 'user' ? (
                 <div className="message-header">
-                  <FaUser className="user-icon text-sm" />
+                  <RiUser3Fill className="user-icon text-sm" />
                 </div>
               ) : (
                 <div className="message-header">
-                  <FaRobot className="ai-icon text-sm" />
+                  <div className="ai-avatar-container">
+                    <RiCompass3Fill className="text-blue-400 text-sm" />
+                  </div>
                 </div>
               )}
               <div className="message-content">
@@ -660,7 +667,7 @@ const NewPromt = ({ data }) => {
             onChange={(e) => setCurrentInput(e.target.value)}
           />
           <button type="submit">
-            <IoMdSend className="send-icon" />
+            <IoSend className="send-icon" />
           </button>
         </form>
       </div>
