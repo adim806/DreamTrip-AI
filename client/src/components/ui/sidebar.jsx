@@ -22,6 +22,11 @@ import {
   MapPin,
   Globe,
   Info,
+  Pencil,
+  Trash2,
+  MoreVertical,
+  Check,
+  X,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Link, useLocation } from "react-router-dom";
@@ -89,10 +94,14 @@ const staggerVariants = {
 export function SidebarNavigation() {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [showChats, setShowChats] = useState(false);
+  const [chatFilter, setChatFilter] = useState("");
+  const [editingChatId, setEditingChatId] = useState(null);
+  const [editingChatTitle, setEditingChatTitle] = useState("");
+  const [showOptionsForChat, setShowOptionsForChat] = useState(null);
   const location = useLocation();
   const pathname = location.pathname;
 
-  const { isPending, error, data: chats } = useQuery({
+  const { isPending, error, data: chats, refetch } = useQuery({
     queryKey: ['userChats'],
     queryFn: () =>
       fetch(`${import.meta.env.VITE_API_URL}/api/userchats`, {
@@ -101,6 +110,79 @@ export function SidebarNavigation() {
         res.json(),
       ),
   });
+
+  const filteredChats = chats?.filter(chat => {
+    return chat.title.toLowerCase().includes(chatFilter.toLowerCase());
+  });
+
+  const toggleChatOptions = (chatId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowOptionsForChat(showOptionsForChat === chatId ? null : chatId);
+  };
+
+  const handleEditChat = (chatId, currentTitle, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingChatId(chatId);
+    setEditingChatTitle(currentTitle);
+    setShowOptionsForChat(null);
+  };
+
+  const handleSaveEdit = async (chatId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (editingChatTitle.trim() === "") return;
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/userchats/${chatId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ title: editingChatTitle }),
+      });
+      
+      if (response.ok) {
+        refetch(); // Refresh the chats list
+        setEditingChatId(null);
+      } else {
+        console.error('Failed to update chat title');
+      }
+    } catch (error) {
+      console.error('Error updating chat title:', error);
+    }
+  };
+
+  const handleDeleteChat = async (chatId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm('האם אתה בטוח שברצונך למחוק את השיחה הזו?')) return;
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/userchats/${chatId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        refetch(); // Refresh the chats list
+      } else {
+        console.error('Failed to delete chat');
+      }
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+    }
+  };
+
+  const handleCancelEdit = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingChatId(null);
+  };
 
   return (
     <motion.div
@@ -160,9 +242,9 @@ export function SidebarNavigation() {
               </div>
             </div>
 
-            <div className="flex h-full w-full flex-col gap-6 pt-4">
-              <div className="flex grow flex-col gap-2 overflow-hidden">
-                <div className="flex w-full flex-col gap-1 px-2">
+            <div className="flex h-full w-full flex-col pt-4">
+              <ScrollArea className="flex-grow px-2">
+                <div className="flex w-full flex-col gap-1">
                   <Link
                     to="/dashboard"
                     className={cn(
@@ -189,38 +271,145 @@ export function SidebarNavigation() {
                       <MessagesSquare className="h-5 w-5 min-w-[20px]" />
                       {!isCollapsed && (
                         <div className="ml-3 flex w-full items-center justify-between">
-                          <span className="text-sm truncate">Chats</span>
-                          <ChevronsUpDown className="h-4 w-4 text-primary/70" />
+                          <div className="flex items-center">
+                            <span className="text-sm truncate">Chats</span>
+                            {(chats?.length > 0) && (
+                              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 text-[10px] font-medium text-primary">
+                                {chats?.length}
+                              </span>
+                            )}
+                          </div>
+                          <ChevronsUpDown className="h-4 w-5 text-primary/70" />
                         </div>
                       )}
                     </div>
                     
                     {showChats && !isCollapsed && (
-                      <div className="ml-6 mt-1.5 flex flex-col gap-1.5 pl-2.5 border-l border-primary/20">
-                        {isPending ? (
-                          <div className="text-xs text-muted-foreground py-1.5 flex items-center">
-                            <div className="w-3 h-3 rounded-full border-2 border-primary/20 border-t-primary animate-spin mr-2"></div>
-                            Loading chats...
+                      <div className="mt-1 flex flex-col border-primary/5 bg-secondary/20 rounded-md shadow-inner max-h-[50vh] overflow-hidden mx-auto w-[13rem] max-w-[13rem]">
+                        <div className="px-2 pt-2 pb-2 w-full">
+                          <div className="relative w-full">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3 text-muted-foreground">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                              </svg>
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Search chat titles..."
+                              value={chatFilter}
+                              onChange={(e) => setChatFilter(e.target.value)}
+                              className="w-full rounded-md bg-background/90 py-1 pl-6 pr-2 text-xs outline-none border border-primary/10 focus:border-primary/30 focus:ring-1 focus:ring-primary/20 transition-all shadow-sm"
+                            />
                           </div>
-                        ) : error ? (
-                          <div className="text-xs text-destructive py-1.5 flex items-center">
-                            <span className="bg-destructive/10 h-5 w-5 rounded-full flex items-center justify-center mr-2">!</span>
-                            Error loading chats
-                          </div>
-                        ) : 
-                          chats?.map(chat => (
-                            <Link
-                              key={chat._id}
-                              to={`/dashboard/chats/${chat._id}`}
-                              className={cn(
-                                "flex h-8 items-center rounded-md px-2.5 text-xs transition-all hover:bg-primary/5 text-muted-foreground",
-                                pathname === `/dashboard/chats/${chat._id}` && "bg-primary/10 text-primary font-medium"
-                              )}
-                            >
-                              {chat.title}
-                            </Link>
-                          ))
-                        }
+                        </div>
+                        
+                        <div className="overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent pr-1 mt-1 pb-1 w-full">
+                          {isPending ? (
+                            <div className="text-xs text-muted-foreground py-3 flex items-center justify-center">
+                              <div className="w-3 h-3 rounded-full border-2 border-primary/20 border-t-primary animate-spin mr-1"></div>
+                              Loading...
+                            </div>
+                          ) : error ? (
+                            <div className="text-xs text-destructive py-3 flex items-center justify-center">
+                              <span className="bg-destructive/10 h-4 w-4 rounded-full flex items-center justify-center mr-1">!</span>
+                              Error
+                            </div>
+                          ) : filteredChats?.length === 0 ? (
+                            <div className="text-xs text-muted-foreground py-4 flex flex-col items-center justify-center space-y-1">
+                              <MessagesSquare className="h-4 w-4 text-primary/30" />
+                              {chatFilter ? "No matches" : "No chats"}
+                            </div>
+                          ) : 
+                            filteredChats?.map(chat => (
+                              <div key={chat._id} className="relative mb-1">
+                                {editingChatId === chat._id ? (
+                                  <form 
+                                    onSubmit={(e) => handleSaveEdit(chat._id, e)} 
+                                    className="flex items-center mx-1 px-2 py-2 rounded-md bg-primary/5 shadow-sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <input
+                                      type="text"
+                                      value={editingChatTitle}
+                                      onChange={(e) => setEditingChatTitle(e.target.value)}
+                                      className="flex-grow bg-transparent text-xs outline-none border-b border-primary/30 px-0.5 py-1 min-w-0"
+                                      autoFocus
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <button 
+                                      type="button" 
+                                      onClick={handleCancelEdit}
+                                      className="p-1 ml-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full flex-shrink-0"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                    <button 
+                                      type="submit" 
+                                      className="p-1 ml-1 text-muted-foreground hover:text-green-500 hover:bg-green-500/10 rounded-full flex-shrink-0"
+                                    >
+                                      <Check size={12} />
+                                    </button>
+                                  </form>
+                                ) : (
+                                  <div className="mx-1 rounded-md overflow-hidden hover:bg-primary/5">
+                                    <div className="flex flex-col w-full">
+                                      <div className="flex items-center w-full justify-between">
+                                        <Link
+                                          to={`/dashboard/chats/${chat._id}`}
+                                          className={cn(
+                                            "flex items-center w-full px-2 py-1.5 text-xs transition-all text-foreground",
+                                            pathname === `/dashboard/chats/${chat._id}` 
+                                              ? "bg-primary/10 text-primary font-medium border-l-2 border-primary" 
+                                              : "border-l-2 border-transparent"
+                                          )}
+                                        >
+                                          <div 
+                                            className="w-[calc(100%-22px)] truncate" 
+                                            title={chat.title.length > 25 ? chat.title : ""}
+                                          >
+                                            {chat.title.length > 25 ? `${chat.title.substring(0, 22)}...` : chat.title}
+                                          </div>
+                                        </Link>
+                                        <button 
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setShowOptionsForChat(showOptionsForChat === chat._id ? null : chat._id);
+                                          }}
+                                          className={cn(
+                                            "p-1 mr-1 text-muted-foreground hover:text-primary rounded-full hover:bg-primary/10 flex-shrink-0",
+                                            showOptionsForChat === chat._id && "text-primary bg-primary/10"
+                                          )}
+                                        >
+                                          <Settings size={11} />
+                                        </button>
+                                      </div>
+                                      
+                                      {showOptionsForChat === chat._id && (
+                                        <div className="flex w-full border-t border-border/10 px-2 py-1 bg-secondary/30">
+                                          <button 
+                                            onClick={(e) => handleEditChat(chat._id, chat.title, e)}
+                                            className="flex items-center text-[10px] text-muted-foreground hover:text-primary mr-2"
+                                          >
+                                            <Pencil size={10} className="mr-1" />
+                                            Edit
+                                          </button>
+                                          <button 
+                                            onClick={(e) => handleDeleteChat(chat._id, e)}
+                                            className="flex items-center text-[10px] text-muted-foreground hover:text-destructive"
+                                          >
+                                            <Trash2 size={10} className="mr-1" />
+                                            Delete
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          }
+                        </div>
                       </div>
                     )}
                   </div>
@@ -267,7 +456,7 @@ export function SidebarNavigation() {
                     )}
                   </Link>
                 </div>
-              </div>
+              </ScrollArea>
               
               <div className="mt-auto p-3 flex items-center justify-center">
                 {!isCollapsed ? (

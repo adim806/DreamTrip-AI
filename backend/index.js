@@ -146,6 +146,67 @@ app.put("/api/chats/:id", ClerkExpressRequireAuth(), async (req, res) => {
   }
 });
 
+// Endpoint to update chat title
+app.put("/api/userchats/:id", ClerkExpressRequireAuth(), async (req, res) => {
+  const userId = req.auth.userId;
+  const chatId = req.params.id;
+  const { title } = req.body;
+
+  if (!title || title.trim() === "") {
+    return res.status(400).send("Title cannot be empty");
+  }
+
+  try {
+    // Update the chat title in the UserChats collection
+    const result = await UserChats.updateOne(
+      { userId, "chats._id": chatId },
+      { $set: { "chats.$.title": title } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).send("Chat not found");
+    }
+
+    res.status(200).send({ success: true });
+  } catch (error) {
+    console.error("Error updating chat title:", error);
+    res.status(500).send("Error updating chat title");
+  }
+});
+
+// Endpoint to delete a chat
+app.delete(
+  "/api/userchats/:id",
+  ClerkExpressRequireAuth(),
+  async (req, res) => {
+    const userId = req.auth.userId;
+    const chatId = req.params.id;
+
+    try {
+      // Delete the chat from UserChats collection
+      const userChatsResult = await UserChats.updateOne(
+        { userId },
+        { $pull: { chats: { _id: chatId } } }
+      );
+
+      // Delete the chat from Chat collection
+      const chatResult = await Chat.deleteOne({ _id: chatId, userId });
+
+      if (
+        userChatsResult.modifiedCount === 0 &&
+        chatResult.deletedCount === 0
+      ) {
+        return res.status(404).send("Chat not found");
+      }
+
+      res.status(200).send({ success: true });
+    } catch (error) {
+      console.error("Error deleting chat:", error);
+      res.status(500).send("Error deleting chat");
+    }
+  }
+);
+
 // Global error handler for unauthenticated access
 app.use((err, req, res, next) => {
   console.error(err.stack);
