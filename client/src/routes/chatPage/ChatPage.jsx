@@ -5,8 +5,8 @@ import { useLocation } from "react-router-dom";
 import Markdown from "react-markdown";
 import { IKImage } from "imagekitio-react";
 import { TripContext } from "@/components/tripcontext/TripProvider";
-import { FcAssistant } from "react-icons/fc";
-import { FaUser, FaRobot } from "react-icons/fa";
+import { RiUser3Fill, RiRobot2Fill, RiCompass3Fill } from "react-icons/ri";
+import { motion } from "framer-motion";
 
 const ChatPage = () => {
   const path = useLocation().pathname;
@@ -49,44 +49,77 @@ const ChatPage = () => {
   }, [data]);
 
   return (
-    <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(30,30,46,0.95)] overflow-hidden">
-      {/* Chat Header */}
-      <div className="flex items-center p-4 bg-gradient-to-r from-[#4d5ee2] to-[#30304b] text-white font-bold text-lg border-b border-[#444]">
-        <FcAssistant className="mr-2 text-xl" />
-        <h3>DreamTrip-AI Assistant</h3>
+    <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(25,28,40,0.97)] overflow-hidden">
+      {/* Chat Header - עיצוב משופר */}
+      <div className="flex items-center justify-between py-2 px-4 bg-gradient-to-r from-[#1E293B] to-[#1E1F2A] border-b border-gray-800/60">
+        <div className="flex items-center space-x-2">
+          <div className="bg-blue-600/20 p-1.5 rounded-full flex items-center justify-center">
+            <RiCompass3Fill className="text-blue-400 text-lg" />
+          </div>
+          <div>
+            <h3 className="text-white font-medium text-base tracking-wide">DreamTrip AI</h3>
+            <div className="flex items-center">
+              <motion.div
+                className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1.5"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+              <span className="text-xs text-gray-400">Active</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <div className="text-xs py-1 px-2 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800/30">
+            Travel Assistant
+          </div>
+        </div>
       </div>
 
       {/* Chat Content with History and Input */}
-      <div className="flex-1 flex flex-col bg-[#292945] overflow-hidden">
+      <div className="flex-1 flex flex-col bg-[#171923] overflow-hidden">
         {/* Message History */}
         <div 
           ref={chatContainerRef}
           id="chat-messages-container"
           className="flex-1 overflow-y-auto p-4 pb-2"
-          style={{ maxHeight: "calc(100vh - 130px)" }}
+          style={{ maxHeight: "calc(100vh - 120px)" }}
         >
           <div className="flex flex-col gap-4">
             {isPending ? (
-              <div className="text-center p-4">Loading...</div>
+              <div className="flex justify-center items-center h-full">
+                <div className="animate-pulse flex space-x-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="w-2 h-2 bg-blue-400 rounded-full" 
+                      style={{ animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+              </div>
             ) : error ? (
-              <div className="text-center p-4 text-red-500">Error loading chat</div>
+              <div className="text-center p-4 text-red-400 bg-red-900/20 rounded-lg border border-red-800/30">
+                Error loading chat
+              </div>
             ) : (
               data?.history?.map((message, i) => (
                 <React.Fragment key={i}>
                   <div
-                    className={`px-4 py-3 bg-[#2b3c5a] rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 ${
+                    className={`px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 ${
                       message.role === "user"
-                        ? "bg-[#5561c0] text-[#f9f9f9] self-end flex-row-reverse"
-                        : "self-start"
+                        ? "bg-blue-600/20 text-[#f9f9f9] self-end flex-row-reverse border-t border-r border-blue-500/20"
+                        : "bg-[#2a2d3c] self-start border-t border-l border-gray-700/30"
                     }`}
                   >
                     {message.role === "user" ? (
                       <div className="message-header">
-                        <FaUser className="text-white text-sm" />
+                        <div className="bg-blue-500/30 p-1 rounded-full">
+                          <RiUser3Fill className="text-white text-xs" />
+                        </div>
                       </div>
                     ) : (
                       <div className="message-header">
-                        <FaRobot className="text-[#8aa2d3] text-sm" />
+                        <div className="ai-avatar-container">
+                          <RiCompass3Fill className="text-blue-400 text-sm" />
+                        </div>
                       </div>
                     )}
                     
@@ -116,7 +149,7 @@ const ChatPage = () => {
         
         {/* Input Component */}
         {data && (
-          <div className="flex-shrink-0 border-t border-[#3c3c56]">
+          <div className="flex-shrink-0 border-t border-[#2a2d3c]">
             <NewPromt data={data} />
           </div>
         )}

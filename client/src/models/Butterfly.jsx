@@ -11,7 +11,7 @@ import { useGLTF, useAnimations } from '@react-three/drei'
 
 export function Butterfly(props) {
   const group = useRef()
-  const { nodes, materials, animations } = useGLTF('./models/butterfly/scene-transformed.glb')
+  const { nodes, materials, animations } = useGLTF('/models/butterfly/scene-transformed.glb')
   const { actions } = useAnimations(animations, group)
   console.log("Nodes:", nodes);
   console.log("Materials:", materials);
@@ -403,4 +403,4 @@ export function Butterfly(props) {
   )
 }
 
-useGLTF.preload('./models/butterfly/scene-transformed.glb')
+useGLTF.preload('/models/butterfly/scene-transformed.glb')

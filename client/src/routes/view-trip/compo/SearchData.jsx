@@ -59,26 +59,25 @@ const SearchData = ({ trip }) => {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Navigation Tabs */}
-      <nav className="flex-none p-4 bg-opacity-90 rounded-lg shadow-md bg-gradient-to-t from-cyan-950 to-slate-950">
-        <div className="flex justify-center items-center gap-4">
+      <nav className="flex-none p-2 bg-opacity-90 rounded-lg shadow-md bg-gradient-to-t from-gray-900 to-gray-900">
+        <div className="flex justify-center items-center gap-1 flex-wrap">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              className={`tab flex justify-center items-center px-6 py-3 rounded-lg shadow-lg font-bold text-sm transition-transform duration-300 transform ${
+              className={`tab flex justify-center items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
                 activeTab === tab.id
-                  ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white scale-105"
-                  : "bg-gray-200 hover:scale-105 hover:bg-gray-300"
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
               }`}
               onClick={() => {
                 setActiveTab(tab.id);
                 setActiveLayer(tab.id);
               }}
               style={{
-                minWidth: "120px",
-                height: "60px",
+                minWidth: "80px",
               }}
             >
-              {tab.icon} {tab.label}
+              <span className="mr-1">{tab.icon}</span> {tab.label}
             </button>
           ))}
         </div>
@@ -87,7 +86,7 @@ const SearchData = ({ trip }) => {
       {/* Content Section */}
       <div
         ref={contentRef}
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto mt-2"
         style={{
           scrollbarWidth: "thin",
           scrollbarColor: "rgba(59, 130, 246, 0.2) rgba(59, 130, 246, 0.1)",

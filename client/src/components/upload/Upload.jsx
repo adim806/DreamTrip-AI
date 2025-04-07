@@ -1,5 +1,8 @@
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { useRef, useEffect } from 'react';
+import { IoImageOutline } from 'react-icons/io5';
+import { motion } from 'framer-motion';
+
 const urlEndpoint = import.meta.env.VITE_IMAGE_KIT_ENDPOINT;
 const publicKey = import.meta.env.VITE_IMAGE_KIT_PUBLIC_KEY;
 
@@ -94,19 +97,33 @@ const Upload = ({ setImg }) => {
         ref={ikUploadRef}
         accept="image/*" // Accept only images
       />
-      <label 
+      <motion.label
         onClick={handleUploadClick} 
         role="button" 
         aria-label="Upload image"
         className="upload-button"
-        style={{ cursor: 'pointer' }}
+        style={{ 
+          cursor: 'pointer',
+          backgroundColor: '#2c3657',
+          width: '38px',
+          height: '38px',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 2px 5px rgba(59, 130, 246, 0.2)'
+        }}
+        whileHover={{ 
+          scale: 1.05, 
+          backgroundColor: '#3a477a' 
+        }}
+        whileTap={{ scale: 0.95 }}
       >
-        <img 
-          src="/attachment.png" 
-          alt="Upload attachment" 
-          style={{ width: '20px', height: '20px' }} 
+        <IoImageOutline 
+          size={20} 
+          color="#d1d5db" 
         />
-      </label>
+      </motion.label>
     </IKContext>
   );
 };

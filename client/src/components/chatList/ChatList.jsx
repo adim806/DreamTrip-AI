@@ -49,6 +49,7 @@ const ChatList = () =>{
             <Link to="/">Explore DreamTrip-AI</Link>  
             <Link to="/">Contact</Link>  
             <Link to="/">My Trips <MdTravelExplore /></Link> 
+            <Link to="/">About <MdTravelExplore /></Link> 
             <hr/>
             <span className="title">Recent Chats</span>
             <div className="list">

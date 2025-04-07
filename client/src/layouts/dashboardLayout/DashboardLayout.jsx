@@ -2,7 +2,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect } from 'react';
 import './dashboardLayout.css';
-import ChatList from "../../components/chatList/ChatList";
+import { SidebarNavigation } from "@/components/ui/sidebar";
 import { TripProvider } from '@/components/tripcontext/TripProvider';
 
 /**
@@ -16,7 +16,7 @@ import { TripProvider } from '@/components/tripcontext/TripProvider';
  * ### Key Functionalities:
  * - **Authentication Check**: Monitors the `isLoaded` and `userId` values. If the user is not authenticated (`!userId`), redirects to the `/sign-in` route.
  * - **Outlet Rendering**: Displays child components routed within `/dashboard`, utilizing `Outlet` to dynamically render these pages.
- * - **ChatList Component**: Renders a sidebar chat list for navigation between different chat rooms or features.
+ * - **SidebarNavigation Component**: Renders a modern, collapsible sidebar for navigation between different app features.
  * 
  * ### CSS Styling:
  * - Uses `dashboardLayout.css` to style the layout of the dashboard and its sections.
@@ -45,11 +45,11 @@ const DashboardLayout = () => {
   return (
     <TripProvider>
     <div className="DashboardLayout">
-      {/* Sidebar menu displaying chat list */}
-        <div className="menu"><ChatList/> </div>
+      {/* Modern collapsible sidebar for navigation */}
+      <SidebarNavigation />
 
-        {/* Main content area rendering nested routes via Outlet */}
-        <div className="content"><Outlet/></div>
+      {/* Main content area rendering nested routes via Outlet */}
+      <div className="content"><Outlet/></div>
     </div>
     </TripProvider>
   );

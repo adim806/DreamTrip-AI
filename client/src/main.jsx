@@ -69,20 +69,17 @@ const router = createBrowserRouter([
             path: "/dashboard",
             element: <DashboardPage />,
           },
-
           {
             path: "/dashboard/chats/:id",
             element: (
-              <div>
-                
+              <div>  
                 <ViewTripData /> {/* מציגים את המפה לצד הצ'אט */}
               </div>
-              
             ),
           },
         ],
       },
-    ],
+    ], 
   },
 ]);
 
