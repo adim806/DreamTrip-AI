@@ -506,7 +506,7 @@ Would you like to make any adjustments to this itinerary?
       if (isAwaitingConfirmation && 
           (userMessage.toLowerCase() === "yes" || 
            userMessage.toLowerCase().includes("generate") && 
-           userMessage.toLowerCase().includes("itinerary"))) {
+           userMessage.includes("itinerary"))) {
         
         // Save the confirmation message
         mutation.mutate({ 

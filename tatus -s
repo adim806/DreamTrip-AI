@@ -1,0 +1,165 @@
+[1mdiff --git a/README.md b/README.md[m
+[1mindex 986ee69..d46ab61 100644[m
+[1m--- a/README.md[m
+[1m+++ b/README.md[m
+[36m@@ -30,6 +30,7 @@[m [mBefore proceeding, ensure you have the following installed on your machine:[m
+ 2. Add the following variables to the `.env` file (replace placeholders with actual values):[m
+ [m
+ ### `.env.server`[m
+[32m+[m
+ ```[m
+ # ImageKit API keys[m
+ [m
+[36m@@ -45,6 +46,7 @@[m [mBefore proceeding, ensure you have the following installed on your machine:[m
+ ```[m
+ [m
+ ### `.env.client`[m
+[32m+[m
+ ```[m
+ [m
+ ```[m
+[36m@@ -52,10 +54,13 @@[m [mBefore proceeding, ensure you have the following installed on your machine:[m
+ ## 3. Installing Dependencies[m
+ [m
+ Run the following command to install all required dependencies:[m
+[32m+[m
+ ```bash[m
+ npm install[m
+ ```[m
+[32m+[m
+ or, if you are using Yarn:[m
+[32m+[m
+ ```bash[m
+ yarn install[m
+ ```[m
+[36m@@ -63,13 +68,17 @@[m [myarn install[m
+ ## 4. Running the Development Server[m
+ [m
+ To start the development server, run:[m
+[32m+[m
+ ```bash[m
+ npm run dev[m
+ ```[m
+[32m+[m
+ or, if you are using Yarn:[m
+[32m+[m
+ ```bash[m
+ yarn dev[m
+ ```[m
+[32m+[m
+ The application will be available at `http://localhost:5173/`.[m
+ [m
+ ## 5. Docker Setup[m
+[36m@@ -85,9 +94,11 @@[m [mThe application will be available at `http://localhost:5173/`.[m
+ ### 5.2. Running the Docker Container[m
+ [m
+ 1. Run the container with the following command:[m
+[32m+[m
+    ```bash[m
+    docker run -p 5173:5173 --env-file .env --name your-container-name your-repository-name[m
+    ```[m
+[32m+[m
+    - `-p 5173:5173`: Maps port 5173 on your machine to port 5173 in the container.[m
+    - `--env-file .env`: Loads the environment variables from the `.env` file.[m
+ [m
+[36m@@ -114,10 +125,13 @@[m [mThe application will be available at `http://localhost:5173/`.[m
+ ## 6. Testing[m
+ [m
+ To run tests (if available), use the following command:[m
+[32m+[m
+ ```bash[m
+ npm test[m
+ ```[m
+[32m+[m
+ or[m
+[32m+[m
+ ```bash[m
+ yarn test[m
+ ```[m
+[36m@@ -146,4 +160,3 @@[m [mFor production, you can use the following steps:[m
+ - For issues or questions, contact the project maintainer at [your-email@example.com](mailto:your-email@example.com).[m
+ [m
+ Enjoy using the project![m
+[31m-[m
+[1mdiff --git a/backend/keys/dreamtrip-ai-d37a84894288.json b/backend/keys/dreamtrip-ai-d37a84894288.json[m
+[1mnew file mode 100644[m
+[1mindex 0000000..1387ea1[m
+[1m--- /dev/null[m
+[1m+++ b/backend/keys/dreamtrip-ai-d37a84894288.json[m
+[36m@@ -0,0 +1,13 @@[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "service_account",[m
+[32m+[m[32m  "project_id": "dreamtrip-ai",[m
+[32m+[m[32m  "private_key_id": "d37a848942888b41ce409f7afa7512de1a648ba1",[m
+[32m+[m[32m  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC0TgSfIhqViV7U\n9/Y9ywSoqA5y5hQjzYM3q1D2LxCWC6BvVV6HFGHIjotgkT5dpRs0WDNLV06c2hKZ\nLOyLq0BANTGb33aoxMpoBvPVBkHEusFCn2264SCaSl2ayljIL09ckSP7pjmZNmXi\n7Xs9kdmGxOiItgmpwAiOrzKiyzPdmSeNv9AfY2tU6k6YY8UhucMb8/xs3LFzjd+9\npJi+WAByPk+mgtagqNS5Esz404qv+0uuE9Rc3FIAWHco62nsl8vBjlcl74gZcqWk\nvmrHIUQppUD2qmf1LErOOKXzydvbJ2eAXmCsJ7QUxtDUBoZm4UnXcXUCLtUhmuT9\nAHhWVU5fAgMBAAECggEAB18lNeTQgFG/JV/oKRCZ89O/l+0A4K5Mqor//ytfcB2w\n6LxfHx7sGPrvasGlco4HNbWojsXk7CJV5W/FirfesZ3JXOSmHdz7MfcrP10q5vsu\n0LO4MVV2UBwi6SPFZ+q7s5PvjCCxkX+1h1wu7LkqmiWjCDL6AJt6jE9QTQEmDdFd\nCkQvIswmSKJ+0Y9o3IBogyrylsIagE9pVnm4d7dwrWA2/QnLQeNrpKx5tDE2a2UV\nKqot/Jz3qQTo7sXKo/gtgF4BimUtzwbXG2OE539AI66HbQncaHIUxafZ0pRhiQfa\noryLOnK+ZJlUD0XZX9kgRR1MKgWNnQQFCjrwqU0YkQKBgQD9047JioK3iakQ/7mo\nW5LU8OmDNf6g5XKRItHdI/OFFH8eicjHmSPEM0pwNhoC5qzrwu9oh9bf5DUNW0b9\ngXUT5qqeQUNVSOXF8UG/c/ZBdYEAXPch8DmCpBdwxjVmJhrh1FLOw2Mgp2hmbcuN\n+q/5VrY9L8dYddBBrninZosbSQKBgQC12Uj1LxvQXv6rB4DkuHFK7VG1IEu46fvw\na+14BgunWrtNspbvQ/GfvfCEhv9jOy/ai2Wq2Jex2TROwLI0r+lZDpUcRZm318KW\nbiNJvi6EQ+604nyUqeni43F7LhHtdOG1ayem8J2ZZyyxJjcWPU7TYh/05AAaTcVI\nQJ143b60ZwKBgHqB9EWj24lYIMh6lJIEeK7cA+h3VAk2FQClzKKuKmfNx7jmiYiE\nijW1B7V290D1MvqrYD+UaIoxK8Xhizbpl6deSnUNTMFJ6NSLp88O2gkn/HY/aGvx\n9N/v8PxWPgmqVIkwoDL5LMvi4MmnLnq9RtfSGS0Y9V7lpfk9izBIltU5AoGAHEtL\nm8KRrFErhMbtGilMj2DvhqQYxBO7/IN+dl9Sbt6iKAuyilXjAXzXMHekwvbRkkqA\nLh33NFfcWKiI0cPRJecr8jMuILm0cB2A5hduO2wqdwCKa8MoPgIvhP/9EBpQiB69\nE696hgTUoleU2KP/YMpyuHLFRVJ2cLCFD+pIot8CgYEA39BohTChycOwgD2lI/rV\nrtFes3WZuGEOekijILS54ezFIsYOOdU9Ps5KfwdhpFZHLv7v2GJ2cZwQWjBeHchb\nrzXT28tYJBeGg/DWzfg4OZFDWkatogcLSRRnCSSwJXt5Qq6M4+uW09KX/UV65YUT\n5NwrLa0UwYQFTkZJrSn/VsU=\n-----END PRIVATE KEY-----\n",[m
+[32m+[m[32m  "client_email": "vertex-ai-service@dreamtrip-ai.iam.gserviceaccount.com",[m
+[32m+[m[32m  "client_id": "108650174866527934410",[m
+[32m+[m[32m  "auth_uri": "https://accounts.google.com/o/oauth2/auth",[m
+[32m+[m[32m  "token_uri": "https://oauth2.googleapis.com/token",[m
+[32m+[m[32m  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",[m
+[32m+[m[32m  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/vertex-ai-service%40dreamtrip-ai.iam.gserviceaccount.com",[m
+[32m+[m[32m  "universe_domain": "googleapis.com"[m
+[32m+[m[32m}[m
+[1mdiff --git a/backend/package-lock.json b/backend/package-lock.json[m
+[1mindex 0988534..de599a3 100644[m
+[1m--- a/backend/package-lock.json[m
+[1m+++ b/backend/package-lock.json[m
+[36m@@ -10,11 +10,16 @@[m
+       "license": "ISC",[m
+       "dependencies": {[m
+         "@clerk/clerk-sdk-node": "^5.0.61",[m
+[32m+[m[32m        "@google-cloud/aiplatform": "^4.1.0",[m
+[32m+[m[32m        "@google/generative-ai": "^0.24.0",[m
+[32m+[m[32m        "@radix-ui/react-tabs": "^1.1.4",[m
+         "cors": "^2.8.5",[m
+         "dotenv": "^16.4.7",[m
+         "express": "^4.21.2",[m
+[32m+[m[32m        "google-auth-library": "^9.15.1",[m
+         "imagekit": "^5.2.0",[m
+         "mongoose": "^8.7.2",[m
+[32m+[m[32m        "node-fetch": "^3.3.2",[m
+         "nodemon": "^3.1.7"[m
+       }[m
+     },[m
+[36m@@ -91,6 +96,69 @@[m
+         "node": ">=18.17.0"[m
+       }[m
+     },[m
+[32m+[m[32m    "node_modules/@google-cloud/aiplatform": {[m
+[32m+[m[32m      "version": "4.1.0",[m
+[32m+[m[32m      "resolved": "https://registry.npmjs.org/@google-cloud/aiplatform/-/aiplatform-4.1.0.tgz",[m
+[32m+[m[32m      "integrity": "sha512-JJVeptNgveCJMT1+LHSBPQPjbwCh0Ir2BexxbS4bhmnEP/acPfDmU/f1hA/tQshqQveKryWvCSxK5TC5cyKE1Q==",[m
+[32m+[m[32m      "license": "Apache-2.0",[m
+[32m+[m[32m      "dependencies": {[m
+[32m+[m[32m        "google-gax": "^5.0.0-rc.0",[m
+[32m+[m[32m        "protobuf.js": "^1.1.2"[m
+[32m+[m[32m      },[m
+[32m+[m[32m      "engines": {[m
+[32m+[m[32m        "node": ">=18"[m
+[32m+[m[32m      }[m
+[32m+[m[32m    },[m
+[32m+[m[32m    "node_modules/@google/generative-ai": {[m
+[32m+[m[32m      "version": "0.24.0",[m
+[32m+[m[32m      "resolved": "https://registry.npmjs.org/@google/generative-ai/-/generative-ai-0.24.0.tgz",[m
+[32m+[m[32m      "integrity": "sha512-fnEITCGEB7NdX0BhoYZ/cq/7WPZ1QS5IzJJfC3Tg/OwkvBetMiVJciyaan297OvE4B9Jg1xvo0zIazX/9sGu1Q==",[m
+[32m+[m[32m      "license": "Apache-2.0",[m
+[32m+[m[32m      "engines": {[m
+[32m+[m[32m        "node": ">=18.0.0"[m
+[32m+[m[32m      }[m
+[32m+[m[32m    },[m
+[32m+[m[32m    "node_modules/@grpc/grpc-js": {[m
+[32m+[m[32m      "version": "1.13.3",[m
+[32m+[m[32m      "resolved": "https://registry.npmjs.org/@grpc/grpc-js/-/grpc-js-1.13.3.tgz",[m
+[32m+[m[32m      "integrity": "sha512-FTXHdOoPbZrBjlVLHuKbDZnsTxXv2BlHF57xw6LuThXacXvtkahEPED0CKMk6obZDf65Hv4k3z62eyPNpvinIg==",[m
+[32m+[m[32m      "license": "Apache-2.0",[m
+[32m+[m[32m      "dependencies": {[m
+[32m+[m[32m        "@grpc/proto-loader": "^0.7.13",[m
+[32m+[m[32m        "@js-sdsl/ordered-map": "^4.4.2"[m
+[32m+[m[32m      },[m
+[32m+[m[32m      "engines": {[m
+[32m+[m[32m        "node": ">=12.10.0"[m
+[32m+[m[32m      }[m
+[32m+[m[32m    },[m
+[32m+[m[32m    "node_modules/@grpc/proto-loader": {[m
+[32m+[m[32m      "version": "0.7.13",[m
+[32m+[m[32m      "resolved": "https://registry.npm
