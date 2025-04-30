@@ -30,6 +30,7 @@ Before proceeding, ensure you have the following installed on your machine:
 2. Add the following variables to the `.env` file (replace placeholders with actual values):
 
 ### `.env.server`
+
 ```
 # ImageKit API keys
 
@@ -45,6 +46,7 @@ Before proceeding, ensure you have the following installed on your machine:
 ```
 
 ### `.env.client`
+
 ```
 
 ```
@@ -52,10 +54,13 @@ Before proceeding, ensure you have the following installed on your machine:
 ## 3. Installing Dependencies
 
 Run the following command to install all required dependencies:
+
 ```bash
 npm install
 ```
+
 or, if you are using Yarn:
+
 ```bash
 yarn install
 ```
@@ -63,13 +68,17 @@ yarn install
 ## 4. Running the Development Server
 
 To start the development server, run:
+
 ```bash
 npm run dev
 ```
+
 or, if you are using Yarn:
+
 ```bash
 yarn dev
 ```
+
 The application will be available at `http://localhost:5173/`.
 
 ## 5. Docker Setup
@@ -85,9 +94,11 @@ The application will be available at `http://localhost:5173/`.
 ### 5.2. Running the Docker Container
 
 1. Run the container with the following command:
+
    ```bash
    docker run -p 5173:5173 --env-file .env --name your-container-name your-repository-name
    ```
+
    - `-p 5173:5173`: Maps port 5173 on your machine to port 5173 in the container.
    - `--env-file .env`: Loads the environment variables from the `.env` file.
 
@@ -114,10 +125,13 @@ The application will be available at `http://localhost:5173/`.
 ## 6. Testing
 
 To run tests (if available), use the following command:
+
 ```bash
 npm test
 ```
+
 or
+
 ```bash
 yarn test
 ```
@@ -146,4 +160,3 @@ For production, you can use the following steps:
 - For issues or questions, contact the project maintainer at [your-email@example.com](mailto:your-email@example.com).
 
 Enjoy using the project!
-

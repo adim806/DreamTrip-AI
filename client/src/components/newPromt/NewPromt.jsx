@@ -14,6 +14,28 @@ import { motion } from "framer-motion";
 import { RiUser3Fill, RiCompass3Fill } from "react-icons/ri";
 import { IoSend, IoImageOutline } from "react-icons/io5";
 
+// Import utility functions
+import { 
+  updateTripDraft, 
+  checkTripDraftCompleteness, 
+  generateFollowUpQuestion,
+  formatTripSummary
+} from "../../utils/tripUtils";
+import { 
+  fetchExternalData, 
+  buildPromptWithExternalData 
+} from "../../utils/externalDataService";
+import {
+  extractStructuredDataFromResponse,
+  getSystemInstruction,
+  getGenerationConfig,
+  intentRequiresExternalData
+} from "../../utils/aiPromptUtils";
+import { 
+  generateItinerary, 
+  saveItinerary 
+} from "../../utils/itineraryGenerator";
+
 /**
  * NewPromt Component
  *
@@ -121,6 +143,8 @@ const NewPromt = ({ data }) => {
   const [currentInput, setCurrentInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [pendingMessages, setPendingMessages] = useState([]);
+  const [isAwaitingConfirmation, setIsAwaitingConfirmation] = useState(false);
+  const [isGeneratingItinerary, setIsGeneratingItinerary] = useState(false);
   
   // Remove the local processedChatIds state
   // Instead we'll use a ref that persists between renders
@@ -136,7 +160,7 @@ const NewPromt = ({ data }) => {
 
   // Navigation and context
   const navigate = useNavigate();
-  const { setTripDetails } = useContext(TripContext);
+  const { tripDetails, setTripDetails, setallTripData } = useContext(TripContext);
   
   // References
   const endRef = useRef(null);
@@ -147,73 +171,10 @@ const NewPromt = ({ data }) => {
   const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
   const model = genAI.getGenerativeModel({
     model: "gemini-2.0-flash",
-    systemInstruction: `
-      You are a highly intelligent travel agent called 'DreamTrip-AI'. Your primary goal is to analyze user input, classify it into a structured format, and respond accordingly as a knowledgeable travel assistant.
-
-      ### Tasks:
-      1. **Input Analysis**:
-        - Classify the user's input into one of two modes:
-          - "Advice": For general travel-related queries or advice.
-          - "Trip-Building": For requests requiring a detailed travel plan.
-        - Determine if the input provides complete information or if additional details are required.
-        - Return a structured JSON object with the analyzed input details.
-
-      2. **Responding to User**:
-        - If the mode is "Advice":
-          - Provide detailed and relevant travel advice.
-          - Ask clarifying questions if the input is incomplete.
-        - If the mode is "Trip-Building":
-          - Use the structured data to create or continue a personalized travel plan.
-          - If data is incomplete, ask targeted questions to fill in missing information.
-
-      ### Response Format:
-      Return a JSON object structured as follows:
-      \`\`\`json
-      {
-        "mode": "Advice" or "Trip-Building",
-        "status": "Complete" or "Incomplete",
-        "response": "Your detailed response here if clarification is needed",
-        "data": {
-          "vacation_location": "string",
-          "duration": "integer",
-          "constraints": {
-            "travel_type": "string",
-            "preferred_activity": "string",
-            "budget": "string",
-            "special_requirements": [
-              "Eco-Friendly",
-              "Accessible for Disabilities",
-              "Kid-Friendly",
-              "Pet-Friendly",
-              "Avoid long walks",
-              "Close to transportation",
-              "Vegetarian/Vegan dining"
-            ]
-          },
-          "preferences": {
-            "hotel_preferences": "string",
-            "dining_preferences": "string",
-            "transportation_mode": "string"
-          },
-          "notes": "string"
-        }
-      }
-      \`\`\`
-
-      ### Guidelines:
-      - Always maintain context based on the conversation history.
-      - Respond in a professional, concise, and friendly manner.
-      - Use user-provided constraints and preferences to enhance responses.
-    `,
+    systemInstruction: getSystemInstruction(),
   });
 
-  const generationConfig = {
-    temperature: 1,
-    topP: 0.95,
-    topK: 40,
-    maxOutputTokens: 1200,
-    responseMimeType: "application/json",
-  };
+  const generationConfig = getGenerationConfig();
 
   // Initialize chat with history
   const chat = model.startChat({
@@ -294,81 +255,120 @@ const NewPromt = ({ data }) => {
     },
   });
 
-  // Function to generate a prompt from trip details
-  const generatePromptFromObject = (tripDetails) => {
-    if (!tripDetails || typeof tripDetails !== "object") {
-      return "No valid trip details provided.";
+  // Handle itinerary generation
+  const handleGenerateItinerary = async () => {
+    if (!tripDetails || isGeneratingItinerary) return;
+    
+    setIsGeneratingItinerary(true);
+    
+    try {
+      // Display a message that we're generating an itinerary
+      setPendingMessages(prev => [...prev, {
+        role: 'model',
+        message: "Generating your personalized travel itinerary. This may take a moment..."
+      }]);
+      
+      // Generate the itinerary
+      const itineraryResult = await generateItinerary(tripDetails);
+      
+      if (itineraryResult.success) {
+        console.log("Itinerary generated successfully");
+        
+        // Store the itinerary in the trip context for use elsewhere in the app
+        setallTripData({
+          tripDetails,
+          itinerary: itineraryResult.itinerary,
+          metadata: itineraryResult.metadata
+        });
+        
+        // Save the itinerary to the server (if you have a backend API for this)
+        try {
+          // This is optional - implemented if you have a backend endpoint for itineraries
+          const saveResult = await saveItinerary(data._id, itineraryResult);
+          console.log("Itinerary saved to server:", saveResult);
+        } catch (saveError) {
+          console.error("Error saving itinerary to server:", saveError);
+          // Continue even if saving fails - we still have the data in the context
+        }
+        
+        // Show the generated itinerary in the chat
+        setPendingMessages(prev => {
+          // Find and remove the "Generating..." message
+          const updatedMessages = prev.filter(
+            msg => msg.role !== 'model' || 
+            msg.message !== "Generating your personalized travel itinerary. This may take a moment..."
+          );
+          
+          // Add the complete itinerary message
+          updatedMessages.push({
+            role: 'model',
+            message: `
+## Your Travel Itinerary for ${tripDetails.vacation_location}
+
+${itineraryResult.itinerary}
+
+Would you like to make any adjustments to this itinerary?
+            `
+          });
+          
+          return updatedMessages;
+        });
+        
+        // Save the itinerary message to the chat history
+        mutation.mutate({
+          userMessage: null,  // No user message to save
+          aiResponse: `
+## Your Travel Itinerary for ${tripDetails.vacation_location}
+
+${itineraryResult.itinerary}
+
+Would you like to make any adjustments to this itinerary?
+          `,
+          image: null
+        });
+        
+      } else {
+        // Handle error in itinerary generation
+        console.error("Failed to generate itinerary:", itineraryResult.error);
+        
+        setPendingMessages(prev => {
+          // Find and remove the "Generating..." message
+          const updatedMessages = prev.filter(
+            msg => msg.role !== 'model' || 
+            msg.message !== "Generating your personalized travel itinerary. This may take a moment..."
+          );
+          
+          // Add the error message
+          updatedMessages.push({
+            role: 'model',
+            message: "I'm sorry, I encountered a problem while generating your itinerary. Would you like to try again?"
+          });
+          
+          return updatedMessages;
+        });
+      }
+    } catch (error) {
+      console.error("Error in itinerary generation process:", error);
+      
+      setPendingMessages(prev => {
+        // Find and remove the "Generating..." message
+        const updatedMessages = prev.filter(
+          msg => msg.role !== 'model' || 
+          msg.message !== "Generating your personalized travel itinerary. This may take a moment..."
+        );
+        
+        // Add the error message
+        updatedMessages.push({
+          role: 'model',
+          message: "I apologize, but there was an unexpected error generating your itinerary. Please try again later."
+        });
+        
+        return updatedMessages;
+      });
+    } finally {
+      setIsGeneratingItinerary(false);
+      setIsAwaitingConfirmation(false);
     }
-
-    const {
-      vacation_location,
-      duration,
-      constraints = {},
-      preferences = {},
-      notes,
-    } = tripDetails;
-
-    const {
-      travel_type = "Not specified",
-      preferred_activity = "Not specified",
-      budget = "Not specified",
-      special_requirements = [],
-    } = constraints;
-
-    const {
-      hotel_preferences = "Not specified",
-      dining_preferences = "Not specified",
-      transportation_mode = "Not specified",
-    } = preferences;
-
-    const specialRequirementsText =
-      special_requirements.length > 0
-        ? special_requirements.join(", ")
-        : "No specific requirements provided.";
-
-    let result = `Generate a detailed travel plan for the following trip:\n`;
-
-    if (vacation_location) {
-      result += `- **Location**: ${vacation_location}\n`;
-    }
-
-    if (duration) {
-      result += `- **Duration**: ${duration} days\n`;
-    }
-
-    if (travel_type !== "Not specified") {
-      result += `- **Travel Type**: ${travel_type}\n`;
-    }
-
-    if (preferred_activity !== "Not specified") {
-      result += `- **Preferred Activity**: ${preferred_activity}\n`;
-    }
-
-    if (budget !== "Not specified") {
-      result += `- **Budget**: ${budget}\n`;
-    }
-
-    if (hotel_preferences !== "Not specified") {
-      result += `- **Hotel Preferences**: ${hotel_preferences}\n`;
-    }
-
-    if (dining_preferences !== "Not specified") {
-      result += `- **Dining Preferences**: ${dining_preferences}\n`;
-    }
-
-    if (transportation_mode !== "Not specified") {
-      result += `- **Transportation Mode**: ${transportation_mode}\n`;
-    }
-
-    if (specialRequirementsText !== "No specific requirements provided.") {
-      result += `- **Special Requirements**: ${specialRequirementsText}\n`;
-    }
-
-    if (notes) {
-      result += `- **Additional Notes**: ${notes}\n`;
-    }
-
-    return result.trim();
   };
 
   // Add this function to check if a chat has already been processed
@@ -435,33 +435,38 @@ const NewPromt = ({ data }) => {
           
           console.log("AI response for initial message:", aiResponse);
 
-          // Process the response
-          let formattedResponse = aiResponse;
-          let tripData = null;
+          // Process the response with structured data extraction
+          const { formattedResponse, data: structuredData, success } = 
+            extractStructuredDataFromResponse(aiResponse);
 
-          // Try to extract JSON from response
-          const jsonMatch = aiResponse.match(/{[\s\S]*}/);
-          if (jsonMatch) {
-            try {
-              const jsonObject = JSON.parse(jsonMatch[0]);
-              formattedResponse = jsonObject.response || aiResponse;
-              
-              if (jsonObject.mode === "Trip-Building") {
-                tripData = jsonObject.data;
-                if (tripData) {
-                  setTripDetails(tripData);
-                }
-              }
-            } catch (error) {
-              console.error("Failed to parse JSON:", error);
-            }
-          }
+          console.log("Extracted structured data:", structuredData);
           
           // Only add AI response to pending messages
           setPendingMessages([{
             role: 'model',
             message: formattedResponse
           }]);
+          
+          // If successful extraction and Trip-Building mode, update trip details
+          if (success && structuredData && structuredData.mode === "Trip-Building") {
+            const newTripDetails = updateTripDraft(tripDetails, structuredData.data);
+            setTripDetails(newTripDetails);
+            console.log("Updated trip details:", newTripDetails);
+            
+            // Check if we need to show a trip summary for confirmation
+            const completenessCheck = checkTripDraftCompleteness(newTripDetails);
+            if (completenessCheck.isComplete && !isAwaitingConfirmation) {
+              const tripSummary = formatTripSummary(newTripDetails);
+              
+              // Add trip summary to pending messages
+              setPendingMessages(prev => [...prev, {
+                role: 'model',
+                message: `${tripSummary}\n\nDoes this summary look correct? Should I generate a detailed itinerary based on this information?`
+              }]);
+              
+              setIsAwaitingConfirmation(true);
+            }
+          }
           
           // Save to server (but don't duplicate the user message)
           mutation.mutate({ 
@@ -483,7 +488,7 @@ const NewPromt = ({ data }) => {
     }
   }, [data?._id, data?.history?.length]);
 
-  // Process user input
+  // Process user input with RAG and structured response handling
   const processUserInput = async (userMessage) => {
     setIsTyping(true);
     
@@ -497,7 +502,26 @@ const NewPromt = ({ data }) => {
     try {
       console.log("Processing user input:", userMessage);
       
-      // Send message to AI
+      // Check if this is a confirmation to generate an itinerary
+      if (isAwaitingConfirmation && 
+          (userMessage.toLowerCase() === "yes" || 
+           userMessage.toLowerCase().includes("generate") && 
+           userMessage.toLowerCase().includes("itinerary"))) {
+        
+        // Save the confirmation message
+        mutation.mutate({ 
+          userMessage, 
+          aiResponse: null, // Will be saved with the itinerary
+          image: img.dbData?.filePath
+        });
+        
+        setIsTyping(false);
+        // Trigger itinerary generation
+        handleGenerateItinerary();
+        return { success: true };
+      }
+      
+      // First send message to AI for initial analysis
       const result = await chat.sendMessageStream(
         Object.entries(img.aiData).length ? [img.aiData, userMessage] : [userMessage]
       );
@@ -507,50 +531,126 @@ const NewPromt = ({ data }) => {
         aiResponse += chunk.text();
       }
       
-      console.log("AI response:", aiResponse);
+      console.log("Initial AI response:", aiResponse);
 
-      // Process the response
-      let formattedResponse = aiResponse;
-      let tripData = null;
-
-      // Try to extract JSON from response
-      const jsonMatch = aiResponse.match(/{[\s\S]*}/);
-      if (jsonMatch) {
-        try {
-          const jsonObject = JSON.parse(jsonMatch[0]);
-          console.log("Parsed JSON:", jsonObject);
+      // Process the response with structured data extraction
+      const { formattedResponse, data: structuredData, success } = 
+        extractStructuredDataFromResponse(aiResponse);
+      
+      console.log("Extracted structured data:", structuredData);
+      
+      let finalResponse = formattedResponse;
+      let finalStructuredData = structuredData;
+      
+      // Check if external data is required for Retrieval-Augmented Generation
+      if (success && structuredData && 
+          (structuredData.requires_external_data === true || 
+           (structuredData.intent && intentRequiresExternalData(structuredData.intent)))) {
+        
+        // Add interim response indicating we're fetching data
+        setPendingMessages(prev => [...prev, {
+          role: 'model',
+          message: "I'm gathering some specific information to better answer your question..."
+        }]);
+        
+        // Fetch external data based on intent
+        const externalData = await fetchExternalData(
+          structuredData.intent, 
+          structuredData.data || {} 
+        );
+        
+        console.log("Fetched external data:", externalData);
+        
+        if (externalData.success) {
+          // Build an enriched prompt with the external data
+          const enrichedPrompt = buildPromptWithExternalData(
+            userMessage, 
+            externalData, 
+            structuredData.intent
+          );
           
-          // Get formatted response from JSON
-          formattedResponse = jsonObject.response || aiResponse;
+          console.log("Enriched prompt:", enrichedPrompt);
           
-          // Handle Trip-Building mode
-          if (jsonObject.mode === "Trip-Building") {
-            console.log("Trip-Building mode detected");
-            tripData = jsonObject.data;
-            if (tripData) {
-              setTripDetails(tripData);
-              console.log("Trip data saved to context");
-              
-              // Generate trip prompt
-              const tripPrompt = generatePromptFromObject(tripData);
-              console.log("Generated trip prompt:", tripPrompt);
-            }
+          // Send the enriched prompt back to the AI
+          const enrichedResult = await chat.sendMessageStream([enrichedPrompt]);
+          
+          let enrichedResponse = "";
+          for await (const chunk of enrichedResult.stream) {
+            enrichedResponse += chunk.text();
           }
-        } catch (error) {
-          console.error("Failed to parse JSON:", error);
+          
+          console.log("Enriched AI response:", enrichedResponse);
+          
+          // Extract structured data from enriched response
+          const enrichedExtracted = extractStructuredDataFromResponse(enrichedResponse);
+          
+          // Update final response and structured data
+          finalResponse = enrichedExtracted.formattedResponse;
+          finalStructuredData = enrichedExtracted.data;
         }
       }
       
-      // Add AI response to pending messages
-      setPendingMessages(prev => [...prev, {
+      // Replace the interim message with the final AI response
+      const updatedPendingMessages = [...pendingMessages];
+      // Remove the interim "gathering information" message if it exists
+      const interimMessageIndex = updatedPendingMessages.findIndex(
+        msg => msg.role === 'model' && msg.message === "I'm gathering some specific information to better answer your question..."
+      );
+      if (interimMessageIndex !== -1) {
+        updatedPendingMessages.splice(interimMessageIndex, 1);
+      }
+      
+      // Add the final response
+      updatedPendingMessages.push({
         role: 'model',
-        message: formattedResponse
-      }]);
+        message: finalResponse
+      });
+      
+      setPendingMessages(updatedPendingMessages);
+      
+      // If successful extraction and we're in Trip-Building mode, update trip details
+      if (success && finalStructuredData && finalStructuredData.mode === "Trip-Building") {
+        console.log("Updating trip details from structured data");
+        
+        // Update the trip details in the context
+        const newTripDetails = updateTripDraft(tripDetails, finalStructuredData.data);
+        setTripDetails(newTripDetails);
+        console.log("Updated trip details:", newTripDetails);
+        
+        // Check if the trip details are complete
+        const completenessCheck = checkTripDraftCompleteness(newTripDetails);
+        console.log("Trip completeness check:", completenessCheck);
+        
+        // If trip is complete and we're not already awaiting confirmation, 
+        // add a trip summary and ask for confirmation
+        if (completenessCheck.isComplete && !isAwaitingConfirmation && 
+            userMessage.toLowerCase() !== "yes" && 
+            !userMessage.toLowerCase().includes("generate itinerary")) {
+          
+          const tripSummary = formatTripSummary(newTripDetails);
+          
+          // Add trip summary to pending messages
+          setPendingMessages(prev => [...prev, {
+            role: 'model',
+            message: `${tripSummary}\n\nDoes this summary look correct? Should I generate a detailed itinerary based on this information?`
+          }]);
+          
+          setIsAwaitingConfirmation(true);
+        }
+        // If user confirms or asks to generate itinerary, and trip is complete
+        else if (completenessCheck.isComplete && 
+                (userMessage.toLowerCase() === "yes" || 
+                 userMessage.toLowerCase().includes("generate itinerary"))) {
+          
+          // Trigger itinerary generation
+          handleGenerateItinerary();
+        }
+      }
       
       // Save to server
       mutation.mutate({ 
         userMessage, 
-        aiResponse: formattedResponse,
+        aiResponse: finalResponse,
         image: img.dbData?.filePath
       });
       
@@ -643,6 +743,37 @@ const NewPromt = ({ data }) => {
           {/* Typing indicator */}
           {isTyping && <TypingIndicator />}
 
+          {/* Itinerary generation indicator */}
+          {isGeneratingItinerary && (
+            <div className="typing-indicator">
+              <div className="typing-indicator-content">
+                <div className="ai-avatar-container mr-1">
+                  <RiCompass3Fill className="text-blue-400 text-sm" />
+                </div>
+                <span className="typing-text">Generating your itinerary</span>
+                <div className="typing-dots">
+                  {[0, 1, 2].map((dot) => (
+                    <motion.div
+                      key={dot}
+                      className="dot"
+                      animate={{
+                        y: ["0%", "-40%", "0%"],
+                        opacity: [0.6, 1, 0.6],
+                        scale: [1, 1.2, 1],
+                      }}
+                      transition={{
+                        duration: 0.6,
+                        repeat: Infinity,
+                        delay: dot * 0.2,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
         <div className="endChat" ref={endRef}></div>
         </div>
 
@@ -665,8 +796,9 @@ const NewPromt = ({ data }) => {
             ref={inputRef}
             placeholder="Ask DreamTrip-AI about your next vacation..." 
             onChange={(e) => setCurrentInput(e.target.value)}
+            disabled={isGeneratingItinerary}
           />
-          <button type="submit">
+          <button type="submit" disabled={isGeneratingItinerary}>
             <IoSend className="send-icon" />
           </button>
         </form>
