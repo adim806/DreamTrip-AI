@@ -24,4 +24,4 @@ dist-ssr
 *.sln
 *.sw?
 
-echo "backend/keys/*.json" >> .gitignore
+
