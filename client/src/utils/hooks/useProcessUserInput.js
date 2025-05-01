@@ -19,6 +19,7 @@ import {
 } from "../aiPromptUtils";
 import { generateItinerary, saveItinerary } from "../itineraryGenerator";
 import { TripContext } from "../../components/tripcontext/TripProvider";
+import { useAuth } from "@clerk/clerk-react";
 
 /**
  * Custom hook for handling AI processing of user input
@@ -71,36 +72,49 @@ export function useProcessUserInput(chatData) {
   // Mutation for saving chat data
   const mutation = useMutation({
     mutationFn: async ({ userMessage, aiResponse, image }) => {
+      const headers = await getAuthHeaders();
+
       if (!chatData?._id) {
         // Create new chat if no chat ID exists
-        return fetch(`${import.meta.env.VITE_API_URL}/api/chats`, {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text: userMessage,
-          }),
-        }).then((res) => res.json());
+        return fetch(
+          `${import.meta.env.VITE_API_URL}/api/chats?userId=${userId}`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers,
+            body: JSON.stringify({
+              text: userMessage,
+            }),
+          }
+        ).then((res) => {
+          if (!res.ok) {
+            throw new Error(`Failed to create chat: ${res.status}`);
+          }
+          return res.json();
+        });
       }
 
       // Update existing chat
       return fetch(
-        `${import.meta.env.VITE_API_URL}/api/chats/${chatData._id}`,
+        `${import.meta.env.VITE_API_URL}/api/chats/${
+          chatData._id
+        }?userId=${userId}`,
         {
           method: "PUT",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({
             question: userMessage,
             answer: aiResponse,
             img: image || undefined,
           }),
         }
-      ).then((res) => res.json());
+      ).then((res) => {
+        if (!res.ok) {
+          throw new Error(`Failed to update chat: ${res.status}`);
+        }
+        return res.json();
+      });
     },
     onSuccess: (data) => {
       console.log("Message saved successfully:", data);
@@ -119,6 +133,26 @@ export function useProcessUserInput(chatData) {
       console.error("Failed to save message:", err);
     },
   });
+
+  const { userId, isSignedIn, getToken } = useAuth();
+
+  // Function to prepare authentication headers
+  const getAuthHeaders = async () => {
+    if (isSignedIn) {
+      try {
+        const token = await getToken();
+        return {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        };
+      } catch (error) {
+        console.error("Failed to get auth token:", error);
+        return { "Content-Type": "application/json" };
+      }
+    } else {
+      return { "Content-Type": "application/json" };
+    }
+  };
 
   /**
    * Handle generating the itinerary after user confirmation

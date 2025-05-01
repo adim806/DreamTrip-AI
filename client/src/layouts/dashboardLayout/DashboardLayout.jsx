@@ -31,6 +31,13 @@ const DashboardLayout = () => {
   const {userId, isLoaded}= useAuth();
   const navigate = useNavigate();
 
+  // Store userId in localStorage for easier access in utility functions
+  useEffect(() => {
+    if (isLoaded && userId) {
+      localStorage.setItem('userId', userId);
+    }
+  }, [isLoaded, userId]);
+
   // Redirects to the sign-in page if the user is not authenticated
   useEffect(() => {
     if(isLoaded && !userId) {

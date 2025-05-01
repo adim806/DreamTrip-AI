@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-react';
 
 const sidebarVariants = {
   open: {
@@ -100,20 +101,67 @@ export function SidebarNavigation() {
   const [showOptionsForChat, setShowOptionsForChat] = useState(null);
   const location = useLocation();
   const pathname = location.pathname;
+  const { userId, isLoaded, isSignedIn, getToken } = useAuth();
+
+  const fetchChats = async () => {
+    console.log("Fetching user chats, userId:", userId);
+    
+    if (!isSignedIn && !import.meta.env.DEV) {
+      console.log("User not signed in, aborting fetch");
+      return [];
+    }
+
+    try {
+      const headers = isSignedIn 
+        ? { 'Authorization': `Bearer ${await getToken()}` }
+        : {};
+        
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/userchats?userId=${userId}`, {
+        method: 'GET',
+        credentials: "include",
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch chats: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log(`Successfully loaded ${data.length} chats`);
+      return data;
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+      throw error;
+    }
+  };
 
   const { isPending, error, data: chats, refetch } = useQuery({
-    queryKey: ['userChats'],
-    queryFn: () =>
-      fetch(`${import.meta.env.VITE_API_URL}/api/userchats`, {
-        credentials: "include",
-      }).then((res) =>
-        res.json(),
-      ),
+    queryKey: ['userChats', userId],
+    queryFn: fetchChats,
+    enabled: isLoaded && (isSignedIn || import.meta.env.DEV) && !!userId,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    if ((isLoaded && isSignedIn && userId) || import.meta.env.DEV) {
+      console.log("Auth state ready, refreshing chats");
+      refetch();
+    }
+  }, [isLoaded, isSignedIn, userId, refetch]);
+
+  const handleToggleChats = () => {
+    if (!showChats && ((isLoaded && isSignedIn && userId) || import.meta.env.DEV)) {
+      refetch();
+    }
+    setShowChats(!showChats);
+  };
 
   const filteredChats = chats?.filter(chat => {
     return chat.title.toLowerCase().includes(chatFilter.toLowerCase());
-  });
+  }) || [];
 
   const toggleChatOptions = (chatId, e) => {
     e.preventDefault();
@@ -136,17 +184,19 @@ export function SidebarNavigation() {
     if (editingChatTitle.trim() === "") return;
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/userchats/${chatId}`, {
+      const headers = isSignedIn 
+        ? { 'Authorization': `Bearer ${await getToken()}`, 'Content-Type': 'application/json' }
+        : { 'Content-Type': 'application/json' };
+        
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/userchats/${chatId}?userId=${userId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         credentials: 'include',
         body: JSON.stringify({ title: editingChatTitle }),
       });
       
       if (response.ok) {
-        refetch(); // Refresh the chats list
+        refetch();
         setEditingChatId(null);
       } else {
         console.error('Failed to update chat title');
@@ -163,13 +213,18 @@ export function SidebarNavigation() {
     if (!confirm('האם אתה בטוח שברצונך למחוק את השיחה הזו?')) return;
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/userchats/${chatId}`, {
+      const headers = isSignedIn 
+        ? { 'Authorization': `Bearer ${await getToken()}` }
+        : {};
+        
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/userchats/${chatId}?userId=${userId}`, {
         method: 'DELETE',
+        headers,
         credentials: 'include',
       });
       
       if (response.ok) {
-        refetch(); // Refresh the chats list
+        refetch();
       } else {
         console.error('Failed to delete chat');
       }
@@ -261,7 +316,7 @@ export function SidebarNavigation() {
                   
                   <div className="relative">
                     <div
-                      onClick={() => setShowChats(!showChats)}
+                      onClick={handleToggleChats}
                       className={cn(
                         "flex h-10 w-full cursor-pointer flex-row items-center rounded-md px-2 py-2 transition-all hover:bg-primary/10 text-foreground font-medium",
                         pathname.includes("/dashboard/chats") && "bg-primary/15 text-primary font-semibold shadow-sm",

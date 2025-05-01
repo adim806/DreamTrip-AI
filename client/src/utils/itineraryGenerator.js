@@ -164,18 +164,30 @@ export const generateItinerary = async (tripDetails) => {
  */
 export const saveItinerary = async (chatId, itineraryData) => {
   try {
-    // This is a placeholder function - you would implement your own API call
-    // to save the itinerary to your backend
     console.log("Saving itinerary for chat:", chatId);
 
+    // Get authentication token if available
+    let headers = { "Content-Type": "application/json" };
+    try {
+      // Use clerk-js directly in this utility function
+      const Clerk = window.Clerk;
+      if (Clerk?.session) {
+        const token = await Clerk.session.getToken();
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    } catch (authError) {
+      console.warn("Auth not available for itinerary save:", authError);
+    }
+
+    // Get the current user ID
+    const userId = window.Clerk?.user?.id || localStorage.getItem("userId");
+
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/itineraries`,
+      `${import.meta.env.VITE_API_URL}/api/itineraries?userId=${userId}`,
       {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           chatId,
           itinerary: itineraryData.itinerary,
@@ -183,6 +195,10 @@ export const saveItinerary = async (chatId, itineraryData) => {
         }),
       }
     );
+
+    if (!response.ok) {
+      throw new Error(`Failed to save itinerary: ${response.status}`);
+    }
 
     return await response.json();
   } catch (error) {

@@ -7,23 +7,52 @@ import { IKImage } from "imagekitio-react";
 import { TripContext } from "@/components/tripcontext/TripProvider";
 import { RiUser3Fill, RiRobot2Fill, RiCompass3Fill } from "react-icons/ri";
 import { motion } from "framer-motion";
+import { useAuth } from "@clerk/clerk-react";
 
 const ChatPage = () => {
   const path = useLocation().pathname;
   const chatId = path.split("/").pop();
   const { tripDetails } = useContext(TripContext);
   const chatContainerRef = useRef(null);
+  const { userId, isLoaded, isSignedIn, getToken } = useAuth();
 
   const { isPending, error, data } = useQuery({
-    queryKey: ["chat", chatId],
-    queryFn: () =>
-      fetch(`${import.meta.env.VITE_API_URL}/api/chats/${chatId}`, {
-        credentials: "include",
-      }).then((res) => res.json()),
+    queryKey: ["chat", chatId, userId],
+    queryFn: async () => {
+      try {
+        // Get authentication headers or use query params in development
+        const headers = isSignedIn 
+          ? { 'Authorization': `Bearer ${await getToken()}` }
+          : {};
+          
+        // Make API request with auth
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/chats/${chatId}?userId=${userId}`, 
+          {
+            credentials: "include",
+            headers
+          }
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch chat: ${response.status}`);
+        }
+        
+        return response.json();
+      } catch (error) {
+        console.error("Error fetching chat:", error);
+        throw error;
+      }
+    },
+    enabled: isLoaded && (isSignedIn || import.meta.env.DEV) && !!userId && !!chatId,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
-    console.log(data);
+    console.log("Chat data:", data);
   }, [data, chatId]);
 
   // Scroll to bottom whenever data changes
