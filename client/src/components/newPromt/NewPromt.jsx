@@ -157,39 +157,42 @@ const NewPromt = ({ data }) => {
   const inputRef = useRef(null);
   
   // Use our custom hook for AI processing
+  const processingHook = useProcessUserInput(data);
   const {
     processUserInput,
-    processInitialMessage,
     pendingMessages,
     isTyping,
     isGeneratingItinerary
-  } = useProcessUserInput(data);
+  } = processingHook;
   
-  // Keep track of processed chats to avoid duplicate processing
-  const processedChatIdsRef = useRef(new Set());
-  
-  // Auto-process initial messages in new chats
+  // Share the hook with the parent component by exposing it on window (temporary solution)
   useEffect(() => {
-    if (!data?._id) return;
-
-    // Only process if the chat has exactly one message and hasn't been processed
-    if (
-      data.history?.length === 1 &&
-      data.history[0].role === "user" &&
-      !isTyping &&
-      !processedChatIdsRef.current.has(data._id)
-    ) {
-      // Mark as processed in local ref
-      processedChatIdsRef.current.add(data._id);
-      
-      const initialMessage = data.history[0].parts[0].text;
-      console.log("Auto-processing initial message:", initialMessage);
-      
-      // Process initial message with our hook
-      processInitialMessage(initialMessage);
-    }
-  }, [data?._id, data?.history?.length]);
-
+    // This is a workaround to share the hook state with ChatPage
+    // A better solution would be to lift this state up or use Context API
+    const updateHookState = () => {
+      window.__processingHookState = {
+        ...processingHook,
+        // Always provide most current reference to functions
+        processInitialMessage: processingHook.processInitialMessage,
+        processUserInput: processingHook.processUserInput
+      };
+    };
+    
+    // Update immediately
+    updateHookState();
+    
+    // Set a flag in the window object to indicate NewPromt is mounted and ready
+    window.__newPromtReady = true;
+    
+    // Clear any ongoing typing indicator when component unmounts
+    return () => {
+      window.__newPromtReady = false;
+      if (window.__processingHookState?.isTyping) {
+        window.__processingHookState.isTyping = false;
+      }
+    };
+  }, [processingHook]);
+  
   // Auto-scroll handling
   useEffect(() => {
     const scrollToBottom = () => {
@@ -243,118 +246,7 @@ const NewPromt = ({ data }) => {
   return (
     <>
       <div className="newpPromt">
-        <div className="chat-container" id="chat-messages-container">
-          {/* Display history from data */}
-          {data?.history?.map((msg, index) => (
-            <div
-              key={`history-${index}`}
-              className={`message ${msg.role === "user" ? "user" : ""}`}
-            >
-              {msg.role === "user" ? (
-                <div className="message-header">
-                  <RiUser3Fill className="user-icon text-sm" />
-                </div>
-              ) : (
-                <div className="message-header">
-                  <div className="ai-avatar-container">
-                    <RiCompass3Fill className="text-blue-400 text-sm" />
-                  </div>
-                </div>
-              )}
-              <div className="message-content">
-                {msg.img && (
-                  <div className="image-container">
-                    <IKImage
-                      urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
-                      path={msg.img}
-                      width="100%"
-                      height="auto"
-                      transformation={[{ width: 300 }]}
-                      className="message-image rounded-lg"
-                      loading="lazy"
-                      lqip={{ active: true, quality: 20 }}
-                    />
-                  </div>
-                )}
-                <Markdown>{msg.parts[0].text}</Markdown>
-              </div>
-            </div>
-          ))}
-          
-          {/* Pending messages (not yet saved to server) */}
-          {pendingMessages.map((msg, index) => (
-            <div
-              key={`pending-${index}`}
-              className={`message ${msg.role === "user" ? "user" : ""}`}
-            >
-              {msg.role === "user" ? (
-                <div className="message-header">
-                  <RiUser3Fill className="user-icon text-sm" />
-                </div>
-              ) : (
-                <div className="message-header">
-                  <div className="ai-avatar-container">
-                    <RiCompass3Fill className="text-blue-400 text-sm" />
-                  </div>
-                </div>
-              )}
-              <div className="message-content">
-                {msg.img && (
-                  <div className="image-container">
-                    <IKImage
-                      urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
-                      path={msg.img}
-                      width="100%"
-                      height="auto"
-                      transformation={[{ width: 300 }]}
-                      className="message-image rounded-lg"
-                      loading="lazy"
-                      lqip={{ active: true, quality: 20 }}
-                    />
-                  </div>
-                )}
-                <Markdown>{msg.message}</Markdown>
-              </div>
-            </div>
-          ))}
-
-          {/* Typing indicator */}
-          {isTyping && <TypingIndicator />}
-
-          {/* Itinerary generation indicator */}
-          {isGeneratingItinerary && (
-            <div className="typing-indicator">
-              <div className="typing-indicator-content">
-                <div className="ai-avatar-container mr-1">
-                  <RiCompass3Fill className="text-blue-400 text-sm" />
-                </div>
-                <span className="typing-text">Generating your itinerary</span>
-                <div className="typing-dots">
-                  {[0, 1, 2].map((dot) => (
-                    <motion.div
-                      key={dot}
-                      className="dot"
-                      animate={{
-                        y: ["0%", "-40%", "0%"],
-                        opacity: [0.6, 1, 0.6],
-                        scale: [1, 1.2, 1],
-                      }}
-                      transition={{
-                        duration: 0.6,
-                        repeat: Infinity,
-                        delay: dot * 0.2,
-                        ease: "easeInOut",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="endChat" ref={endRef}></div>
-        </div>
-
+        {/* Input form only - messages are displayed in the parent component */}
         <form className="newform" onSubmit={handleSubmit} ref={formRef}>
           <Upload setImg={setImg} />
           {img.isLoading && (

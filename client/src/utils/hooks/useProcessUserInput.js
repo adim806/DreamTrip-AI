@@ -1,4 +1,4 @@
-import { useState, useContext, useRef } from "react";
+import { useState, useContext, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
@@ -22,6 +22,144 @@ import { TripContext } from "../../components/tripcontext/TripProvider";
 import { useAuth } from "@clerk/clerk-react";
 
 /**
+ * Utility function for early intent detection based on simple pattern matching
+ * @param {string} userMessage - The user's message
+ * @returns {Object|null} - Detected intent and details or null if no intent detected
+ */
+const detectEarlyIntent = (userMessage) => {
+  if (!userMessage) return null;
+
+  const text = userMessage.toLowerCase().trim();
+
+  // Weather intent detection - include common misspellings
+  const weatherRegex =
+    /weather|wheather|forecast|temperature|rain|sunny|cloudy|climate|hot|cold|humid/i;
+
+  // Complex location regex to match:
+  // - Places with spaces: "new york", "tel aviv"
+  // - Places with country: "paris, france", "tel aviv, israel"
+  // - Places with prepositions: "in tel aviv", "at new york"
+  const locationRegex =
+    /(?:in|at|for|from|to)\s+([a-z\s,]+)|\b([a-z]+(?:\s+[a-z]+){1,3}(?:\s*,\s*[a-z]+)?)\b/gi;
+
+  // Current time indicators
+  const currentTimeRegex =
+    /now|current|right now|currently|at the moment|today|tonight|this morning|this afternoon|this evening/i;
+
+  if (weatherRegex.test(text)) {
+    // Try to extract all possible location matches
+    const locationMatches = Array.from(text.matchAll(locationRegex));
+    let bestLocation = null;
+
+    // Process all matches to find the best location
+    if (locationMatches && locationMatches.length > 0) {
+      // Look through all matches
+      for (const match of locationMatches) {
+        const potentialLocation = (match[1] || match[2] || "").trim();
+
+        // Skip very short words or words that are part of weather phrases
+        if (
+          potentialLocation.length < 3 ||
+          /weather|rain|cloud|sun|hot|cold|forecast|temperature/i.test(
+            potentialLocation
+          )
+        ) {
+          continue;
+        }
+
+        // If we found a location with a comma (city, country) - that's likely the best match
+        if (potentialLocation.includes(",")) {
+          bestLocation = potentialLocation;
+          break;
+        }
+
+        // Otherwise store the first valid location
+        if (!bestLocation) {
+          bestLocation = potentialLocation;
+        }
+      }
+    }
+
+    // Determine if asking about current weather
+    const isCurrentWeather = currentTimeRegex.test(text);
+
+    // Get current date in YYYY-MM-DD format
+    const currentDate = new Date().toISOString().split("T")[0];
+
+    if (bestLocation) {
+      console.log(`Detected weather request for location: "${bestLocation}"`);
+      return {
+        intent: "Weather-Request",
+        data: {
+          location: bestLocation,
+          date: isCurrentWeather ? currentDate : "today", // Use actual date for current weather
+        },
+      };
+    }
+
+    return {
+      intent: "Weather-Request",
+      data: {
+        location: null,
+        date: isCurrentWeather ? currentDate : "today",
+      },
+    };
+  }
+
+  // Hotel recommendations intent detection
+  const hotelRegex =
+    /hotel|stay|accommodation|place to sleep|lodging|inn|resort/i;
+
+  if (hotelRegex.test(text)) {
+    // Try to extract location
+    const locationMatch = text.match(locationRegex);
+    const location = locationMatch
+      ? (
+          locationMatch[1] ||
+          locationMatch[2] ||
+          locationMatch[3] ||
+          locationMatch[4] ||
+          ""
+        ).trim()
+      : null;
+
+    return {
+      intent: "Find-Hotel",
+      data: {
+        location: location,
+      },
+    };
+  }
+
+  // Attractions intent detection
+  const attractionsRegex =
+    /attraction|visit|see|tour|sight|landmark|museum|park|explore/i;
+
+  if (attractionsRegex.test(text)) {
+    // Try to extract location
+    const locationMatch = text.match(locationRegex);
+    const location = locationMatch
+      ? (
+          locationMatch[1] ||
+          locationMatch[2] ||
+          locationMatch[3] ||
+          locationMatch[4] ||
+          ""
+        ).trim()
+      : null;
+
+    return {
+      intent: "Find-Attractions",
+      data: {
+        location: location,
+      },
+    };
+  }
+
+  return null;
+};
+
+/**
  * Custom hook for handling AI processing of user input
  * - Processes user messages through Gemini AI
  * - Extracts structured data from responses
@@ -37,10 +175,39 @@ export function useProcessUserInput(chatData) {
   const [isTyping, setIsTyping] = useState(false);
   const [isAwaitingConfirmation, setIsAwaitingConfirmation] = useState(false);
   const [isGeneratingItinerary, setIsGeneratingItinerary] = useState(false);
+  const [parallelDataFetch, setParallelDataFetch] = useState({
+    inProgress: false,
+    intent: null,
+    data: null,
+    result: null,
+  });
 
   // Create refs to keep track of state between renders
   const chatRef = useRef(null);
   const processedMsgCountRef = useRef(0);
+  const previousHistoryLengthRef = useRef(0);
+  const pendingClearRef = useRef(false);
+
+  // Track history changes to know when to clear pending messages
+  useEffect(() => {
+    // Only run if chatData and its history are available
+    if (chatData?.history) {
+      const currentHistoryLength = chatData.history.length;
+
+      // If history length increased and we have a pending clear operation
+      if (
+        currentHistoryLength > previousHistoryLengthRef.current &&
+        pendingClearRef.current
+      ) {
+        console.log("History updated, clearing pending messages");
+        setPendingMessages([]);
+        pendingClearRef.current = false;
+      }
+
+      // Update the reference
+      previousHistoryLengthRef.current = currentHistoryLength;
+    }
+  }, [chatData?.history?.length, chatData]);
 
   // Initialize Gemini AI model
   const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
@@ -118,6 +285,10 @@ export function useProcessUserInput(chatData) {
     },
     onSuccess: (data) => {
       console.log("Message saved successfully:", data);
+
+      // Instead of clearing immediately, mark for clearing when history updates
+      pendingClearRef.current = true;
+
       // Update queries depending on whether we created a new chat or updated existing
       if (chatData?._id) {
         queryClient.invalidateQueries({ queryKey: ["chat", chatData._id] });
@@ -125,9 +296,6 @@ export function useProcessUserInput(chatData) {
         queryClient.invalidateQueries({ queryKey: ["userchats"] });
         queryClient.invalidateQueries({ queryKey: ["chat", data] });
       }
-
-      // Clear pending messages as they're now in the main chat
-      setPendingMessages([]);
     },
     onError: (err) => {
       console.error("Failed to save message:", err);
@@ -329,6 +497,60 @@ Would you like to make any adjustments to this itinerary?
         return { success: true };
       }
 
+      // Try to detect intent early using pattern matching
+      const earlyIntent = detectEarlyIntent(userMessage);
+      let parallelFetchPromise = null;
+
+      // If we detect an intent that requires external data, start fetching in parallel
+      if (earlyIntent && earlyIntent.intent && earlyIntent.data) {
+        console.log("Early intent detection:", earlyIntent);
+
+        // Start data fetching in parallel
+        setParallelDataFetch({
+          inProgress: true,
+          intent: earlyIntent.intent,
+          data: earlyIntent.data,
+          result: null,
+        });
+
+        // Add an interim message indicating we're fetching relevant data
+        setPendingMessages((prev) => [
+          ...prev,
+          {
+            role: "model",
+            message: getDataFetchingMessage(
+              earlyIntent.intent,
+              earlyIntent.data
+            ),
+            id: `fetch-${Date.now()}`,
+          },
+        ]);
+
+        // Start fetching data in parallel with AI processing
+        parallelFetchPromise = fetchExternalData(
+          earlyIntent.intent,
+          earlyIntent.data
+        )
+          .then((result) => {
+            console.log("Parallel data fetch completed:", result);
+            setParallelDataFetch((prev) => ({
+              ...prev,
+              inProgress: false,
+              result,
+            }));
+            return result;
+          })
+          .catch((error) => {
+            console.error("Error in parallel data fetch:", error);
+            setParallelDataFetch((prev) => ({
+              ...prev,
+              inProgress: false,
+              result: { success: false, error: error.message },
+            }));
+            return { success: false, error: error.message };
+          });
+      }
+
       // First send message to AI for initial analysis
       const result = await chatRef.current.sendMessageStream(
         Object.entries(imageData?.aiData || {}).length
@@ -355,31 +577,57 @@ Would you like to make any adjustments to this itinerary?
       let finalResponse = formattedResponse;
       let finalStructuredData = structuredData;
 
-      // Check if external data is required for Retrieval-Augmented Generation
-      if (
+      // Determine whether to use the parallel fetched data or do a sequential fetch
+      const needsExternalData =
         success &&
         structuredData &&
         (structuredData.requires_external_data === true ||
           (structuredData.intent &&
-            intentRequiresExternalData(structuredData.intent)))
-      ) {
-        // Add interim response indicating we're fetching data
-        setPendingMessages((prev) => [
-          ...prev,
-          {
-            role: "model",
-            message:
-              "I'm gathering some specific information to better answer your question...",
-          },
-        ]);
+            intentRequiresExternalData(structuredData.intent)));
 
-        // Fetch external data based on intent
-        const externalData = await fetchExternalData(
-          structuredData.intent,
-          structuredData.data || {}
-        );
+      if (needsExternalData) {
+        // Wait for parallel fetch to complete if it's in progress and intents match
+        const useParallelData =
+          parallelFetchPromise &&
+          structuredData.intent === parallelDataFetch.intent;
 
-        console.log("Fetched external data:", externalData);
+        let externalData;
+
+        if (useParallelData) {
+          // Wait for the parallel fetch that we started earlier
+          console.log("Using parallel fetched data for", structuredData.intent);
+          externalData = await parallelFetchPromise;
+
+          // Remove the interim "fetching data" message
+          setPendingMessages((prev) =>
+            prev.filter((msg) => !msg.id || !msg.id.startsWith("fetch-"))
+          );
+        } else {
+          // If intents don't match or we didn't do parallel fetch, do a sequential fetch
+          console.log(
+            "Fetching external data sequentially for",
+            structuredData.intent
+          );
+
+          // Add interim response indicating we're fetching data
+          setPendingMessages((prev) => [
+            ...prev,
+            {
+              role: "model",
+              message:
+                "I'm gathering some specific information to better answer your question...",
+              id: `fetch-seq-${Date.now()}`,
+            },
+          ]);
+
+          // Fetch external data based on intent
+          externalData = await fetchExternalData(
+            structuredData.intent,
+            structuredData.data || {}
+          );
+        }
+
+        console.log("External data:", externalData);
 
         if (externalData.success) {
           // Build an enriched prompt with the external data
@@ -413,23 +661,18 @@ Would you like to make any adjustments to this itinerary?
         }
       }
 
-      // Replace the interim message with the final AI response
-      const updatedPendingMessages = [...pendingMessages];
-      // Remove the interim "gathering information" message if it exists
-      const interimMessageIndex = updatedPendingMessages.findIndex(
+      // Remove any interim messages
+      const updatedPendingMessages = pendingMessages.filter(
         (msg) =>
-          msg.role === "model" &&
-          msg.message ===
-            "I'm gathering some specific information to better answer your question..."
+          !msg.id ||
+          (!msg.id.startsWith("fetch-") && !msg.id.includes("gathering"))
       );
-      if (interimMessageIndex !== -1) {
-        updatedPendingMessages.splice(interimMessageIndex, 1);
-      }
 
       // Add the final response
       updatedPendingMessages.push({
         role: "model",
         message: finalResponse,
+        id: Date.now().toString(), // Add unique ID to help track message
       });
 
       setPendingMessages(updatedPendingMessages);
@@ -470,6 +713,7 @@ Would you like to make any adjustments to this itinerary?
             {
               role: "model",
               message: `${tripSummary}\n\nDoes this summary look correct? Should I generate a detailed itinerary based on this information?`,
+              id: `summary-${Date.now()}`,
             },
           ]);
 
@@ -502,6 +746,7 @@ Would you like to make any adjustments to this itinerary?
               {
                 role: "model",
                 message: `To continue planning your trip, I need to know more: ${followUpQuestion}`,
+                id: `followup-${Date.now()}`,
               },
             ]);
           }
@@ -532,6 +777,83 @@ Would you like to make any adjustments to this itinerary?
       return { success: false, error };
     } finally {
       setIsTyping(false);
+
+      // Reset parallel data fetch state
+      setParallelDataFetch({
+        inProgress: false,
+        intent: null,
+        data: null,
+        result: null,
+      });
+    }
+  };
+
+  /**
+   * Generate appropriate message for data fetching based on intent
+   */
+  const getDataFetchingMessage = (intent, data) => {
+    switch (intent) {
+      case "Weather-Request": {
+        // Format location for display
+        const location = data.location || "your destination";
+
+        // Format date for display
+        let dateDisplay = "currently";
+        if (data.date) {
+          if (
+            data.date === "today" ||
+            data.date === new Date().toISOString().split("T")[0]
+          ) {
+            dateDisplay = "today";
+          } else {
+            // Format date nicely if it's not today
+            try {
+              const dateObj = new Date(data.date);
+              dateDisplay = dateObj.toLocaleDateString(undefined, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              });
+            } catch (e) {
+              dateDisplay = data.date;
+            }
+          }
+        }
+
+        return `Fetching real-time weather information for ${location} ${dateDisplay}...`;
+      }
+
+      case "Find-Hotel": {
+        const location = data.location || "your destination";
+        let preferences = "";
+
+        if (data.preferences) {
+          const prefList = [];
+          if (data.preferences.budget)
+            prefList.push(`budget: ${data.preferences.budget}`);
+          if (data.preferences.rating)
+            prefList.push(`rating: ${data.preferences.rating}+`);
+          if (prefList.length > 0) {
+            preferences = ` (${prefList.join(", ")})`;
+          }
+        }
+
+        return `Looking up top hotel recommendations in ${location}${preferences}...`;
+      }
+
+      case "Find-Attractions": {
+        const location = data.location || "your destination";
+        let categoryInfo = "";
+
+        if (data.category) {
+          categoryInfo = ` (focusing on ${data.category})`;
+        }
+
+        return `Finding popular attractions and things to do in ${location}${categoryInfo}...`;
+      }
+
+      default:
+        return "Gathering specific information to better answer your question...";
     }
   };
 
@@ -563,7 +885,7 @@ Would you like to make any adjustments to this itinerary?
 
       console.log("Extracted structured data:", structuredData);
 
-      // Only add AI response to pending messages
+      // Add AI response to pending messages immediately
       setPendingMessages([
         {
           role: "model",
@@ -616,12 +938,18 @@ Would you like to make any adjustments to this itinerary?
         }
       }
 
-      // Save to server (but don't duplicate the user message)
-      mutation.mutate({
-        userMessage: null, // Don't add user message again
-        aiResponse: formattedResponse,
-        image: null,
-      });
+      // Save to server immediately to update the chat history
+      try {
+        await mutation.mutateAsync({
+          userMessage: null, // Don't add user message again
+          aiResponse: formattedResponse,
+          image: null,
+        });
+
+        console.log("Initial response saved to server successfully");
+      } catch (savingError) {
+        console.error("Error saving initial response:", savingError);
+      }
 
       return { success: true };
     } catch (error) {
