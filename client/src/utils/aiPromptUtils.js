@@ -75,13 +75,20 @@ export const getSystemInstruction = () => {
       - If the mode is "Trip-Building":
         - Use the structured data to create or continue a personalized travel plan.
         - If data is incomplete, ask targeted questions to fill in missing information.
+      - If the user asks to plan a new trip while an existing trip is being planned, support this context switch. For example: "Now plan me a trip to Spain as well."
+      - Be attentive to requests for itinerary modifications, distinguishing between minor adjustments (e.g., "Change day 2 to include more museums") and major changes (e.g., "I want to completely change my travel style").
+
+    3. **Multi-Trip Support**:
+      - Maintain context for the current active trip.
+      - Be able to switch between different trips when indicated by user.
+      - When adding new trips or modifying an existing one, maintain a clear separation.
 
     ### Response Format:
     You MUST return a JSON object structured as follows:
     \`\`\`json
     {
       "mode": "Advice" or "Trip-Building",
-      "intent": "Build-Trip" | "Weather-Request" | "Find-Hotel" | "Find-Attractions" | "Budget-Advice" | "Travel-Tips" | "Safety-Information" | "General-Query",
+      "intent": "Build-Trip" | "New-Trip-Request" | "Weather-Request" | "Find-Hotel" | "Find-Attractions" | "Budget-Advice" | "Travel-Tips" | "Safety-Information" | "General-Query" | "Edit-Itinerary",
       "status": "Complete" or "Incomplete",
       "requires_external_data": true or false,
       "response": "Your detailed natural language response here, including any clarification questions",
@@ -108,7 +115,12 @@ export const getSystemInstruction = () => {
           "dining_preferences": "string",
           "transportation_mode": "string"
         },
-        "notes": "string"
+        "notes": "string",
+        "itinerary_changes": {
+          "day": "integer (if applicable)",
+          "change_type": "addition" | "removal" | "modification",
+          "description": "Details of the change"
+        }
       }
     }
     \`\`\`
@@ -121,6 +133,8 @@ export const getSystemInstruction = () => {
     - Always extract and return as many trip details as can be determined from the user message.
     - Only include fields in the data object that you can determine from user messages; leave others undefined.
     - The response field should contain your natural language response to the user.
+    - When the user asks for a new trip while working on an existing one, set intent to "New-Trip-Request" and include any details you can extract about the new destination.
+    - For itinerary edits, provide details in the itinerary_changes object.
   `;
 };
 

@@ -18,7 +18,10 @@ import {
   getGenerationConfig,
 } from "../aiPromptUtils";
 import { generateItinerary, saveItinerary } from "../itineraryGenerator";
-import { TripContext } from "../../components/tripcontext/TripProvider";
+import {
+  TripContext,
+  CONVERSATION_STATES,
+} from "../../components/tripcontext/TripProvider";
 import { useAuth } from "@clerk/clerk-react";
 
 /**
@@ -30,6 +33,21 @@ const detectEarlyIntent = (userMessage) => {
   if (!userMessage) return null;
 
   const text = userMessage.toLowerCase().trim();
+
+  // Add intent detection for new trip request
+  const newTripRegex =
+    /(?:new|another|second|different|more)\s+(?:trip|plan|itinerary|vacation)/i;
+
+  if (newTripRegex.test(text)) {
+    // Match patterns like "plan a trip to Spain" or "make me an itinerary for Italy"
+    const destinationMatch = text.match(/(?:to|for|in)\s+([a-z\s,]+)/i);
+    return {
+      intent: "New-Trip-Request",
+      data: {
+        destination: destinationMatch ? destinationMatch[1].trim() : null,
+      },
+    };
+  }
 
   // Weather intent detection - include common misspellings
   const weatherRegex =
@@ -156,6 +174,29 @@ const detectEarlyIntent = (userMessage) => {
     };
   }
 
+  // Itinerary edit detection
+  const editItineraryRegex =
+    /change|adjust|modify|edit|update|add|remove|replace|extend/i;
+  const daySpecificRegex = /day\s+(\d+)|(\d+)(st|nd|rd|th)\s+day/i;
+
+  if (editItineraryRegex.test(text)) {
+    const dayMatch = text.match(daySpecificRegex);
+    const dayNumber = dayMatch
+      ? parseInt(dayMatch[1] || dayMatch[2], 10)
+      : null;
+
+    return {
+      intent: "Edit-Itinerary",
+      data: {
+        day: dayNumber,
+        isMinorEdit:
+          !text.includes("completely") &&
+          !text.includes("entire") &&
+          dayNumber !== null,
+      },
+    };
+  }
+
   return null;
 };
 
@@ -168,13 +209,23 @@ const detectEarlyIntent = (userMessage) => {
  * - Manages conversation state with pending messages
  */
 export function useProcessUserInput(chatData) {
-  const { tripDetails, setTripDetails, setallTripData } =
-    useContext(TripContext);
+  const {
+    tripDetails,
+    setTripDetails,
+    setallTripData,
+    allTripData,
+    conversationState,
+    transitionState,
+    CONVERSATION_STATES,
+    startNewTrip,
+    registerItineraryGenerator,
+  } = useContext(TripContext);
+
   const queryClient = useQueryClient();
   const [pendingMessages, setPendingMessages] = useState([]);
+
+  // Replace explicit state flags with state machine references
   const [isTyping, setIsTyping] = useState(false);
-  const [isAwaitingConfirmation, setIsAwaitingConfirmation] = useState(false);
-  const [isGeneratingItinerary, setIsGeneratingItinerary] = useState(false);
   const [parallelDataFetch, setParallelDataFetch] = useState({
     inProgress: false,
     intent: null,
@@ -326,9 +377,14 @@ export function useProcessUserInput(chatData) {
    * Handle generating the itinerary after user confirmation
    */
   const handleGenerateItinerary = async () => {
-    if (!tripDetails || isGeneratingItinerary) return;
+    if (
+      !tripDetails ||
+      conversationState === CONVERSATION_STATES.GENERATING_ITINERARY
+    )
+      return;
 
-    setIsGeneratingItinerary(true);
+    // Update state to generating itinerary
+    transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
 
     try {
       // Display a message that we're generating an itinerary
@@ -347,12 +403,18 @@ export function useProcessUserInput(chatData) {
       if (itineraryResult.success) {
         console.log("Itinerary generated successfully");
 
-        // Store the itinerary in the trip context
-        setallTripData({
+        // Create the complete trip data
+        const tripData = {
           tripDetails,
           itinerary: itineraryResult.itinerary,
           metadata: itineraryResult.metadata,
-        });
+        };
+
+        // Store the itinerary in the trip context and update state
+        setallTripData(tripData);
+
+        // Transition state to displaying itinerary, which will also handle completing the trip
+        transitionState(CONVERSATION_STATES.DISPLAYING_ITINERARY, tripData);
 
         // Save the itinerary to the server
         try {
@@ -407,6 +469,9 @@ Would you like to make any adjustments to this itinerary?
         // Handle error in itinerary generation
         console.error("Failed to generate itinerary:", itineraryResult.error);
 
+        // Transition back to trip building mode
+        transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+
         setPendingMessages((prev) => {
           // Find and remove the "Generating..." message
           const updatedMessages = prev.filter(
@@ -429,6 +494,9 @@ Would you like to make any adjustments to this itinerary?
     } catch (error) {
       console.error("Error in itinerary generation process:", error);
 
+      // Transition back to trip building mode
+      transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+
       setPendingMessages((prev) => {
         // Find and remove the "Generating..." message
         const updatedMessages = prev.filter(
@@ -447,11 +515,54 @@ Would you like to make any adjustments to this itinerary?
 
         return updatedMessages;
       });
-    } finally {
-      setIsGeneratingItinerary(false);
-      setIsAwaitingConfirmation(false);
     }
   };
+
+  /**
+   * Utility function to add system messages to the chat
+   * Used for automated responses to user actions (like button clicks)
+   */
+  const addSystemMessage = (message) => {
+    if (!message) return;
+
+    // Add the message to the pending messages
+    setPendingMessages((prev) => [
+      ...prev,
+      {
+        role: "model",
+        message,
+        isSystemMessage: true, // Flag to identify automated system messages
+      },
+    ]);
+
+    // Save to history
+    mutation.mutate({
+      userMessage: null, // No user message for system messages
+      aiResponse: message,
+      image: null,
+    });
+  };
+
+  // Register the itinerary generator function with the context
+  // This allows other components to trigger generation via buttons or text commands
+  useEffect(() => {
+    if (registerItineraryGenerator) {
+      registerItineraryGenerator(handleGenerateItinerary);
+    }
+
+    // Also expose the addSystemMessage function to the window for component use
+    window.__processingHookState = {
+      ...(window.__processingHookState || {}),
+      addSystemMessage,
+    };
+
+    return () => {
+      // Clean up the reference when component unmounts
+      if (window.__processingHookState) {
+        delete window.__processingHookState.addSystemMessage;
+      }
+    };
+  }, [registerItineraryGenerator]);
 
   /**
    * Process user input with RAG and structured response handling
@@ -463,6 +574,9 @@ Would you like to make any adjustments to this itinerary?
     }
 
     setIsTyping(true);
+
+    // Set state to analyzing input
+    transitionState(CONVERSATION_STATES.ANALYZING_INPUT);
 
     // Add the user message to pending messages first
     setPendingMessages((prev) => [
@@ -477,12 +591,216 @@ Would you like to make any adjustments to this itinerary?
     try {
       console.log("Processing user input:", userMessage);
 
-      // Check if this is a confirmation to generate an itinerary
+      // Handle text-based commands that mirror button actions in the TripSummary component
+      // These commands apply when in AWAITING_USER_TRIP_CONFIRMATION state
       if (
-        isAwaitingConfirmation &&
+        conversationState ===
+        CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION
+      ) {
+        const lowerCaseMsg = userMessage.toLowerCase().trim();
+
+        // Handle cancel command (matching "cancel" or similar phrases)
+        if (
+          lowerCaseMsg === "cancel" ||
+          lowerCaseMsg === "cancel trip" ||
+          lowerCaseMsg.includes("cancel the trip") ||
+          lowerCaseMsg.includes("start over")
+        ) {
+          // Transition back to idle state
+          transitionState(CONVERSATION_STATES.IDLE);
+
+          // Add response message
+          setPendingMessages((prev) => [
+            ...prev,
+            {
+              role: "model",
+              message:
+                "I've cancelled the trip planning. How else can I assist you today?",
+              isSystemMessage: true,
+            },
+          ]);
+
+          // Save to history
+          mutation.mutate({
+            userMessage,
+            aiResponse:
+              "I've cancelled the trip planning. How else can I assist you today?",
+            image: imageData?.dbData?.filePath,
+          });
+
+          setIsTyping(false);
+          return { success: true };
+        }
+
+        // Handle edit command (matching "edit" or similar phrases)
+        if (
+          lowerCaseMsg === "edit" ||
+          lowerCaseMsg === "edit details" ||
+          lowerCaseMsg.includes("change the details") ||
+          lowerCaseMsg.includes("edit the trip") ||
+          lowerCaseMsg.includes("modify the trip")
+        ) {
+          // Transition back to trip building mode
+          transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+
+          // Add response message
+          setPendingMessages((prev) => [
+            ...prev,
+            {
+              role: "model",
+              message:
+                "Let's continue editing your trip details. What would you like to change?",
+              isSystemMessage: true,
+            },
+          ]);
+
+          // Save to history
+          mutation.mutate({
+            userMessage,
+            aiResponse:
+              "Let's continue editing your trip details. What would you like to change?",
+            image: imageData?.dbData?.filePath,
+          });
+
+          setIsTyping(false);
+          return { success: true };
+        }
+
+        // Handle confirm/generate command (matching "yes", "confirm", "generate itinerary", etc.)
+        if (
+          lowerCaseMsg === "yes" ||
+          lowerCaseMsg === "confirm" ||
+          lowerCaseMsg === "ok" ||
+          lowerCaseMsg === "looks good" ||
+          lowerCaseMsg.includes("generate") ||
+          lowerCaseMsg.includes("create itinerary") ||
+          lowerCaseMsg.includes("looks right") ||
+          lowerCaseMsg.includes("that's correct")
+        ) {
+          // Save the confirmation message
+          mutation.mutate({
+            userMessage,
+            aiResponse:
+              "Great! I'll generate your personalized travel itinerary now. This might take a moment...",
+            image: imageData?.dbData?.filePath,
+          });
+
+          // Add a system message for itinerary generation
+          setPendingMessages((prev) => [
+            ...prev,
+            {
+              role: "model",
+              message:
+                "Great! I'll generate your personalized travel itinerary now. This might take a moment...",
+              isSystemMessage: true,
+            },
+          ]);
+
+          setIsTyping(false);
+          // Trigger itinerary generation
+          handleGenerateItinerary();
+          return { success: true };
+        }
+      }
+
+      // Check if user wants to start a new trip
+      const earlyIntent = detectEarlyIntent(userMessage);
+
+      // Handle request for a new trip
+      if (earlyIntent && earlyIntent.intent === "New-Trip-Request") {
+        console.log("New trip request detected:", earlyIntent);
+
+        // Start a new trip
+        startNewTrip();
+
+        // Add a response immediately
+        const initialDestination = earlyIntent.data.destination;
+        const response = initialDestination
+          ? `I'll help you plan a new trip to ${initialDestination}. What dates are you thinking of traveling?`
+          : "I'll help you plan a new trip. Where would you like to travel to?";
+
+        setPendingMessages((prev) => [
+          ...prev,
+          {
+            role: "model",
+            message: response,
+          },
+        ]);
+
+        // Save message to history
+        mutation.mutate({
+          userMessage,
+          aiResponse: response,
+          image: imageData?.dbData?.filePath,
+        });
+
+        // If we have a destination, start building trip with it
+        if (initialDestination) {
+          setTripDetails({
+            vacation_location: initialDestination,
+            id: Date.now(),
+          });
+          transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+        } else {
+          transitionState(CONVERSATION_STATES.IDLE);
+        }
+
+        setIsTyping(false);
+        return { success: true };
+      }
+
+      // Handle itinerary editing intent
+      if (earlyIntent && earlyIntent.intent === "Edit-Itinerary") {
+        // If we're in display itinerary mode and have a completed trip
+        if (
+          conversationState === CONVERSATION_STATES.DISPLAYING_ITINERARY &&
+          allTripData
+        ) {
+          transitionState(CONVERSATION_STATES.EDITING_ITINERARY);
+
+          if (earlyIntent.data.isMinorEdit) {
+            // For minor edits, just send to AI and stay in editing mode
+            setPendingMessages((prev) => [
+              ...prev,
+              {
+                role: "model",
+                message: `I'll help you make those changes to ${
+                  earlyIntent.data.day
+                    ? `day ${earlyIntent.data.day}`
+                    : "your itinerary"
+                }. Let me adjust that for you.`,
+              },
+            ]);
+
+            // We would process the edit here
+            // For now, just acknowledge
+
+            setIsTyping(false);
+            return { success: true };
+          } else {
+            // For major changes, consider regenerating
+            setPendingMessages((prev) => [
+              ...prev,
+              {
+                role: "model",
+                message:
+                  "It sounds like you want to make significant changes to your itinerary. Would you like me to regenerate it completely?",
+              },
+            ]);
+
+            setIsTyping(false);
+            return { success: true };
+          }
+        }
+      }
+
+      // Check if this is a confirmation to generate an itinerary when in awaiting confirmation state
+      if (
+        conversationState ===
+          CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION &&
         (userMessage.toLowerCase() === "yes" ||
           (userMessage.toLowerCase().includes("generate") &&
-            userMessage.includes("itinerary")))
+            userMessage.toLowerCase().includes("itinerary")))
       ) {
         // Save the confirmation message
         mutation.mutate({
@@ -497,12 +815,22 @@ Would you like to make any adjustments to this itinerary?
         return { success: true };
       }
 
-      // Try to detect intent early using pattern matching
-      const earlyIntent = detectEarlyIntent(userMessage);
+      // For itinerary adjustments when already in editing mode, need to implement later
+      // if (conversationState === CONVERSATION_STATES.EDITING_ITINERARY) {
+      //   // Process editing request
+      // }
+
+      // Try to detect other intents for external data using pattern matching
       let parallelFetchPromise = null;
 
       // If we detect an intent that requires external data, start fetching in parallel
-      if (earlyIntent && earlyIntent.intent && earlyIntent.data) {
+      if (
+        earlyIntent &&
+        earlyIntent.intent &&
+        earlyIntent.data &&
+        earlyIntent.intent !== "New-Trip-Request" &&
+        earlyIntent.intent !== "Edit-Itinerary"
+      ) {
         console.log("Early intent detection:", earlyIntent);
 
         // Start data fetching in parallel
@@ -525,6 +853,9 @@ Would you like to make any adjustments to this itinerary?
             id: `fetch-${Date.now()}`,
           },
         ]);
+
+        // Set state to fetching external data
+        transitionState(CONVERSATION_STATES.FETCHING_EXTERNAL_DATA);
 
         // Start fetching data in parallel with AI processing
         parallelFetchPromise = fetchExternalData(
@@ -620,6 +951,9 @@ Would you like to make any adjustments to this itinerary?
             },
           ]);
 
+          // Explicitly set state for sequential fetch
+          transitionState(CONVERSATION_STATES.FETCHING_EXTERNAL_DATA);
+
           // Fetch external data based on intent
           externalData = await fetchExternalData(
             structuredData.intent,
@@ -685,11 +1019,20 @@ Would you like to make any adjustments to this itinerary?
       ) {
         console.log("Updating trip details from structured data");
 
+        // Ensure we're in trip building mode
+        transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+
         // Update the trip details in the context
         const newTripDetails = updateTripDraft(
           tripDetails,
           finalStructuredData.data
         );
+
+        // Ensure the trip has an ID for tracking
+        if (!newTripDetails.id) {
+          newTripDetails.id = Date.now();
+        }
+
         setTripDetails(newTripDetails);
         console.log("Updated trip details:", newTripDetails);
 
@@ -697,15 +1040,19 @@ Would you like to make any adjustments to this itinerary?
         const completenessCheck = checkTripDraftCompleteness(newTripDetails);
         console.log("Trip completeness check:", completenessCheck);
 
-        // If trip is complete and we're not already awaiting confirmation,
+        // If trip is complete and we're not already in confirmation state,
         // add a trip summary and ask for confirmation
         if (
           completenessCheck.isComplete &&
-          !isAwaitingConfirmation &&
+          conversationState !==
+            CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION &&
           userMessage.toLowerCase() !== "yes" &&
           !userMessage.toLowerCase().includes("generate itinerary")
         ) {
           const tripSummary = formatTripSummary(newTripDetails);
+
+          // Update state for awaiting confirmation
+          transitionState(CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION);
 
           // Add trip summary to pending messages
           setPendingMessages((prev) => [
@@ -716,8 +1063,6 @@ Would you like to make any adjustments to this itinerary?
               id: `summary-${Date.now()}`,
             },
           ]);
-
-          setIsAwaitingConfirmation(true);
         }
         // If user confirms or asks to generate itinerary, and trip is complete
         else if (
@@ -751,6 +1096,13 @@ Would you like to make any adjustments to this itinerary?
             ]);
           }
         }
+      } else if (
+        success &&
+        finalStructuredData &&
+        finalStructuredData.mode === "Advice"
+      ) {
+        // Set to advisory mode for general travel advice
+        transitionState(CONVERSATION_STATES.ADVISORY_MODE);
       }
 
       // Save to server
@@ -773,6 +1125,9 @@ Would you like to make any adjustments to this itinerary?
             "Sorry, I encountered an error processing your request. Please try again.",
         },
       ]);
+
+      // Return to idle state
+      transitionState(CONVERSATION_STATES.IDLE);
 
       return { success: false, error };
     } finally {
@@ -864,6 +1219,7 @@ Would you like to make any adjustments to this itinerary?
     if (!chatRef.current || isTyping) return { success: false };
 
     setIsTyping(true);
+    transitionState(CONVERSATION_STATES.ANALYZING_INPUT);
 
     try {
       // Send message to AI
@@ -899,18 +1255,30 @@ Would you like to make any adjustments to this itinerary?
         structuredData &&
         structuredData.mode === "Trip-Building"
       ) {
+        // Update trip building state
+        transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+
         const newTripDetails = updateTripDraft(
           tripDetails,
           structuredData.data
         );
+
+        // Ensure the trip has an ID
+        if (!newTripDetails.id) {
+          newTripDetails.id = Date.now();
+        }
+
         setTripDetails(newTripDetails);
         console.log("Updated trip details:", newTripDetails);
 
         // Check if we need to show a trip summary for confirmation
         const completenessCheck = checkTripDraftCompleteness(newTripDetails);
 
-        if (completenessCheck.isComplete && !isAwaitingConfirmation) {
+        if (completenessCheck.isComplete) {
           const tripSummary = formatTripSummary(newTripDetails);
+
+          // Update state for awaiting confirmation
+          transitionState(CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION);
 
           // Add trip summary to pending messages
           setPendingMessages((prev) => [
@@ -920,8 +1288,6 @@ Would you like to make any adjustments to this itinerary?
               message: `${tripSummary}\n\nDoes this summary look correct? Should I generate a detailed itinerary based on this information?`,
             },
           ]);
-
-          setIsAwaitingConfirmation(true);
         } else if (!completenessCheck.isComplete) {
           // Generate follow-up question for missing fields
           const followUpQuestion = generateFollowUpQuestion(
@@ -936,6 +1302,16 @@ Would you like to make any adjustments to this itinerary?
             },
           ]);
         }
+      } else if (
+        success &&
+        structuredData &&
+        structuredData.mode === "Advice"
+      ) {
+        // Set to advisory mode
+        transitionState(CONVERSATION_STATES.ADVISORY_MODE);
+      } else {
+        // Default to idle state
+        transitionState(CONVERSATION_STATES.IDLE);
       }
 
       // Save to server immediately to update the chat history
@@ -962,6 +1338,9 @@ Would you like to make any adjustments to this itinerary?
         },
       ]);
 
+      // Return to idle state
+      transitionState(CONVERSATION_STATES.IDLE);
+
       return { success: false, error };
     } finally {
       setIsTyping(false);
@@ -973,8 +1352,6 @@ Would you like to make any adjustments to this itinerary?
     processInitialMessage,
     pendingMessages,
     isTyping,
-    isGeneratingItinerary,
-    isAwaitingConfirmation,
     handleGenerateItinerary,
   };
 }

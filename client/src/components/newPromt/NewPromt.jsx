@@ -9,10 +9,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { useNavigate } from "react-router-dom";
-import { TripContext } from "../tripcontext/TripProvider";
+import { TripContext, CONVERSATION_STATES } from "../tripcontext/TripProvider";
 import { motion } from "framer-motion";
 import { RiUser3Fill, RiCompass3Fill } from "react-icons/ri";
 import { IoSend, IoImageOutline } from "react-icons/io5";
+
+// Import UI components
+import TripSummary from "../ui/TripSummary";
+import ItineraryDisplay from "../ui/ItineraryDisplay";
+import TripSelector from "../ui/TripSelector";
+import ItineraryEditor from "../ui/ItineraryEditor";
 
 // Import utility functions
 import {
@@ -143,6 +149,14 @@ const LoadingDots = () => {
 };
 
 const NewPromt = ({ data }) => {
+  // Get the trip context
+  const { 
+    conversationState, 
+    CONVERSATION_STATES, 
+    transitionState,
+    startNewTrip
+  } = useContext(TripContext);
+  
   // Image handling state
   const [img, setImg] = useState({
     isLoading: false,
@@ -162,7 +176,7 @@ const NewPromt = ({ data }) => {
     processUserInput,
     pendingMessages,
     isTyping,
-    isGeneratingItinerary
+    handleGenerateItinerary
   } = processingHook;
   
   // Share the hook with the parent component by exposing it on window (temporary solution)
@@ -219,6 +233,44 @@ const NewPromt = ({ data }) => {
     }
   }, [data, pendingMessages]);
 
+  // Trip summary action handlers
+  const handleConfirmTrip = () => {
+    // Display a system message before generating itinerary
+    if (window.__processingHookState && window.__processingHookState.addSystemMessage) {
+      window.__processingHookState.addSystemMessage(
+        "Great! I'll generate your personalized travel itinerary now. This might take a moment..."
+      );
+    }
+    
+    // Generate the itinerary
+    handleGenerateItinerary();
+  };
+  
+  const handleEditTrip = () => {
+    // Transition back to trip building mode to edit details
+    transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+    
+    // Display a system message for editing
+    if (window.__processingHookState && window.__processingHookState.addSystemMessage) {
+      window.__processingHookState.addSystemMessage(
+        "Let's continue editing your trip details. What would you like to change?"
+      );
+    }
+  };
+  
+  const handleCancelTrip = () => {
+    // Reset and transition back to idle
+    startNewTrip();
+    transitionState(CONVERSATION_STATES.IDLE);
+    
+    // Display a system message for cancellation
+    if (window.__processingHookState && window.__processingHookState.addSystemMessage) {
+      window.__processingHookState.addSystemMessage(
+        "I've cancelled the trip planning. How else can I assist you today?"
+      );
+    }
+  };
+
   // Form submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -243,9 +295,28 @@ const NewPromt = ({ data }) => {
     });
   };
 
+  // Determine if we should disable input based on state
+  const isInputDisabled = conversationState === CONVERSATION_STATES.GENERATING_ITINERARY;
+
   return (
     <>
       <div className="newpPromt">
+        {/* Trip selector component */}
+        <TripSelector />
+        
+        {/* Trip summary with confirm/edit/cancel buttons */}
+        <TripSummary 
+          onConfirm={handleConfirmTrip}
+          onEdit={handleEditTrip}
+          onCancel={handleCancelTrip}
+        />
+        
+        {/* Itinerary display component */}
+        <ItineraryDisplay />
+        
+        {/* Itinerary editor component */}
+        <ItineraryEditor />
+        
         {/* Input form only - messages are displayed in the parent component */}
         <form className="newform" onSubmit={handleSubmit} ref={formRef}>
           <Upload setImg={setImg} />
@@ -265,9 +336,9 @@ const NewPromt = ({ data }) => {
             name="text"
             ref={inputRef}
             placeholder="Ask DreamTrip-AI about your next vacation..."
-            disabled={isGeneratingItinerary}
+            disabled={isInputDisabled}
           />
-          <button type="submit" disabled={isGeneratingItinerary}>
+          <button type="submit" disabled={isInputDisabled}>
             <IoSend className="send-icon" />
           </button>
         </form>

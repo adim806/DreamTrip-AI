@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import Markdown from "react-markdown";
 import { IKImage } from "imagekitio-react";
-import { TripContext } from "@/components/tripcontext/TripProvider";
+import { TripContext, CONVERSATION_STATES } from "../../components/tripcontext/TripProvider";
 import { RiUser3Fill, RiRobot2Fill, RiCompass3Fill } from "react-icons/ri";
 import { motion } from "framer-motion";
 import { useAuth } from "@clerk/clerk-react";
@@ -12,7 +12,7 @@ import { useAuth } from "@clerk/clerk-react";
 const ChatPage = () => {
   const path = useLocation().pathname;
   const chatId = path.split("/").pop();
-  const { tripDetails } = useContext(TripContext);
+  const { tripDetails, conversationState } = useContext(TripContext);
   const chatContainerRef = useRef(null);
   const { userId, isLoaded, isSignedIn, getToken } = useAuth();
 
@@ -228,6 +228,42 @@ const ChatPage = () => {
     );
   };
 
+  // Function to render appropriate state indicators
+  const renderStateIndicator = () => {
+    switch (conversationState) {
+      case CONVERSATION_STATES.ANALYZING_INPUT:
+        return (
+          <div className="state-indicator flex items-center text-xs text-blue-400 mb-2">
+            <div className="mr-1">🔍</div>
+            <span>Analyzing your request...</span>
+          </div>
+        );
+      case CONVERSATION_STATES.FETCHING_EXTERNAL_DATA:
+        return (
+          <div className="state-indicator flex items-center text-xs text-blue-400 mb-2">
+            <div className="mr-1">🌐</div>
+            <span>Fetching latest information...</span>
+          </div>
+        );
+      case CONVERSATION_STATES.GENERATING_ITINERARY:
+        return (
+          <div className="state-indicator flex items-center text-xs text-green-400 mb-2">
+            <div className="mr-1">✨</div>
+            <span>Generating your personalized itinerary...</span>
+          </div>
+        );
+      case CONVERSATION_STATES.EDITING_ITINERARY:
+        return (
+          <div className="state-indicator flex items-center text-xs text-orange-400 mb-2">
+            <div className="mr-1">✏️</div>
+            <span>Editing your itinerary...</span>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(25,28,40,0.97)] overflow-hidden">
       {/* Chat Header - עיצוב משופר */}
@@ -338,7 +374,9 @@ const ChatPage = () => {
                       className={`px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 ${
                         message.role === "user"
                           ? "bg-blue-600/20 text-[#f9f9f9] self-end flex-row-reverse border-t border-r border-blue-500/20"
-                          : "bg-[#2a2d3c] self-start border-t border-l border-gray-700/30"
+                          : message.isSystemMessage
+                            ? "bg-[#2a3856] self-start border-t border-l border-blue-400/30"
+                            : "bg-[#2a2d3c] self-start border-t border-l border-gray-700/30"
                       }`}
                     >
                       {message.role === "user" ? (
@@ -350,7 +388,7 @@ const ChatPage = () => {
                       ) : (
                         <div className="message-header">
                           <div className="ai-avatar-container">
-                            <RiCompass3Fill className="text-blue-400 text-sm" />
+                            <RiCompass3Fill className={`${message.isSystemMessage ? "text-blue-300" : "text-blue-400"} text-sm`} />
                           </div>
                         </div>
                       )}
@@ -376,8 +414,15 @@ const ChatPage = () => {
                   </React.Fragment>
                 ))}
                 
-                {/* Typing indicator */}
-                {isTyping && <TypingIndicator />}
+                {/* Show state indicators */}
+                {renderStateIndicator()}
+                
+                {/* Show typing indicator if the AI is currently generating a response */}
+                {isTyping && (
+                  <div className="typing-indicator-wrapper">
+                    <TypingIndicator />
+                  </div>
+                )}
                 
                 {/* Itinerary generation indicator */}
                 {isGeneratingItinerary && (
