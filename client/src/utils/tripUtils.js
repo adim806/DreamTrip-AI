@@ -47,53 +47,140 @@ export const updateTripDraft = (existingTripDetails, newTripData) => {
 };
 
 /**
- * Checks if the trip details are complete or if any required fields are missing
- * @param {Object} tripDetails - The current trip details
- * @returns {Object} - Status object containing completeness and missing fields
+ * מיזוג מרכזי של לוגיקת בדיקת שלמות הטיול
+ * פונקציה זו משמשת כמנוע מרכזי לכל בדיקות השלמות במערכת
+ * @param {Object} tripDetails - פרטי הטיול לבדיקה
+ * @param {Object} options - אפשרויות התאמה אישית לבדיקה
+ * @returns {Object} - תוצאת הבדיקה עם כל המידע הרלוונטי
  */
-export const checkTripDraftCompleteness = (tripDetails) => {
+export const validateTripCompletion = (tripDetails, options = {}) => {
   if (!tripDetails) {
     return {
+      success: false,
+      status: "Incomplete",
       isComplete: false,
-      missingFields: ["vacation_location", "duration", "dates"],
-      status: "No trip details provided",
+      missingFields: ["vacation_location", "duration", "dates", "budget"],
+      recommendedFields: ["travelers", "preferences", "constraints"],
+      validatedFields: {},
+      allRequiredFields: ["vacation_location", "duration", "dates", "budget"],
     };
   }
 
-  const missingFields = [];
+  // הגדרת השדות הנדרשים ומומלצים
+  const requiredFields = ["vacation_location", "duration", "dates", "budget"];
+  const recommendedFields = ["travelers", "preferences", "constraints"];
 
-  // Check for required fields
+  // איתור שדות חסרים
+  const missingFields = [];
+  const validatedFields = {};
+
+  // בדיקת יעד החופשה
   if (!tripDetails.vacation_location) {
     missingFields.push("vacation_location");
+    validatedFields.vacation_location = false;
+  } else {
+    validatedFields.vacation_location = true;
   }
 
-  if (!tripDetails.duration) {
+  // בדיקת משך זמן החופשה
+  if (tripDetails.duration === undefined || tripDetails.duration === null) {
     missingFields.push("duration");
+    validatedFields.duration = false;
+  } else {
+    validatedFields.duration = true;
   }
 
-  if (!tripDetails.dates || !tripDetails.dates.from || !tripDetails.dates.to) {
+  // בדיקת תאריכי החופשה - הבדיקה המורכבת ביותר
+  const datesValid =
+    tripDetails.dates &&
+    ((tripDetails.dates.from && tripDetails.dates.to) ||
+      (tripDetails.dates.from && tripDetails.isTomorrow) ||
+      (tripDetails.dates.from && tripDetails.duration));
+
+  if (!datesValid) {
     missingFields.push("dates");
+    validatedFields.dates = false;
+  } else {
+    validatedFields.dates = true;
   }
 
-  if (!tripDetails.constraints || !tripDetails.constraints.budget) {
+  // בדיקת תקציב - יכול להיות במספר מקומות במבנה הנתונים
+  const hasBudget =
+    (tripDetails.constraints && tripDetails.constraints.budget) ||
+    tripDetails.budget;
+
+  if (!hasBudget) {
     missingFields.push("budget");
+    validatedFields.budget = false;
+  } else {
+    validatedFields.budget = true;
   }
 
-  // Optional but recommended fields
-  const recommendedFields = [];
-  if (!tripDetails.constraints || !tripDetails.constraints.travel_type) {
-    recommendedFields.push("travel_type");
-  }
+  // בדיקת שדות מומלצים אבל לא חובה
+  const missingRecommendedFields = recommendedFields.filter((field) => {
+    if (field === "constraints") {
+      // שדה מיוחד שיכול להיות בכמה מבנים שונים
+      const hasConstraints =
+        tripDetails.constraints &&
+        Object.keys(tripDetails.constraints).length > 0 &&
+        (Object.keys(tripDetails.constraints).some((key) => key !== "budget") ||
+          !hasBudget);
+      validatedFields.constraints = hasConstraints;
+      return !hasConstraints;
+    }
 
-  if (!tripDetails.preferences || !tripDetails.preferences.hotel_preferences) {
-    recommendedFields.push("hotel_preferences");
-  }
+    const fieldExists =
+      tripDetails[field] !== undefined && tripDetails[field] !== null;
+    validatedFields[field] = fieldExists;
+    return !fieldExists;
+  });
 
+  // יצירת תוצאת הבדיקה המקיפה
+  const isComplete = missingFields.length === 0;
+  const result = {
+    success: isComplete,
+    status: isComplete ? "Complete" : "Incomplete",
+    isComplete: isComplete,
+    missingFields: missingFields,
+    recommendedFields: missingRecommendedFields,
+    validatedFields: validatedFields,
+    allRequiredFields: requiredFields,
+    shouldDelayFetch: !isComplete,
+  };
+
+  return result;
+};
+
+/**
+ * בדיקת שלמות של טיוטת טיול - מסתמכת על הפונקציה המאוחדת
+ * נשמרת לאחור לצורך תאימות עם הקוד הקיים
+ * @param {Object} tripDetails - פרטי הטיול לבדיקה
+ * @returns {Object} - תוצאת הבדיקה במבנה התואם לפונקציה המקורית
+ */
+export const checkTripDraftCompleteness = (tripDetails) => {
+  const validationResult = validateTripCompletion(tripDetails);
+
+  // החזרת התוצאה במבנה התואם לפונקציה המקורית
   return {
-    isComplete: missingFields.length === 0,
-    missingFields,
-    recommendedFields,
-    status: missingFields.length === 0 ? "Complete" : "Incomplete",
+    isComplete: validationResult.isComplete,
+    missingFields: validationResult.missingFields,
+    recommendedFields: validationResult.recommendedFields,
+  };
+};
+
+/**
+ * בדיקת שדות נדרשים בטיול - מסתמכת על הפונקציה המאוחדת
+ * נשמרת לאחור לצורך תאימות עם הקוד הקיים
+ * @param {Object} tripDetails - פרטי הטיול לבדיקה
+ * @returns {Object} - תוצאת הבדיקה במבנה התואם לפונקציה המקורית
+ */
+export const validateRequiredTripFields = (tripDetails) => {
+  const validationResult = validateTripCompletion(tripDetails);
+
+  // החזרת התוצאה במבנה התואם לפונקציה המקורית
+  return {
+    success: validationResult.success,
+    missingFields: validationResult.missingFields,
   };
 };
 
@@ -131,67 +218,107 @@ export const generateFollowUpQuestion = (missingFields) => {
 };
 
 /**
- * Formats trip details into a readable summary for the user
- * @param {Object} tripDetails - The complete trip details
- * @returns {String} - Formatted summary string
+ * Formats a trip summary for display
+ * Enhanced with icons and better visual formatting
+ * @param {Object} tripDetails - The trip details to format
+ * @returns {string} - Formatted trip summary
  */
 export const formatTripSummary = (tripDetails) => {
-  if (!tripDetails) return "No trip details available.";
-
-  let summary = `**Trip Summary**\n\n`;
-
-  if (tripDetails.vacation_location) {
-    summary += `🌍 **Destination**: ${tripDetails.vacation_location}\n`;
+  if (!tripDetails) {
+    return "No trip details available.";
   }
 
-  if (tripDetails.duration) {
-    summary += `⏱️ **Duration**: ${tripDetails.duration} days\n`;
+  // Function to format date in a more readable format
+  const formatDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch (e) {
+      return dateString || "Not specified";
+    }
+  };
+
+  // Get trip budget from either constraints or direct budget property
+  const budget =
+    tripDetails.constraints?.budget || tripDetails.budget || "Not specified";
+
+  // Format budget to be more readable
+  const formattedBudget =
+    typeof budget === "number"
+      ? new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: "USD",
+        }).format(budget)
+      : budget;
+
+  // Get travelers information with default to 1
+  const travelers = tripDetails.travelers || 1;
+
+  // Create a more compact summary with just the essentials
+  const location = tripDetails.vacation_location || "Destination not specified";
+  const country = tripDetails.country ? `, ${tripDetails.country}` : "";
+  const duration = tripDetails.duration
+    ? `${tripDetails.duration} days`
+    : "Duration not specified";
+
+  // Format dates if available
+  let dateInfo = "Dates not specified";
+  if (tripDetails.dates) {
+    if (tripDetails.dates.from && tripDetails.dates.to) {
+      dateInfo = `${formatDate(tripDetails.dates.from)} to ${formatDate(
+        tripDetails.dates.to
+      )}`;
+    } else if (tripDetails.dates.from) {
+      dateInfo = `Starting on ${formatDate(tripDetails.dates.from)}`;
+    }
+  } else if (tripDetails.isTomorrow) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    dateInfo = `Starting tomorrow (${formatDate(tomorrow)})`;
   }
 
-  if (tripDetails.dates && tripDetails.dates.from && tripDetails.dates.to) {
-    summary += `🗓️ **Dates**: ${tripDetails.dates.from} to ${tripDetails.dates.to}\n`;
-  }
-
-  if (tripDetails.constraints) {
-    if (tripDetails.constraints.budget) {
-      summary += `💰 **Budget**: ${tripDetails.constraints.budget}\n`;
-    }
-
-    if (tripDetails.constraints.travel_type) {
-      summary += `🧳 **Travel Type**: ${tripDetails.constraints.travel_type}\n`;
-    }
-
-    if (tripDetails.constraints.preferred_activity) {
-      summary += `🏄 **Preferred Activities**: ${tripDetails.constraints.preferred_activity}\n`;
-    }
-
-    if (
-      tripDetails.constraints.special_requirements &&
-      tripDetails.constraints.special_requirements.length > 0
-    ) {
-      summary += `✅ **Special Requirements**: ${tripDetails.constraints.special_requirements.join(
-        ", "
-      )}\n`;
-    }
-  }
-
+  // Create a compact display of preferences if available
+  let preferencesList = "";
   if (tripDetails.preferences) {
-    if (tripDetails.preferences.hotel_preferences) {
-      summary += `🏨 **Hotel Preferences**: ${tripDetails.preferences.hotel_preferences}\n`;
-    }
+    const prefs = [];
+    Object.entries(tripDetails.preferences).forEach(([key, value]) => {
+      if (value && key !== "budget") {
+        prefs.push(`${key}: ${value}`);
+      }
+    });
 
-    if (tripDetails.preferences.dining_preferences) {
-      summary += `🍽️ **Dining Preferences**: ${tripDetails.preferences.dining_preferences}\n`;
-    }
-
-    if (tripDetails.preferences.transportation_mode) {
-      summary += `🚗 **Transportation**: ${tripDetails.preferences.transportation_mode}\n`;
+    if (prefs.length > 0) {
+      preferencesList = "\n**Preferences:** " + prefs.join(", ");
     }
   }
 
-  if (tripDetails.notes) {
-    summary += `📝 **Additional Notes**: ${tripDetails.notes}\n`;
+  // Create compact version of constraints if available (excluding budget)
+  let constraintsList = "";
+  if (tripDetails.constraints) {
+    const constraints = [];
+    Object.entries(tripDetails.constraints).forEach(([key, value]) => {
+      if (value && key !== "budget") {
+        constraints.push(`${key}: ${value}`);
+      }
+    });
+
+    if (constraints.length > 0) {
+      constraintsList = "\n**Constraints:** " + constraints.join(", ");
+    }
   }
 
-  return summary;
+  // Return a clean, compact trip summary
+  return `### 🧳 Trip Summary
+**Destination:** ${location}${country}
+**Duration:** ${duration}
+**Dates:** ${dateInfo}
+**Budget:** ${formattedBudget}
+**Travelers:** ${travelers}${preferencesList}${constraintsList}
+
+Does this look correct? I'll create your travel itinerary based on these details.`;
 };

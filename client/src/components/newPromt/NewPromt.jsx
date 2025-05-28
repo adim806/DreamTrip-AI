@@ -33,7 +33,8 @@ import {
 } from "../../utils/externalDataService";
 import {
   extractStructuredDataFromResponse,
-  getSystemInstruction,
+  getInitialSystemInstruction,
+  getBaseSystemInstruction,
   getGenerationConfig,
   intentRequiresExternalData,
 } from "../../utils/aiPromptUtils";
@@ -154,7 +155,8 @@ const NewPromt = ({ data }) => {
     conversationState, 
     CONVERSATION_STATES, 
     transitionState,
-    startNewTrip
+    startNewTrip,
+    tripDetails
   } = useContext(TripContext);
   
   // Image handling state
@@ -201,7 +203,11 @@ const NewPromt = ({ data }) => {
     // Clear any ongoing typing indicator when component unmounts
     return () => {
       window.__newPromtReady = false;
-      if (window.__processingHookState?.isTyping) {
+      // Explicitly set isTyping to false to ensure indicator is removed
+      if (processingHook && processingHook.setIsTyping) {
+        processingHook.setIsTyping(false);
+      }
+      if (window.__processingHookState) {
         window.__processingHookState.isTyping = false;
       }
     };
@@ -232,6 +238,54 @@ const NewPromt = ({ data }) => {
       return () => observer.disconnect();
     }
   }, [data, pendingMessages]);
+
+  // Monitor conversation state changes to debug TripSummary rendering
+  useEffect(() => {
+    // Debounce to prevent excessive monitoring and logging
+    const debounceTimeout = setTimeout(() => {
+      // Use a counter to only log periodically, not on every render
+      const now = Date.now();
+      const lastLogTime = window.__lastPromtMonitorLog || 0;
+      
+      // Only log if it's been more than 2 seconds since the last log
+      if (now - lastLogTime > 2000) {
+        window.__lastPromtMonitorLog = now;
+        
+        console.log("NewPromt monitoring state:", {
+          conversationState,
+          hasTripDetails: !!tripDetails,
+          tripDetailsKeys: tripDetails ? Object.keys(tripDetails) : [],
+          shouldDisplaySummary: conversationState === CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION && !!tripDetails
+        });
+        
+        // Check if all the required trip data is present
+        if (tripDetails) {
+          const hasRequiredFields = 
+            tripDetails.vacation_location && 
+            tripDetails.duration &&
+            ((tripDetails.dates && tripDetails.dates.from && tripDetails.dates.to) || tripDetails.isTomorrow) &&
+            (tripDetails.budget || (tripDetails.constraints && tripDetails.constraints.budget));
+            
+          console.log("Trip completeness check in NewPromt:", { 
+            hasRequiredFields,
+            vacation_location: !!tripDetails.vacation_location,
+            duration: !!tripDetails.duration,
+            dates: !!(tripDetails.dates && tripDetails.dates.from && tripDetails.dates.to),
+            isTomorrow: !!tripDetails.isTomorrow,
+            budget: !!(tripDetails.budget || (tripDetails.constraints && tripDetails.constraints.budget))
+          });
+          
+          // Force state transition if data is complete but we're not in the right state
+          if (hasRequiredFields && conversationState !== CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION) {
+            console.log("🔶 Trip data is complete but not in AWAITING_USER_TRIP_CONFIRMATION state");
+          }
+        }
+      }
+    }, 300); // 300ms debounce
+
+    // Cleanup timeout on unmount or when dependencies change
+    return () => clearTimeout(debounceTimeout);
+  }, [conversationState, tripDetails]);
 
   // Trip summary action handlers
   const handleConfirmTrip = () => {
@@ -278,12 +332,16 @@ const NewPromt = ({ data }) => {
 
     if (!text) return;
 
-    // Clear input field
+    // Clear input field immediately
     if (inputRef.current) {
       inputRef.current.value = "";
     }
 
-    // Process the input with our custom hook, passing the image data if available
+    // REMOVED: Don't add user message here - let processUserInput handle it
+    // This prevents duplicate user messages
+    console.log("NewPromt: Submitting user input:", text);
+
+    // Process the input with our custom hook
     await processUserInput(text, img);
     
     // Reset image state after processing
@@ -300,7 +358,7 @@ const NewPromt = ({ data }) => {
 
   return (
     <>
-      <div className="newpPromt">
+      <div className="w-full flex flex-col relative box-border bg-[#171923] max-h-full">
         {/* Trip selector component */}
         <TripSelector />
         
@@ -318,16 +376,20 @@ const NewPromt = ({ data }) => {
         <ItineraryEditor />
         
         {/* Input form only - messages are displayed in the parent component */}
-        <form className="newform" onSubmit={handleSubmit} ref={formRef}>
+        <form 
+          className="w-full relative bg-[#1a1e2d] flex items-center gap-4 mb-3 px-5 py-4 z-20 shadow-[0_-4px_15px_rgba(0,0,0,0.35)] border-t-2 border-blue-500/20 min-h-[70px] rounded-t-lg" 
+          onSubmit={handleSubmit} 
+          ref={formRef}
+        >
           <Upload setImg={setImg} />
           {img.isLoading && (
-            <div className="image-loading-indicator">
+            <div className="flex items-center justify-center bg-blue-500/15 rounded-lg px-2 h-6 ml-1">
               <LoadingDots />
             </div>
           )}
           {img.dbData?.filePath && (
-            <div className="image-preview-badge" title="Image attached">
-              <div className="image-status">📎</div>
+            <div className="flex items-center justify-center bg-blue-500/20 rounded-lg px-2 h-6 ml-1" title="Image attached">
+              <div className="text-sm text-gray-300">📎</div>
             </div>
           )}
           <input id="file" type="file" multiple={false} hidden />
@@ -337,9 +399,14 @@ const NewPromt = ({ data }) => {
             ref={inputRef}
             placeholder="Ask DreamTrip-AI about your next vacation..."
             disabled={isInputDisabled}
+            className="flex-1 px-4 py-3 border-none outline-none bg-[#2a2d3c] text-gray-100 text-base rounded-xl h-[45px] shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)] focus:ring-2 focus:ring-blue-500/40"
           />
-          <button type="submit" disabled={isInputDisabled}>
-            <IoSend className="send-icon" />
+          <button 
+            type="submit" 
+            disabled={isInputDisabled}
+            className="rounded-full bg-blue-500 border-none p-2.5 w-[45px] h-[45px] flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0 shadow-[0_3px_8px_rgba(59,130,246,0.4)] hover:bg-blue-600 hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(59,130,246,0.5)] active:translate-y-[1px] active:shadow-[0_1px_3px_rgba(59,130,246,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <IoSend className="text-white text-xl" />
           </button>
         </form>
       </div>

@@ -1,4 +1,13 @@
 {
+  "name": "dreamtrip-ai",
+  "version": "1.0.0",
+  "description": "DreamTrip AI travel planning application",
+  "type": "module",
+  "scripts": {
+    "test:location": "node tests/locationResolver.test.js"
+  },
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "@clerk/express": "^1.3.31",
     "@headlessui/react": "^2.2.0",
@@ -8,8 +17,12 @@
     "express": "^4.21.1",
     "framer-motion": "^12.6.2",
     "imagekit": "^5.2.0",
+    "node-cache": "^5.1.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-parallax": "^3.5.1"
+  },
+  "devDependencies": {
+    "node-fetch": "^3.3.2"
   }
 }

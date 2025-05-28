@@ -8,12 +8,14 @@ import { TripContext, CONVERSATION_STATES } from "../../components/tripcontext/T
 import { RiUser3Fill, RiRobot2Fill, RiCompass3Fill } from "react-icons/ri";
 import { motion } from "framer-motion";
 import { useAuth } from "@clerk/clerk-react";
+import { fieldComponentMap } from "../../components/FieldCompletion/FieldComponents";
 
 const ChatPage = () => {
   const path = useLocation().pathname;
   const chatId = path.split("/").pop();
   const { tripDetails, conversationState } = useContext(TripContext);
   const chatContainerRef = useRef(null);
+  const displayedMessagesRef = useRef(new Set());
   const { userId, isLoaded, isSignedIn, getToken } = useAuth();
 
   const { isPending, error, data } = useQuery({
@@ -51,27 +53,37 @@ const ChatPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  // Get pending messages and typing status from the hook
+  // Hook state
   const [hookState, setHookState] = useState({
     pendingMessages: [],
     isTyping: false,
     isGeneratingItinerary: false,
-    processInitialMessage: () => {}
+    parallelDataFetch: { inProgress: false, intent: null, data: null, result: null },
+    processInitialMessage: () => {},
   });
   
-  // Check for updates to the hook state
-  useEffect(() => {
+  // Check if this is a new chat with only an initial message
+  // Define this BEFORE using it in any useEffect hooks
+  const isNewChatWithInitialMessage = useMemo(() => {
+    if (!data?.history) return false;
+    return data.history.length === 1 && data.history[0].role === 'user';
+  }, [data?.history]);
+  
+  // Function to check the hook state periodically
     const checkHookState = () => {
       if (window.__processingHookState) {
         setHookState({
           pendingMessages: window.__processingHookState.pendingMessages || [],
           isTyping: window.__processingHookState.isTyping || false,
           isGeneratingItinerary: window.__processingHookState.isGeneratingItinerary || false,
-          processInitialMessage: window.__processingHookState.processInitialMessage || (() => {})
+          parallelDataFetch: window.__processingHookState.parallelDataFetch || { inProgress: false, intent: null, data: null, result: null },
+          processInitialMessage: window.__processingHookState.processInitialMessage || (() => {}),
         });
       }
     };
     
+  // Set up hook state checking
+  useEffect(() => {
     // Initial check
     checkHookState();
     
@@ -81,7 +93,7 @@ const ChatPage = () => {
     return () => clearInterval(interval);
   }, []);
   
-  const { pendingMessages, isTyping, isGeneratingItinerary, processInitialMessage } = hookState;
+  const { pendingMessages, isTyping, isGeneratingItinerary, parallelDataFetch, processInitialMessage } = hookState;
 
   useEffect(() => {
     console.log("Chat data:", data);
@@ -94,121 +106,234 @@ const ChatPage = () => {
     }
   }, [data, pendingMessages, isTyping]);
 
-  // Process initial message in a new chat (with better timing)
+  // Process initial message in a new chat (with better timing and duplicate prevention)
   useEffect(() => {
     // Check if this is a new chat with only one message (the user message)
-    if (data && data.history && data.history.length === 1 && 
-        data.history[0].role === 'user' && !isTyping) {
+    if (isNewChatWithInitialMessage) {
       
-      // Only process if there are no model responses yet
-      const hasModelResponse = data.history.some(msg => msg.role === 'model');
+      // Only process if there are no model responses yet in history
+      const hasModelResponseInHistory = data.history.some(msg => msg.role === 'model');
       
-      if (!hasModelResponse) {
+      // Also check if there's already a model response in pendingMessages
+      const hasModelResponseInPending = pendingMessages?.some(msg => 
+        msg.role === 'model' && !msg.isLoadingMessage
+      );
+      
+      // Check if there's a loading indicator, meaning we're already processing
+      const hasLoadingIndicator = pendingMessages?.some(msg => 
+        msg.isLoadingMessage && msg.isGenericTyping
+      );
+      
+      // Only proceed if there's no model response anywhere and we're not already processing
+      if (!hasModelResponseInHistory && !hasModelResponseInPending && !hasLoadingIndicator && !isTyping) {
+        console.log("Checking if initial message needs processing...");
+        
         // Wait for NewPromt component to be ready
         const checkAndProcess = () => {
           if (window.__newPromtReady && window.__processingHookState) {
             const initialMessage = data.history[0].parts[0].text;
-            console.log("New chat detected, processing first message:", initialMessage);
+            
+            // Get a unique ID for this chat + message combination to prevent duplicate processing
+            const chatMessageId = `${chatId}-${initialMessage}`;
+            
+            // Check if we've already processed this specific message in this chat
+            if (!window.__processedInitialMessages) {
+              window.__processedInitialMessages = new Set();
+            }
+            
+            if (!window.__processedInitialMessages.has(chatMessageId)) {
+              console.log("New chat detected, processing first message:", initialMessage);
+              
+              // Special new chat processing flag - signals to the hook NOT to add a user message
+              window.__isProcessingNewChatMessage = true;
+              
+              // Mark this message as processed
+              window.__processedInitialMessages.add(chatMessageId);
             
             // Make sure we're not already processing
             if (!window.__processingHookState.isTyping) {
+                console.log("Starting initial message processing");
               window.__processingHookState.processInitialMessage(initialMessage);
+              }
+              
+              // Remove the flag after a delay
+              setTimeout(() => {
+                window.__isProcessingNewChatMessage = false;
+              }, 500);
+            } else {
+              console.log("This initial message has already been processed");
             }
           } else {
             // Try again in a short moment
+            console.log("NewPromt component not ready yet, retrying soon...");
             setTimeout(checkAndProcess, 100);
           }
         };
         
         checkAndProcess();
+      } else if (hasModelResponseInPending || hasLoadingIndicator) {
+        console.log("Initial message already has a response or is being processed, skipping");
       }
     }
-  }, [data]);
+  }, [data, pendingMessages, isTyping, chatId, isNewChatWithInitialMessage]);
 
-  // Filter out duplicate pending messages that are already in history
+  // Simple approach - show all messages without complex filtering
   const filteredPendingMessages = useMemo(() => {
-    if (!data?.history || !pendingMessages?.length) return pendingMessages;
+    if (!pendingMessages?.length) return [];
+    
+    console.log("All pending messages (no filtering):", pendingMessages);
+    
+    // Don't filter anything - show all pending messages
+    // This ensures user messages are always visible
+    return pendingMessages;
+  }, [pendingMessages]);
 
-    // Special case for initial message in new chat - don't filter
-    if (data.history.length === 1 && data.history[0].role === 'user') {
-      return pendingMessages;
+  // SIMPLE APPROACH - Just combine history and all pending messages
+  const messagesToDisplay = useMemo(() => {
+    const allMessages = [];
+    
+    // Add all history messages first (if any)
+    if (data?.history?.length) {
+      data.history.forEach((message, i) => {
+        allMessages.push({ 
+          ...message, 
+          source: 'history', 
+          index: i,
+          id: `history-${i}`,
+          displayMessage: message.parts?.[0]?.text || message.message || '',
+          role: message.role
+        });
+      });
     }
-
-    // Create a more robust filtering system that prevents message flickering
-    return pendingMessages.filter(pendingMsg => {
-      // Keep all user messages that aren't already in history
-      if (pendingMsg.role === 'user') {
-        return !data.history.some(historyMsg => 
-          historyMsg.role === 'user' && 
-          historyMsg.parts[0].text === pendingMsg.message
-        );
-      }
-      
-      // For model messages, use more sophisticated matching to prevent flickering
-      // and handle content that might have been partially stored
-      for (const historyMsg of data.history) {
-        if (historyMsg.role !== 'model') continue;
-        
-        const pendingText = pendingMsg.message?.trim() || '';
-        const historyText = historyMsg.parts[0].text?.trim() || '';
-        
-        // If the exact content is already in history, filter it out
-        if (pendingText === historyText) return false;
-        
-        // If history contains the entire pending message, filter it out
-        if (historyText.includes(pendingText) && pendingText.length > 10) return false;
-        
-        // If pending contains the entire history message, filter it out
-        if (pendingText.includes(historyText) && historyText.length > 10) return false;
-      }
-      
-      return true;
-    });
-  }, [pendingMessages, data?.history]);
-
-  // Ref to keep track of which messages are being displayed
-  const displayedMessagesRef = useRef(new Set());
+    
+    // Add ALL pending messages (no filtering at all)
+    if (filteredPendingMessages?.length) {
+      filteredPendingMessages.forEach((message, i) => {
+        allMessages.push({ 
+          ...message, 
+          source: 'pending', 
+          index: i,
+          id: message.id || `pending-${i}`,
+          displayMessage: message.message || '',
+          role: message.role
+        });
+      });
+    }
+    
+    console.log("SIMPLE: All messages to display:", allMessages.map(m => ({
+      id: m.id,
+      role: m.role, 
+      message: (m.displayMessage || '').substring(0, 50) + '...',
+      source: m.source
+    })));
+    
+    return allMessages;
+  }, [data?.history, filteredPendingMessages]);
   
   // Handle smooth transitions for pending messages
   useEffect(() => {
-    if (!data?.history || !filteredPendingMessages.length) return;
+    if (!data?.history || !messagesToDisplay.length) return;
     
     // Keep track of which messages are currently displayed
     const currentDisplayed = new Set();
     
     // Mark all history messages as displayed
     data.history.forEach((msg, index) => {
-      const key = `history-${msg.role}-${index}`;
+      const key = `history-${index}`;
       currentDisplayed.add(key);
     });
     
     // Mark all pending messages as displayed
-    filteredPendingMessages.forEach((msg, index) => {
-      const key = `pending-${msg.role}-${msg.id || index}`;
+    messagesToDisplay.forEach((msg, index) => {
+      const key = `pending-${msg.id || index}`;
       currentDisplayed.add(key);
     });
     
     // Update our ref
     displayedMessagesRef.current = currentDisplayed;
     
-  }, [data?.history, filteredPendingMessages]);
+    // Smooth scroll to the bottom when new messages appear
+    const chatContainer = document.getElementById("chat-messages-container");
+    if (chatContainer) {
+      // Check if we're already at the bottom
+      const isAtBottom = 
+        chatContainer.scrollHeight - chatContainer.clientHeight <= 
+        chatContainer.scrollTop + 100;
+      
+      // If we're already at/near the bottom or it's a user message, scroll down
+      if (isAtBottom || messagesToDisplay.some(msg => msg.role === "user")) {
+        // Use smooth scrolling for better UX
+        chatContainer.scrollTo({
+          top: chatContainer.scrollHeight,
+          behavior: "smooth"
+        });
+      }
+    }
+  }, [data?.history, messagesToDisplay]);
+
+  // Add a new useEffect to show processing indicators after user messages
+  useEffect(() => {
+    const chatContainer = document.getElementById("chat-messages-container");
+    if (!chatContainer) return;
+
+    // Find the last user message in pending messages
+    const lastUserMessage = [...messagesToDisplay].reverse()
+      .find(msg => msg.role === "user");
+    
+    // If we found a user message and system is processing (typing or in specific states)
+    if (lastUserMessage && (isTyping || 
+        conversationState === CONVERSATION_STATES.ANALYZING_INPUT ||
+        conversationState === CONVERSATION_STATES.FETCHING_EXTERNAL_DATA)) {
+      
+      // Scroll down immediately to show processing indicators
+      setTimeout(() => {
+        chatContainer.scrollTo({
+          top: chatContainer.scrollHeight,
+          behavior: "smooth"
+        });
+      }, 100);
+    }
+  }, [messagesToDisplay, isTyping, conversationState]);
 
   // Typing indicator component
   const TypingIndicator = () => {
     return (
-      <div className="typing-indicator px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md bg-[#2a2d3c] self-start border-t border-l border-gray-700/30 flex gap-3">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -5 }}
+        transition={{ duration: 0.4, type: "spring", stiffness: 100 }}
+        className="typing-indicator px-4 py-3 rounded-xl text-white text-sm max-w-[75%] shadow-md bg-gradient-to-r from-[#293348] to-[#2d3346] self-start border-t border-l border-gray-700/40 flex gap-3 ml-8 mt-1"
+      >
         <div className="message-header">
-          <div className="ai-avatar-container">
+          <motion.div 
+            className="ai-avatar-container"
+            animate={{ 
+              scale: [1, 1.1, 1],
+              rotate: [0, 2, 0, -2, 0] 
+            }}
+            transition={{ 
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut" 
+            }}
+          >
             <RiCompass3Fill className="text-blue-400 text-sm" />
-          </div>
+          </motion.div>
         </div>
         <div className="typing-indicator-content flex items-center">
-          <span className="typing-text mr-2">typing</span>
-          <div className="typing-dots flex">
+          <motion.span 
+            className="typing-text text-blue-100/80"
+            animate={{ opacity: [0.7, 1, 0.7] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            typing
+          </motion.span>
+          <div className="typing-dots flex ml-2">
             {[0, 1, 2].map((dot) => (
               <motion.div
                 key={dot}
-                className="w-1.5 h-1.5 bg-blue-400 rounded-full mx-0.5"
+                className="w-1.5 h-1.5 bg-blue-400/80 rounded-full mx-0.5"
                 animate={{
                   y: ["0%", "-40%", "0%"],
                   opacity: [0.6, 1, 0.6],
@@ -224,43 +349,311 @@ const ChatPage = () => {
             ))}
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   };
 
   // Function to render appropriate state indicators
   const renderStateIndicator = () => {
+    // Don't show indicators if no pending messages
+    if (!messagesToDisplay?.length) return null;
+    
+    // Don't show state indicators if there's already a typing indicator visible
+    const hasVisibleTypingIndicator = messagesToDisplay.some(
+      msg => msg.isLoadingMessage && msg.isGenericTyping
+    );
+    
+    if (hasVisibleTypingIndicator) {
+      return null; // Skip showing state indicators when typing indicators are visible
+    }
+    
+    // Find the last user message to know where to place the indicators
+    const lastUserMessage = [...messagesToDisplay].reverse()
+      .find(msg => msg.role === "user");
+      
+    // Only show indicators if there's a user message to respond to
+    if (!lastUserMessage) return null;
+
+    // Find if there's already a model response after the last user message
+    const hasModelResponse = messagesToDisplay.some((msg, index) => {
+      // Find the index of the last user message
+      const lastUserIndex = messagesToDisplay.findIndex(m => m.id === lastUserMessage.id);
+      // Check if this is a model message and comes after the last user message
+      return msg.role === "model" && !msg.isLoadingMessage && index > lastUserIndex;
+    });
+    
+    // Don't show the indicators if there's already a model response
+    if (hasModelResponse) return null;
+    
+    // Always show indicator when system is typing, even if we haven't entered a specific state yet
+    if (isTyping) {
+      return (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="state-indicator flex items-center text-sm text-blue-300 mt-2 mb-2 bg-blue-500/10 px-4 py-2 rounded-lg ml-8 border-t border-l border-blue-500/20 shadow-md"
+        >
+          <motion.div 
+            className="mr-2 text-blue-300 text-base"
+            animate={{ 
+              scale: [1, 1.2, 1]
+            }}
+            transition={{ 
+              duration: 1.5, 
+              repeat: Infinity,
+              ease: "easeInOut" 
+            }}
+          >
+            💬
+          </motion.div>
+          <span className="font-medium">Preparing response</span>
+          <div className="flex space-x-1 ml-2">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="w-1.5 h-1.5 bg-blue-400/80 rounded-full"
+                animate={{
+                  y: ["0%", "-50%", "0%"],
+                  opacity: [0.5, 1, 0.5],
+                  scale: [1, 1.2, 1],
+                }}
+                transition={{
+                  duration: 0.8,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                }}
+              />
+            ))}
+          </div>
+        </motion.div>
+      );
+    }
+    
     switch (conversationState) {
       case CONVERSATION_STATES.ANALYZING_INPUT:
         return (
-          <div className="state-indicator flex items-center text-xs text-blue-400 mb-2">
-            <div className="mr-1">🔍</div>
-            <span>Analyzing your request...</span>
+          <motion.div 
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="state-indicator flex items-center text-sm text-blue-300 mb-2 mt-2 bg-blue-500/10 px-4 py-2 rounded-lg ml-8 border-t border-l border-blue-500/20 shadow-md"
+          >
+            <motion.div 
+              className="mr-2 text-blue-300 text-base"
+              animate={{ 
+                scale: [1, 1.2, 1],
+                rotate: [0, 10, 0, -10, 0],
+              }}
+              transition={{ 
+                duration: 2, 
+                repeat: Infinity,
+                ease: "easeInOut" 
+              }}
+            >
+              🔍
+            </motion.div>
+            <span className="font-medium">Analyzing your request</span>
+            <div className="flex space-x-1 ml-2">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-1.5 h-1.5 bg-blue-400/80 rounded-full"
+                  animate={{
+                    y: ["0%", "-50%", "0%"],
+                    opacity: [0.5, 1, 0.5],
+                    scale: [1, 1.2, 1],
+                  }}
+                  transition={{
+                    duration: 0.8,
+                    repeat: Infinity,
+                    delay: i * 0.2,
+                  }}
+                />
+              ))}
           </div>
+          </motion.div>
         );
       case CONVERSATION_STATES.FETCHING_EXTERNAL_DATA:
         return (
-          <div className="state-indicator flex items-center text-xs text-blue-400 mb-2">
-            <div className="mr-1">🌐</div>
-            <span>Fetching latest information...</span>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="state-indicator flex items-center text-sm text-purple-300 mt-2 mb-2 bg-purple-500/10 px-4 py-2 rounded-lg ml-8 border-t border-l border-purple-500/20 shadow-md"
+          >
+            <motion.div 
+              className="mr-2 text-purple-300 text-base"
+              animate={{ 
+                rotate: [0, 360],
+                scale: [1, 1.1, 1]
+              }}
+              transition={{ 
+                rotate: { duration: 2, repeat: Infinity, ease: "linear" },
+                scale: { duration: 1.2, repeat: Infinity }
+              }}
+            >
+              🔍
+            </motion.div>
+            <span className="font-medium">Fetching external data</span>
+            <div className="flex space-x-1 ml-2">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-1.5 h-1.5 bg-purple-400/80 rounded-full"
+                  animate={{
+                    y: ["0%", "-50%", "0%"],
+                    opacity: [0.5, 1, 0.5],
+                    scale: [1, 1.2, 1],
+                  }}
+                  transition={{
+                    duration: 0.8,
+                    repeat: Infinity,
+                    delay: i * 0.2,
+                  }}
+                />
+              ))}
           </div>
+          </motion.div>
         );
       case CONVERSATION_STATES.GENERATING_ITINERARY:
         return (
-          <div className="state-indicator flex items-center text-xs text-green-400 mb-2">
-            <div className="mr-1">✨</div>
-            <span>Generating your personalized itinerary...</span>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="state-indicator flex items-center text-sm text-green-300 mt-2 mb-2 bg-green-500/10 px-4 py-2 rounded-lg ml-8 border-t border-l border-green-500/20 shadow-md"
+          >
+            <motion.div 
+              className="mr-2 text-green-300 text-base"
+              animate={{ 
+                rotate: [0, 360],
+                scale: [1, 1.2, 1]
+              }}
+              transition={{ 
+                rotate: { duration: 3, repeat: Infinity, ease: "linear" },
+                scale: { duration: 1.5, repeat: Infinity }
+              }}
+            >
+              ✨
+            </motion.div>
+            <span className="font-medium">Generating your personalized itinerary</span>
+            <div className="flex space-x-1 ml-2">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-1.5 h-1.5 bg-green-400/80 rounded-full"
+                  animate={{
+                    y: ["0%", "-50%", "0%"],
+                    opacity: [0.5, 1, 0.5],
+                    scale: [1, 1.2, 1],
+                  }}
+                  transition={{
+                    duration: 0.8,
+                    repeat: Infinity,
+                    delay: i * 0.2,
+                  }}
+                />
+              ))}
           </div>
+          </motion.div>
         );
       case CONVERSATION_STATES.EDITING_ITINERARY:
         return (
-          <div className="state-indicator flex items-center text-xs text-orange-400 mb-2">
-            <div className="mr-1">✏️</div>
-            <span>Editing your itinerary...</span>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="state-indicator flex items-center text-sm text-orange-300 mt-2 mb-2 bg-orange-500/10 px-4 py-2 rounded-lg ml-8 border-t border-l border-orange-500/20 shadow-md"
+          >
+            <motion.div 
+              className="mr-2 text-orange-300 text-base"
+              animate={{ 
+                rotate: [-10, 10, -10],
+                y: [0, -2, 0]
+              }}
+              transition={{ 
+                duration: 1.5, 
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            >
+              ✏️
+            </motion.div>
+            <span className="font-medium">Editing your itinerary</span>
+            <div className="flex space-x-1 ml-2">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-1.5 h-1.5 bg-orange-400/80 rounded-full"
+                  animate={{
+                    y: ["0%", "-50%", "0%"],
+                    opacity: [0.5, 1, 0.5]
+                  }}
+                  transition={{
+                    duration: 0.8,
+                    repeat: Infinity,
+                    delay: i * 0.2,
+                  }}
+                />
+              ))}
           </div>
+          </motion.div>
         );
       default:
         return null;
+    }
+  };
+
+  // Log our message state for troubleshooting
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('Current message state:');
+      console.log('- History messages:', data?.history?.length || 0);
+      console.log('- Pending messages:', pendingMessages?.length || 0);
+      console.log('- Filtered messages:', messagesToDisplay?.length || 0);
+      console.log('- IsNewChat:', isNewChatWithInitialMessage);
+    }
+  }, [data?.history, pendingMessages, messagesToDisplay, isNewChatWithInitialMessage]);
+
+  // Handler for missing field completion
+  const [missingFieldsState, setMissingFieldsState] = useState({ fields: [], values: {}, messageId: null });
+  const [localValues, setLocalValues] = useState({});
+
+  useEffect(() => {
+    setLocalValues(missingFieldsState.values || {});
+    // eslint-disable-next-line
+  }, [missingFieldsState.messageId]);
+
+  const isAllValid = missingFieldsState.fields.length > 0 &&
+    missingFieldsState.fields.every(f => {
+      const v = localValues[f];
+      return v !== undefined && v !== null && v.toString().trim() !== "";
+    });
+
+  const handleFieldChange = (field, value) => {
+    setLocalValues(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = () => {
+    if (!isAllValid) return;
+    // עדכון ה־state הגלובלי
+    if (window.__processingHookState?.setMissingFieldsState) {
+      window.__processingHookState.setMissingFieldsState({
+        ...missingFieldsState,
+        values: localValues,
+      });
+    }
+    // עדכון מצב לשלב שליפה
+    if (window.__processingHookState?.transitionState) {
+      window.__processingHookState.transitionState(
+        window.__processingHookState.CONVERSATION_STATES?.FETCHING_EXTERNAL_DATA || "FETCHING_EXTERNAL_DATA"
+      );
+    }
+    // שליחה ל־processUserInput
+    if (window.__processingHookState?.processUserInput) {
+      const userMessage = missingFieldsState.fields.map(f => `${f}: ${localValues[f]}`).join(', ');
+      window.__processingHookState.processUserInput(userMessage);
+    }
+    // איפוס
+    setLocalValues({});
+    if (window.__processingHookState?.setMissingFieldsState) {
+      window.__processingHookState.setMissingFieldsState({ fields: [], values: {}, messageId: null });
     }
   };
 
@@ -293,13 +686,13 @@ const ChatPage = () => {
       </div>
 
       {/* Chat Content with History and Input */}
-      <div className="flex-1 flex flex-col bg-[#171923] overflow-hidden">
+      <div className="flex-1 flex flex-col bg-[#171923] overflow-hidden relative">
         {/* Message History */}
         <div 
           ref={chatContainerRef}
           id="chat-messages-container"
-          className="flex-1 overflow-y-auto p-4 pb-2"
-          style={{ maxHeight: "calc(100vh - 120px)" }}
+          className="flex-1 overflow-y-auto p-4 pb-28"
+          style={{ maxHeight: "calc(100vh - 130px)" }}
         >
           <div className="flex flex-col gap-4">
             {isPending ? (
@@ -317,116 +710,240 @@ const ChatPage = () => {
               </div>
             ) : (
               <>
-                {/* Server-loaded chat history */}
-                {data?.history?.map((message, i) => (
-                  <React.Fragment key={`history-${i}`}>
-                    <motion.div
-                      initial={{ opacity: 0.9 }}
-                      animate={{ opacity: 1 }}
-                      className={`px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 ${
-                        message.role === "user"
-                          ? "bg-blue-600/20 text-[#f9f9f9] self-end flex-row-reverse border-t border-r border-blue-500/20"
-                          : "bg-[#2a2d3c] self-start border-t border-l border-gray-700/30"
-                      }`}
-                    >
-                      {message.role === "user" ? (
-                        <div className="message-header">
-                          <div className="bg-blue-500/30 p-1 rounded-full">
-                            <RiUser3Fill className="text-white text-xs" />
+                {/* Use our filtered combined history and pending messages */}
+                {messagesToDisplay.map((message, i) => {
+                  // Determine which key to use based on message source
+                  const messageKey = message.source === 'history' 
+                    ? `history-${message.index}` 
+                    : `pending-${message.id || message.index}`;
+                  
+                  // Render missing field UI if needed
+                  if (message.isMissingFields && Array.isArray(message.missingFields)) {
+                    return (
+                      <div
+                        key={messageKey}
+                        className="missing-fields-ui ml-5 mt-1 p-5 rounded-2xl bg-gradient-to-br from-[#23263a] to-[#181a29] border border-blue-500/30 max-w-lg shadow-lg"
+                        style={{ minWidth: 320, maxWidth: '90%', color: '#e0e6ff' }}
+                      >
+                        <div className="font-bold text-blue-300 text-lg mb-2">נדרש מידע נוסף להמשך</div>
+                        <div className="text-xs text-blue-200 mb-4">אנא השלם את השדות הבאים כדי שנוכל להמשיך:</div>
+                        <form onSubmit={e => { e.preventDefault(); handleSubmit(); }}>
+                          {message.missingFields.map((field) => {
+                            const FieldComponent = fieldComponentMap[field];
+                            if (FieldComponent) {
+                              return (
+                                <FieldComponent
+                                  key={field}
+                                  value={localValues[field] || ""}
+                                  onComplete={value => handleFieldChange(field, value)}
+                                  label={field}
+                                />
+                              );
+                            }
+                            // fallback
+                            return (
+                              <div key={field} style={{ margin: "12px 0" }}>
+                                <label style={{ color: '#b3c6ff', fontWeight: 500 }}>{field}:</label>
+                                <input
+                                  value={localValues[field] || ""}
+                                  onChange={e => handleFieldChange(field, e.target.value)}
+                                  placeholder={`הכנס ${field}`}
+                                  style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: "1px solid #3a4060", background: '#23263a', color: '#e0e6ff', fontSize: '1rem' }}
+                                />
+                              </div>
+                            );
+                          })}
+                          <button
+                            type="submit"
+                            disabled={!isAllValid}
+                            className={`mt-6 w-full py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold text-base shadow-md transition ${isAllValid ? 'hover:from-blue-700 hover:to-blue-600' : 'opacity-50 cursor-not-allowed'}`}
+                            style={{ letterSpacing: '0.05em' }}
+                          >
+                            המשך
+                          </button>
+                        </form>
+                      </div>
+                    );
+                  }
+                  
+                  // Special rendering for external data loading indicators
+                  if (message.isExternalDataFetch && message.isLoadingMessage) {
+                    return (
+                      <motion.div
+                        key={messageKey}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="external-data-loading-wrapper ml-5 mt-1"
+                      >
+                        <div className="external-data-loading px-4 py-3 rounded-lg text-white text-sm shadow-md bg-gradient-to-r from-[#2a3856] to-[#2c3e69] self-start border-t border-l border-purple-500/30 inline-flex gap-3 items-center">
+                          <RiCompass3Fill className="text-purple-400 text-base" />
+                          <div className="flex items-center">
+                            <span className="mr-3">{message.message}</span>
+                            <div className="typing-dots flex">
+                              {[0, 1, 2].map((dot) => (
+                                <motion.div
+                                  key={dot}
+                                  className="w-1.5 h-1.5 bg-purple-400/80 rounded-full mx-0.5"
+                                  animate={{
+                                    y: ["0%", "-50%", "0%"],
+                                    opacity: [0.6, 1, 0.6],
+                                    scale: [1, 1.2, 1],
+                                  }}
+                                  transition={{
+                                    duration: 0.8,
+                                    repeat: Infinity,
+                                    delay: dot * 0.2,
+                                  }}
+                                />
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      ) : (
-                        <div className="message-header">
-                          <div className="ai-avatar-container">
-                            <RiCompass3Fill className="text-blue-400 text-sm" />
+                      </motion.div>
+                    );
+                  }
+                
+                  // Special rendering for generic typing indicators
+                  if (message.isGenericTyping) {
+                    return (
+                      <motion.div
+                        key={messageKey}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="typing-indicator-wrapper ml-5 mt-1"
+                      >
+                        <div className="typing-indicator px-3 py-2 rounded-lg text-white text-sm shadow-md bg-gradient-to-r from-[#293348] to-[#2d3346] self-start border-t border-l border-blue-500/20 inline-flex gap-2 items-center">
+                          <RiCompass3Fill className="text-blue-400 text-sm" />
+                          <div className="typing-dots flex">
+                            {[0, 1, 2].map((dot) => (
+                              <motion.div
+                                key={dot}
+                                className="w-1.5 h-1.5 bg-blue-400/80 rounded-full mx-0.5"
+                                animate={{
+                                  y: ["0%", "-40%", "0%"],
+                                  opacity: [0.6, 1, 0.6],
+                                }}
+                                transition={{
+                                  duration: 0.6,
+                                  repeat: Infinity,
+                                  delay: dot * 0.2,
+                                }}
+                              />
+                            ))}
                           </div>
                         </div>
-                      )}
-                      
-                      <div className="message-content overflow-wrap-break-word" style={{ maxWidth: "calc(100% - 30px)" }}>
-                        {message.img && (
-                          <div className="image-container mb-2">
-                            <IKImage
-                              urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
-                              path={message.img}
-                              width="100%"
-                              height="auto"
-                              transformation={[{ width: 300 }]}
-                              loading="lazy"
-                              lqip={{ active: true, quality: 20 }}
-                              className="message-image rounded-lg"
-                            />
+                      </motion.div>
+                    );
+                  }
+                
+                  // Regular message rendering
+                  return (
+                    <React.Fragment key={messageKey}>
+                      <motion.div
+                        initial={{ 
+                          opacity: message.source === 'pending' && !message.isDisplayStable ? 0 : 0.8, 
+                          y: message.source === 'pending' && !message.isDisplayStable ? 15 : 0,
+                          scale: message.source === 'pending' && !message.isDisplayStable ? 0.98 : 1
+                        }}
+                        animate={{ 
+                          opacity: 1, 
+                          y: 0,
+                          scale: 1,
+                          ...(message.isTransitioning ? { opacity: [1, 0.7] } : {})
+                        }}
+                        transition={{ 
+                          duration: message.source === 'pending' && !message.isDisplayStable ? 0.4 : 0.3,
+                          ease: "easeOut",
+                          opacity: { duration: 0.4 },
+                          y: { type: "spring", stiffness: 120, damping: 14 }
+                        }}
+                        className={`px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 ${
+                          message.role === "user"
+                            ? "bg-gradient-to-r from-blue-600/30 to-blue-500/20 text-[#f9f9f9] self-end flex-row-reverse border-t border-r border-blue-500/20"
+                            : message.isSystemMessage
+                              ? "bg-gradient-to-r from-[#2a3856] to-[#2c3e69] self-start border-t border-l border-blue-400/30"
+                                : message.isLoadingMessage
+                                  ? "bg-gradient-to-r from-[#2a2d3c] to-[#2a3856] self-start border-t border-l border-blue-400/20"
+                                : message.isTransitioning
+                                  ? "bg-gradient-to-r from-[#2a2d3c] to-[#2a3046] self-start border-t border-l border-gray-700/30"
+                              : "bg-gradient-to-r from-[#2a2d3c] to-[#30324a] self-start border-t border-l border-gray-700/30 hover:shadow-lg hover:border-gray-700/50 transition-all duration-200"
+                        }`}
+                      >
+                        {message.role === "user" ? (
+                          <div className="message-header">
+                            <motion.div 
+                              className="bg-blue-500/30 p-1 rounded-full"
+                              initial={{ scale: 0.9 }}
+                              animate={{ scale: 1 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              <RiUser3Fill className="text-white text-xs" />
+                            </motion.div>
+                          </div>
+                        ) : (
+                          <div className="message-header">
+                            <motion.div 
+                              className="ai-avatar-container"
+                              initial={{ scale: 0.9, rotate: -10 }}
+                              animate={{ scale: 1, rotate: 0 }}
+                              transition={{ duration: 0.3, type: "spring" }}
+                            >
+                              <RiCompass3Fill className={`${
+                                message.isSystemMessage 
+                                  ? "text-blue-300" 
+                                  : message.isLoadingMessage
+                                    ? "text-blue-400 animate-pulse"
+                                    : message.isTransitioning
+                                      ? "text-blue-400"
+                                      : "text-blue-400"
+                              } text-sm`} />
+                            </motion.div>
                           </div>
                         )}
-                        <Markdown>{message.parts[0].text}</Markdown>
-                      </div>
-                    </motion.div>
-                  </React.Fragment>
-                ))}
-                
-                {/* Pending messages not yet saved to server */}
-                {filteredPendingMessages.map((message, i) => (
-                  <React.Fragment key={`pending-${message.id || i}`}>
-                    <motion.div
-                      initial={{ opacity: 0.5, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className={`px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 ${
-                        message.role === "user"
-                          ? "bg-blue-600/20 text-[#f9f9f9] self-end flex-row-reverse border-t border-r border-blue-500/20"
-                          : message.isSystemMessage
-                            ? "bg-[#2a3856] self-start border-t border-l border-blue-400/30"
-                            : "bg-[#2a2d3c] self-start border-t border-l border-gray-700/30"
-                      }`}
-                    >
-                      {message.role === "user" ? (
-                        <div className="message-header">
-                          <div className="bg-blue-500/30 p-1 rounded-full">
-                            <RiUser3Fill className="text-white text-xs" />
-                          </div>
+                        
+                        <div className="message-content overflow-wrap-break-word" style={{ maxWidth: "calc(100% - 30px)" }}>
+                          {message.img && (
+                            <motion.div 
+                              className="image-container mb-2"
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.4, delay: 0.2 }}
+                            >
+                              <IKImage
+                                urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
+                                path={message.img}
+                                width="100%"
+                                height="auto"
+                                transformation={[{ width: 300 }]}
+                                loading="lazy"
+                                lqip={{ active: true, quality: 20 }}
+                                className="message-image rounded-lg shadow hover:shadow-md transition-all duration-200"
+                              />
+                            </motion.div>
+                          )}
+                          <Markdown>{message.displayMessage || message.message || (message.parts && message.parts[0]?.text) || ''}</Markdown>
                         </div>
-                      ) : (
-                        <div className="message-header">
-                          <div className="ai-avatar-container">
-                            <RiCompass3Fill className={`${message.isSystemMessage ? "text-blue-300" : "text-blue-400"} text-sm`} />
-                          </div>
-                        </div>
-                      )}
+                      </motion.div>
                       
-                      <div className="message-content overflow-wrap-break-word" style={{ maxWidth: "calc(100% - 30px)" }}>
-                        {message.img && (
-                          <div className="image-container mb-2">
-                            <IKImage
-                              urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
-                              path={message.img}
-                              width="100%"
-                              height="auto"
-                              transformation={[{ width: 300 }]}
-                              loading="lazy"
-                              lqip={{ active: true, quality: 20 }}
-                              className="message-image rounded-lg"
-                            />
-                          </div>
-                        )}
-                        <Markdown>{message.message}</Markdown>
-                      </div>
-                    </motion.div>
-                  </React.Fragment>
-                ))}
+                      {/* Show state indicator right after user message */}
+                      {message.role === "user" && 
+                       i === messagesToDisplay.findIndex(m => m.role === "user" && m.id === message.id) && 
+                       (isTyping || 
+                        conversationState === CONVERSATION_STATES.ANALYZING_INPUT ||
+                        conversationState === CONVERSATION_STATES.FETCHING_EXTERNAL_DATA ||
+                        parallelDataFetch?.inProgress) && 
+                       renderStateIndicator()}
+                    </React.Fragment>
+                  );
+                })}
                 
-                {/* Show state indicators */}
-                {renderStateIndicator()}
-                
-                {/* Show typing indicator if the AI is currently generating a response */}
-                {isTyping && (
-                  <div className="typing-indicator-wrapper">
-                    <TypingIndicator />
-                  </div>
-                )}
-                
-                {/* Itinerary generation indicator */}
+                {/* Show itinerary generation indicator */}
                 {isGeneratingItinerary && (
-                  <div className="px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md bg-[#2a2d3c] self-start border-t border-l border-gray-700/30 flex gap-3">
+                  <div className="px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md bg-gradient-to-r from-[#2a2d3c] to-[#30324a] self-start border-t border-l border-gray-700/30 flex gap-3">
                     <div className="message-header">
                       <div className="ai-avatar-container">
                         <RiCompass3Fill className="text-blue-400 text-sm" />
@@ -463,7 +980,7 @@ const ChatPage = () => {
         
         {/* Input Component */}
         {data && (
-          <div className="flex-shrink-0 border-t border-[#2a2d3c]">
+          <div className="sticky bottom-0 z-20 flex-shrink-0 mt-auto w-full">
             <NewPromt data={data} />
           </div>
         )}
