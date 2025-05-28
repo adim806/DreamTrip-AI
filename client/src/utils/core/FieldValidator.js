@@ -296,6 +296,50 @@ export const validateFields = (
       enhancedData.isCurrentTime = true;
       console.log("Detected current time reference in weather request");
     }
+
+    // Map time field to date field if needed
+    if (enhancedData.time && !enhancedData.date) {
+      console.log("Mapping time field to date field:", enhancedData.time);
+
+      // If time is a date string, use it directly
+      if (enhancedData.time.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        enhancedData.date = enhancedData.time;
+      }
+      // If time is "today", "tomorrow", etc., convert it
+      else if (
+        ["today", "tomorrow", "weekend"].includes(
+          enhancedData.time.toLowerCase()
+        )
+      ) {
+        const today = new Date();
+
+        if (enhancedData.time.toLowerCase() === "tomorrow") {
+          const tomorrow = new Date(today);
+          tomorrow.setDate(today.getDate() + 1);
+          enhancedData.date = tomorrow.toISOString().split("T")[0];
+          enhancedData.isTomorrow = true;
+        } else if (enhancedData.time.toLowerCase() === "weekend") {
+          const weekend = new Date(today);
+          const dayOfWeek = weekend.getDay();
+          // Calculate days until weekend (Saturday)
+          const daysUntilWeekend = dayOfWeek === 6 ? 0 : 6 - dayOfWeek;
+          weekend.setDate(today.getDate() + daysUntilWeekend);
+          enhancedData.date = weekend.toISOString().split("T")[0];
+          enhancedData.isWeekend = true;
+        } else {
+          // Default to today
+          enhancedData.date = today.toISOString().split("T")[0];
+          enhancedData.isToday = true;
+        }
+      }
+      // For other time values, default to today
+      else {
+        enhancedData.date = new Date().toISOString().split("T")[0];
+        enhancedData.isToday = true;
+      }
+
+      console.log("Mapped time to date:", enhancedData.date);
+    }
   }
 
   // Remove "country" from missingFields if we've resolved it through the LocationResolver

@@ -608,14 +608,40 @@ export const fetchExternalData = async (
   }
 
   try {
-    // For the four supported intents, use the server endpoint
+    // Special handling for Find-Attractions to ensure location is properly set
+    if (intent === "Find-Attractions") {
+      console.log(
+        "Processing Find-Attractions intent with details:",
+        processedDetails
+      );
+
+      // Make sure we have a location parameter - check all possible location fields
+      const location =
+        processedDetails.location ||
+        processedDetails.city ||
+        processedDetails.vacation_location ||
+        processedDetails.destination;
+
+      if (!location) {
+        console.error("Location is required for attractions search");
+        return {
+          success: false,
+          error: "Location is required for attractions search",
+        };
+      }
+
+      // Create a clean params object with the location properly set
+      return await fetchAttractions(location, {
+        country: processedDetails.country,
+        category: processedDetails.category,
+        rating: processedDetails.rating,
+        ...processedDetails.filters,
+      });
+    }
+
+    // For the other supported intents, use the server endpoint
     if (
-      [
-        "Weather-Request",
-        "Find-Hotel",
-        "Find-Attractions",
-        "Find-Restaurants",
-      ].includes(intent)
+      ["Weather-Request", "Find-Hotel", "Find-Restaurants"].includes(intent)
     ) {
       // Call the generic server endpoint with intent and all processed details
       const params = new URLSearchParams({

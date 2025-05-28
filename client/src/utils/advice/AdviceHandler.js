@@ -292,12 +292,31 @@ export const processAdviceIntent = async ({
         );
       }
 
+      console.log(
+        `[AdviceHandler] Missing fields detected, requesting transition to AWAITING_MISSING_INFO state`
+      );
+
+      // Generate a unique message ID to help prevent duplicate forms
+      const messageId = `missing-fields-${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 9)}`;
+
+      console.log(`[AdviceHandler] Generated unique messageId: ${messageId}`);
+
       return {
         success: false,
         needsFollowUp: true,
         followUpQuestion,
         data: validation.enhancedData,
         missingFields: effectiveMissingFields,
+        // Add state transition information
+        stateTransition: {
+          nextState: "AWAITING_MISSING_INFO",
+          nextAction: "collect_missing_fields",
+          intent: intent,
+          requiredFields: effectiveMissingFields,
+          messageId: messageId, // Add unique message ID to help prevent duplicates
+        },
       };
     }
   }
@@ -376,6 +395,12 @@ export const processAdviceIntent = async ({
         needsExternalData: true,
         message: formattedResponse,
         rawData: externalData,
+        // Add state transition information for successful fetch
+        stateTransition: {
+          nextState: "ADVISORY_MODE",
+          nextAction: "display_external_data",
+          intent: intent,
+        },
       };
     } else {
       // Handle failed data fetch
@@ -386,6 +411,12 @@ export const processAdviceIntent = async ({
         error: externalData.error || "Failed to fetch external data",
         data: validation.enhancedData,
         message: formatAdviceResponse(intent, externalData),
+        // Add state transition information for error case
+        stateTransition: {
+          nextState: "ADVISORY_MODE",
+          nextAction: "display_error",
+          intent: intent,
+        },
       };
     }
   } catch (error) {
@@ -399,6 +430,12 @@ export const processAdviceIntent = async ({
       message: `Sorry, I encountered an error while getting ${intent
         .replace("-", " ")
         .toLowerCase()} information: ${error.message}`,
+      // Add state transition information for error case
+      stateTransition: {
+        nextState: "ADVISORY_MODE",
+        nextAction: "display_error",
+        intent: intent,
+      },
     };
   }
 };

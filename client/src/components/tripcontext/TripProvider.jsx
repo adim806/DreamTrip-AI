@@ -11,7 +11,8 @@ export const CONVERSATION_STATES = {
   DISPLAYING_ITINERARY: "displaying_itinerary",
   EDITING_ITINERARY: "editing_itinerary",
   ADVISORY_MODE: "advisory_mode",
-  TRIP_BUILDING_MODE: "trip_building_mode"
+  TRIP_BUILDING_MODE: "trip_building_mode",
+  AWAITING_MISSING_INFO: "awaiting_missing_info"
 };
 
 // Define service categories for UserProfile
@@ -398,6 +399,20 @@ export function TripProvider({ children }) {
               );
             }, 1000);
           }
+        }
+        break;
+        
+      case CONVERSATION_STATES.AWAITING_MISSING_INFO:
+        // When transitioning to AWAITING_MISSING_INFO, we're waiting for the user to fill in missing fields
+        console.log("Transitioning to AWAITING_MISSING_INFO state - waiting for user to provide missing information");
+        // No special handling needed here - the MissingFieldsForm component will handle the UI
+        break;
+        
+      case CONVERSATION_STATES.FETCHING_EXTERNAL_DATA:
+        // When transitioning from AWAITING_MISSING_INFO to FETCHING_EXTERNAL_DATA,
+        // it means the user has submitted the missing fields form
+        if (conversationState === CONVERSATION_STATES.AWAITING_MISSING_INFO) {
+          console.log("User submitted missing fields form, fetching external data");
         }
         break;
         

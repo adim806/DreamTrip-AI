@@ -123,7 +123,7 @@ export const getRequiredFieldsForIntent = (intent, rules = null) => {
 
   // Default field requirements by intent
   const defaultRequirements = {
-    "Weather-Request": ["city", "country"],
+    "Weather-Request": ["city", "country", "date"],
     "Find-Hotel": ["city", "country", "budget_level"],
     "Find-Attractions": ["city"],
     "Find-Restaurants": ["city"],

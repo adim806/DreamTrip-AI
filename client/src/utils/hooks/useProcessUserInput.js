@@ -282,6 +282,14 @@ export function useProcessUserInput(chatData) {
     result: null,
   });
 
+  // Declare missingFieldsState here, before it's used in any functions
+  const [missingFieldsState, setMissingFieldsState] = useState({
+    fields: [],
+    values: {},
+    messageId: null,
+    submitted: false,
+  });
+
   // Refs for tracking state
   const chatRef = useRef(null);
   const chatSessionIdRef = useRef(null);
@@ -683,8 +691,88 @@ export function useProcessUserInput(chatData) {
             result: null,
           });
 
+          // NEW: Check for state transition information from the advice handler
+          if (adviceResult?.stateTransition) {
+            console.log(
+              `[ModularProcessing] State transition requested:`,
+              adviceResult.stateTransition
+            );
+
+            // Get the requested state transition
+            const {
+              nextState,
+              nextAction,
+              intent: transitionIntent,
+              requiredFields,
+            } = adviceResult.stateTransition;
+
+            // Map the nextState to a valid CONVERSATION_STATES value
+            let targetState;
+            switch (nextState) {
+              case "AWAITING_MISSING_INFO":
+                targetState = CONVERSATION_STATES.AWAITING_MISSING_INFO;
+                break;
+              case "ADVISORY_MODE":
+                targetState = CONVERSATION_STATES.ADVISORY_MODE;
+                break;
+              case "FETCHING_EXTERNAL_DATA":
+                targetState = CONVERSATION_STATES.FETCHING_EXTERNAL_DATA;
+                break;
+              default:
+                // If unknown state requested, default to ADVISORY_MODE
+                targetState = CONVERSATION_STATES.ADVISORY_MODE;
+            }
+
+            // If we have missing fields to collect, update the missingFieldsState
+            if (
+              nextAction === "collect_missing_fields" &&
+              requiredFields?.length > 0
+            ) {
+              console.log(
+                `[ModularProcessing] Setting missing fields state with fields:`,
+                requiredFields
+              );
+
+              // Check if we already have a form with the same fields to prevent duplicates
+              const hasDuplicateForm = pendingMessages.some(
+                (msg) =>
+                  msg.isMissingFields &&
+                  msg.missingFields?.length === requiredFields.length &&
+                  msg.missingFields.every((field) =>
+                    requiredFields.includes(field)
+                  )
+              );
+
+              if (hasDuplicateForm) {
+                console.log(
+                  `[ModularProcessing] Duplicate form detected, not creating another one`
+                );
+              } else {
+                // Use the messageId from adviceHandler if available, or generate a new one
+                const messageId =
+                  adviceResult.stateTransition.messageId ||
+                  `missing-fields-${Date.now()}`;
+                console.log(
+                  `[ModularProcessing] Using messageId: ${messageId}`
+                );
+
+                setMissingFieldsState({
+                  fields: requiredFields,
+                  values: {},
+                  messageId: messageId,
+                  intent: transitionIntent,
+                  submitted: false,
+                });
+              }
+            }
+
+            // Transition to the requested state
+            console.log(`[ModularProcessing] Transitioning to ${targetState}`);
+            transitionState(targetState);
+          }
           // ALWAYS transition back from FETCHING_EXTERNAL_DATA if we were in that state
-          if (
+          // and no specific state transition was requested
+          else if (
             conversationState === CONVERSATION_STATES.FETCHING_EXTERNAL_DATA
           ) {
             transitionState(CONVERSATION_STATES.ADVISORY_MODE);
@@ -892,8 +980,15 @@ export function useProcessUserInput(chatData) {
       );
 
       try {
+        // Check if this message is a response to missing fields request
+        const isMissingFieldsResponse =
+          missingFieldsState.fields.length > 0 &&
+          missingFieldsState.fields.some((field) =>
+            userMessage.includes(`${field}:`)
+          );
+
         // Use modular acknowledgment detection
-        if (isAcknowledgmentMessage(userMessage)) {
+        if (!isMissingFieldsResponse && isAcknowledgmentMessage(userMessage)) {
           console.log(
             "[ModularProcessing] Detected acknowledgment message, adding simple response"
           );
@@ -928,6 +1023,32 @@ export function useProcessUserInput(chatData) {
           if (!initSuccess) {
             throw new Error("Failed to initialize chat");
           }
+        }
+
+        // If this is a missing fields response, process it differently
+        if (isMissingFieldsResponse && missingFieldsState.fields.length > 0) {
+          console.log("[ModularProcessing] Processing missing fields response");
+
+          // Extract field values from the message
+          const fieldValues = {};
+          missingFieldsState.fields.forEach((field) => {
+            const regex = new RegExp(`${field}:\\s*([^,]+)`, "i");
+            const match = userMessage.match(regex);
+            if (match && match[1]) {
+              fieldValues[field] = match[1].trim();
+            }
+          });
+
+          console.log(
+            "[ModularProcessing] Extracted field values:",
+            fieldValues
+          );
+
+          // Update missing fields state with the extracted values
+          setMissingFieldsState((prev) => ({
+            ...prev,
+            values: { ...prev.values, ...fieldValues },
+          }));
         }
 
         // Send message to AI
@@ -1049,25 +1170,110 @@ export function useProcessUserInput(chatData) {
           extractedData?.data?.missingFields &&
           extractedData.data.missingFields.length > 0
         ) {
-          // Switch to missing fields state
-          transitionState(
-            CONVERSATION_STATES.COLLECT_MISSING_FIELD ||
-              CONVERSATION_STATES.AWAITING_MISSING_INFO
+          console.log(
+            "[ModularProcessing] Found missing fields in extracted data:",
+            extractedData.data.missingFields
           );
-          setMissingFieldsState({
+
+          // Get the detected intent or use a default
+          const detectedIntent =
+            extractedData.data.intent ||
+            sanitizeIntent(extractedData.data.intent || "General-Query");
+
+          // Make sure we have a valid AWAITING_MISSING_INFO state to transition to
+          const targetState =
+            CONVERSATION_STATES.AWAITING_MISSING_INFO ||
+            CONVERSATION_STATES.COLLECT_MISSING_FIELD ||
+            "awaiting_missing_info";
+
+          console.log(
+            `[ModularProcessing] Transitioning to missing fields state: ${targetState}`
+          );
+
+          // Switch to missing fields state
+          transitionState(targetState);
+
+          // Update missing fields state
+          const newMissingFieldsState = {
             fields: extractedData.data.missingFields,
             values: {},
-            messageId: `missing-fields-${Date.now()}`,
-          });
-          setPendingMessages((prev) => [
-            ...prev,
-            {
+            messageId: `missing-fields-${Date.now()}-${Math.random()
+              .toString(36)
+              .substring(2, 9)}`,
+            intent: detectedIntent, // Include the intent
+            submitted: false, // Add submitted field to prevent infinite loops
+          };
+
+          console.log(
+            "[ModularProcessing] Setting missing fields state:",
+            newMissingFieldsState
+          );
+
+          // Check if we already have a form with the same fields to prevent duplicates
+          const hasDuplicateFields = pendingMessages.some(
+            (msg) =>
+              msg.isMissingFields &&
+              msg.missingFields?.length ===
+                extractedData.data.missingFields.length &&
+              msg.missingFields.every((field) =>
+                extractedData.data.missingFields.includes(field)
+              )
+          );
+
+          if (hasDuplicateFields) {
+            console.log(
+              "[ModularProcessing] Duplicate missing fields form detected, not updating state"
+            );
+          } else {
+            setMissingFieldsState(newMissingFieldsState);
+          }
+
+          // Check if we already have a missing fields form in the pending messages
+          // to prevent duplicates
+          const hasMissingFieldsForm = pendingMessages.some(
+            (msg) => msg.isMissingFields
+          );
+
+          if (!hasMissingFieldsForm) {
+            // Add the missing fields form to pending messages
+            const missingFieldsMessage = {
               role: "model",
               isMissingFields: true,
               missingFields: extractedData.data.missingFields,
+              intent: detectedIntent, // Include the intent
               id: `missing-fields-${Date.now()}`,
-            },
-          ]);
+            };
+
+            console.log(
+              "[ModularProcessing] Adding missing fields form to pending messages:",
+              missingFieldsMessage
+            );
+
+            // IMPORTANT: Add the form in a way that doesn't trigger re-renders
+            // that could cause infinite loops
+            setTimeout(() => {
+              setPendingMessages((prev) => {
+                // Check one more time for duplicates before adding
+                if (prev.some((msg) => msg.isMissingFields)) {
+                  console.log(
+                    "[ModularProcessing] Found existing form in pending messages, not adding a duplicate"
+                  );
+                  return prev;
+                }
+
+                console.log(
+                  "[ModularProcessing] Actually adding missing fields form to pendingMessages"
+                );
+                return [...prev, missingFieldsMessage];
+              });
+            }, 0);
+          } else {
+            console.log(
+              "[ModularProcessing] Missing fields form already exists, not adding a duplicate"
+            );
+          }
+
+          // Make sure we're not showing typing indicator
           setIsTyping(false);
           return;
         }
@@ -1101,6 +1307,8 @@ export function useProcessUserInput(chatData) {
       setIsTyping,
       mutation,
       transitionState,
+      missingFieldsState,
+      setMissingFieldsState,
     ]
   );
 
@@ -1386,6 +1594,107 @@ export function useProcessUserInput(chatData) {
       setParallelDataFetch,
       conversationState,
       transitionState,
+      // Add missing fields state and setter
+      missingFieldsState,
+      setMissingFieldsState,
+      // Add CONVERSATION_STATES for transitions
+      CONVERSATION_STATES,
+      // Add a function to process missing fields submission
+      processMissingFieldsSubmission: (formValues) => {
+        console.log(
+          "[MissingFields] Processing missing fields submission:",
+          formValues
+        );
+
+        // Check if we have missing fields to process
+        if (missingFieldsState.fields.length === 0) {
+          console.log("[MissingFields] No missing fields to process");
+          return false;
+        }
+
+        // Update missing fields state with submitted values
+        setMissingFieldsState((prev) => ({
+          ...prev,
+          values: {
+            ...prev.values,
+            ...formValues,
+          },
+          submitted: true, // Mark as submitted to prevent re-rendering
+        }));
+
+        // Transition to fetching external data state
+        console.log(
+          "[MissingFields] Transitioning to FETCHING_EXTERNAL_DATA state"
+        );
+        transitionState(CONVERSATION_STATES.FETCHING_EXTERNAL_DATA);
+
+        // Create a message with the collected field values
+        const userMessage = missingFieldsState.fields
+          .map((field) => `${field}: ${formValues[field]}`)
+          .join(", ");
+
+        // Check if this message already exists in pendingMessages to prevent duplicates
+        const messageExists = pendingMessages.some(
+          (msg) => msg.role === "user" && msg.message === userMessage
+        );
+
+        if (!messageExists) {
+          // Add the message to the chat
+          setPendingMessages((prev) => {
+            // First remove any missing fields forms to prevent duplicates
+            const filteredMessages = prev.filter((msg) => !msg.isMissingFields);
+
+            // Then add the user message
+            return [
+              ...filteredMessages,
+              {
+                role: "user",
+                message: userMessage,
+                id: `user-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                isFormSubmission: true, // Mark as form submission
+              },
+            ];
+          });
+        } else {
+          console.log(
+            "[MissingFields] Message already exists, not adding duplicate"
+          );
+        }
+
+        // Add a loading message to indicate processing
+        const loadingId = addLoadingMessage();
+
+        // Replace loading message with external data fetching indicator
+        setTimeout(() => {
+          // Get the intent from the missing fields state
+          const intent = missingFieldsState.intent || "Find-Hotel"; // Default to Find-Hotel if no intent
+
+          replaceLoadingMessage(loadingId, {
+            role: "model",
+            message: getExternalDataLoadingMessage(intent),
+            id: loadingId,
+            isLoadingMessage: true,
+            isExternalDataFetch: true,
+          });
+
+          // Process the message to fetch external data
+          processUserInput(userMessage);
+
+          // IMPORTANT: Reset missing fields state AFTER processing starts
+          // This prevents infinite loops by ensuring the form isn't shown again
+          setTimeout(() => {
+            setMissingFieldsState({
+              fields: [],
+              values: {},
+              messageId: null,
+              submitted: true,
+            });
+          }, 500);
+        }, 100);
+
+        return true;
+      },
     };
   }, [
     pendingMessages,
@@ -1400,13 +1709,96 @@ export function useProcessUserInput(chatData) {
     setParallelDataFetch,
     conversationState,
     transitionState,
+    // Add missing fields state and setter to dependencies
+    missingFieldsState,
+    setMissingFieldsState,
+    CONVERSATION_STATES,
+    // Add processUserInput to dependencies
+    processUserInput,
+    // Add replaceLoadingMessage to dependencies
+    replaceLoadingMessage,
+    getExternalDataLoadingMessage,
   ]);
 
-  const [missingFieldsState, setMissingFieldsState] = useState({
-    fields: [],
-    values: {},
-    messageId: null,
-  });
+  // Create a wrapper for transitionState that can handle string values
+  const safeTransitionState = useCallback(
+    (newState, contextData) => {
+      // If newState is a string, try to map it to a CONVERSATION_STATES value
+      if (typeof newState === "string" && CONVERSATION_STATES) {
+        console.log(`[ModularProcessing] Handling string state: "${newState}"`);
+
+        // Try to find a direct match first
+        if (Object.values(CONVERSATION_STATES).includes(newState)) {
+          console.log(
+            `[ModularProcessing] Found direct match for "${newState}"`
+          );
+          transitionState(newState, contextData);
+          return;
+        }
+
+        // Convert to lowercase for case-insensitive comparison with enum values
+        const lowerState = newState.toLowerCase();
+
+        // Find the matching state in CONVERSATION_STATES
+        for (const [key, value] of Object.entries(CONVERSATION_STATES)) {
+          if (value === lowerState) {
+            console.log(
+              `[ModularProcessing] Mapped string state "${newState}" to enum value ${key}`
+            );
+            transitionState(value, contextData);
+            return;
+          }
+        }
+
+        // If no match found but we have a state called AWAITING_MISSING_INFO, use that for "awaiting_missing_info"
+        if (
+          lowerState === "awaiting_missing_info" &&
+          CONVERSATION_STATES.AWAITING_MISSING_INFO
+        ) {
+          console.log(
+            `[ModularProcessing] Using AWAITING_MISSING_INFO state for "${newState}"`
+          );
+          transitionState(
+            CONVERSATION_STATES.AWAITING_MISSING_INFO,
+            contextData
+          );
+          return;
+        }
+
+        // If no match found but we have a state called FETCHING_EXTERNAL_DATA, use that for "fetching_external_data"
+        if (
+          lowerState === "fetching_external_data" &&
+          CONVERSATION_STATES.FETCHING_EXTERNAL_DATA
+        ) {
+          console.log(
+            `[ModularProcessing] Using FETCHING_EXTERNAL_DATA state for "${newState}"`
+          );
+          transitionState(
+            CONVERSATION_STATES.FETCHING_EXTERNAL_DATA,
+            contextData
+          );
+          return;
+        }
+
+        // If still no match, use ADVISORY_MODE as fallback
+        console.log(
+          `[ModularProcessing] No match found for "${newState}", using ADVISORY_MODE as fallback`
+        );
+        transitionState(CONVERSATION_STATES.ADVISORY_MODE, contextData);
+      } else {
+        // Otherwise, use the original function
+        transitionState(newState, contextData);
+      }
+    },
+    [transitionState, CONVERSATION_STATES]
+  );
+
+  // Register the safeTransitionState function in the global hook state
+  useEffect(() => {
+    if (window.__processingHookState) {
+      window.__processingHookState.safeTransitionState = safeTransitionState;
+    }
+  }, [safeTransitionState]);
 
   // Return the complete hook interface (maintaining backward compatibility)
   return {

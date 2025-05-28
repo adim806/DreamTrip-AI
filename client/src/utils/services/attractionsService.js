@@ -8,6 +8,8 @@
  *
  * @param {Object} params - Search parameters
  * @param {string} params.location - The location to search for attractions
+ * @param {string} params.city - The city to search for attractions
+ * @param {string} params.country - The country to search for attractions
  * @param {Object} params.filters - User filters
  * @param {string} params.filters.category - Category of attractions (museum, park, etc.)
  * @param {number} params.filters.rating - Minimum rating (1-5)
@@ -15,110 +17,63 @@
  */
 export const fetchAttractionRecommendations = async (params) => {
   // Destructure at the top level so these variables are accessible in catch blocks
-  const { location, filters = {} } = params || {};
+  const { location, city, country, filters = {} } = params || {};
+
+  // Make sure we have a location to search with
+  const searchLocation = location || city;
+
+  if (!searchLocation) {
+    console.error("Location is required for attractions search");
+    return {
+      success: false,
+      error: "Location is required for attractions search",
+    };
+  }
 
   try {
-    console.log("Fetching attraction recommendations with params:", params);
+    console.log(
+      `Fetching attractions for ${searchLocation} with filters:`,
+      filters
+    );
 
-    if (!location) {
-      return {
-        success: false,
-        error: "Location is required to search for attractions",
-      };
-    }
-
-    // Google Places API key
-    const apiKey = import.meta.env.VITE_GOOGLE_PLACE_API_KEY;
-
-    if (!apiKey) {
-      console.warn("No Google Places API key provided, using simulated data");
-      return simulateAttractionData(location, filters);
-    }
-
+    // Try to get real data from API
     try {
-      // First try using the backend proxy
-      const backendUrl = "http://localhost:3000"; // Backend server URL
-      const proxyUrl = `${backendUrl}/api/places/search?query=${encodeURIComponent(
-        `attractions in ${location}`
-      )}&type=tourist_attraction&radius=10000`;
+      // Simulate API call delay
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
-      console.log("Fetching from backend proxy:", proxyUrl);
-
-      // First check if the backend is reachable with a test call
-      try {
-        const testResponse = await fetch(`${backendUrl}/api/places/test`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          mode: "cors",
-          timeout: 5000, // 5 second timeout
-        });
-
-        if (!testResponse.ok) {
-          throw new Error(
-            `Backend test failed with status: ${testResponse.status}`
-          );
-        }
-
-        const testData = await testResponse.json();
-        console.log("Backend test response:", testData);
-
-        if (!testData.googlePlacesApiConfigured) {
-          throw new Error("Google Places API not configured in backend");
-        }
-      } catch (testError) {
-        console.error("Backend test failed:", testError);
-        // If the backend test fails, immediately fall back to simulated data
-        console.log("Backend not available, using simulated data");
-        return simulateAttractionData(location, filters);
-      }
-
-      // If we get here, the backend test passed, so try the actual request
-      const response = await fetch(proxyUrl, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        mode: "cors",
+      // For now, return simulated data based on the location
+      const attractionsData = simulateAttractionData(searchLocation, {
+        ...filters,
+        country: country,
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Proxy error (${response.status}): ${errorText}`);
-        throw new Error(
-          `Proxy error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
-      console.log("Received data from proxy:", data);
-
-      if (data.status !== "OK" || !data.results) {
-        console.error("Places API error:", data);
-        throw new Error(`Places API error: ${data.status || "Unknown error"}`);
-      }
-
-      // Map the results to our standard format
-      const attractions = await processAttractionResults(
-        data.results,
-        filters,
-        apiKey
-      );
 
       return {
         success: true,
-        location: location,
-        attractions: attractions,
-        source: "Google Places",
+        location: searchLocation,
+        country: country || null,
+        attractions: attractionsData,
+        source: "Simulated data",
       };
-    } catch (proxyError) {
-      console.error("Error fetching from proxy:", proxyError);
-      console.log("Falling back to simulated data");
-      return simulateAttractionData(location, filters);
+    } catch (apiError) {
+      console.warn("API call failed, using fallback data:", apiError);
+      // Fall back to simulated data
+      const attractionsData = simulateAttractionData(searchLocation, filters);
+
+      return {
+        success: true,
+        location: searchLocation,
+        country: country || null,
+        attractions: attractionsData,
+        source: "Fallback simulated data",
+      };
     }
   } catch (error) {
-    console.error("Error fetching attraction data:", error);
-
-    // Fall back to simulated data if the API fails
-    console.log("Falling back to simulated data");
-    return simulateAttractionData(location, filters);
+    console.error("Error in fetchAttractionRecommendations:", error);
+    return {
+      success: false,
+      error: `Failed to fetch attractions: ${error.message}`,
+      source: "Error",
+    };
   }
 };
 

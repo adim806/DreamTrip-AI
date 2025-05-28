@@ -9,6 +9,7 @@ import { RiUser3Fill, RiRobot2Fill, RiCompass3Fill } from "react-icons/ri";
 import { motion } from "framer-motion";
 import { useAuth } from "@clerk/clerk-react";
 import { fieldComponentMap } from "../../components/FieldCompletion/FieldComponents";
+import MissingFieldsForm from "../../components/FieldCompletion/MissingFieldsForm";
 
 const ChatPage = () => {
   const path = useLocation().pathname;
@@ -72,25 +73,46 @@ const ChatPage = () => {
   // Function to check the hook state periodically
     const checkHookState = () => {
       if (window.__processingHookState) {
+      const hookPendingMessages = window.__processingHookState.pendingMessages || [];
+      const currentIsTyping = window.__processingHookState.isTyping || false;
+      const currentIsGeneratingItinerary = window.__processingHookState.isGeneratingItinerary || false;
+      const currentParallelDataFetch = window.__processingHookState.parallelDataFetch || { inProgress: false, intent: null, data: null, result: null };
+      
+      // Only update state if something has actually changed
+      const hasChanges = 
+        hookPendingMessages.length !== pendingMessages.length ||
+        currentIsTyping !== isTyping ||
+        currentIsGeneratingItinerary !== isGeneratingItinerary ||
+        currentParallelDataFetch.inProgress !== parallelDataFetch.inProgress;
+      
+      if (hasChanges) {
         setHookState({
-          pendingMessages: window.__processingHookState.pendingMessages || [],
-          isTyping: window.__processingHookState.isTyping || false,
-          isGeneratingItinerary: window.__processingHookState.isGeneratingItinerary || false,
-          parallelDataFetch: window.__processingHookState.parallelDataFetch || { inProgress: false, intent: null, data: null, result: null },
+          pendingMessages: hookPendingMessages,
+          isTyping: currentIsTyping,
+          isGeneratingItinerary: currentIsGeneratingItinerary,
+          parallelDataFetch: currentParallelDataFetch,
           processInitialMessage: window.__processingHookState.processInitialMessage || (() => {}),
         });
       }
+      }
     };
     
-  // Set up hook state checking
+  // Set up hook state checking with debounce to prevent excessive updates
   useEffect(() => {
     // Initial check
     checkHookState();
     
-    // Set up interval to check regularly
-    const interval = setInterval(checkHookState, 100);
+    // Set up interval to check regularly with debounce
+    let debounceTimeout;
+    const interval = setInterval(() => {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(checkHookState, 50);
+    }, 500); // Check less frequently (every 500ms)
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(debounceTimeout);
+    };
   }, []);
   
   const { pendingMessages, isTyping, isGeneratingItinerary, parallelDataFetch, processInitialMessage } = hookState;
@@ -181,8 +203,6 @@ const ChatPage = () => {
   const filteredPendingMessages = useMemo(() => {
     if (!pendingMessages?.length) return [];
     
-    console.log("All pending messages (no filtering):", pendingMessages);
-    
     // Don't filter anything - show all pending messages
     // This ensures user messages are always visible
     return pendingMessages;
@@ -191,41 +211,77 @@ const ChatPage = () => {
   // SIMPLE APPROACH - Just combine history and all pending messages
   const messagesToDisplay = useMemo(() => {
     const allMessages = [];
+    const seenMessageContents = new Set(); // Track message contents to prevent duplicates
+    const seenLoadingIndicators = new Set(); // Track loading indicators by type
     
     // Add all history messages first (if any)
     if (data?.history?.length) {
       data.history.forEach((message, i) => {
+        const displayMessage = message.parts?.[0]?.text || message.message || '';
+        
+        // Skip duplicate messages based on content
+        if (displayMessage && seenMessageContents.has(displayMessage)) {
+          return;
+        }
+        
+        // Add to tracking set
+        if (displayMessage) {
+          seenMessageContents.add(displayMessage);
+        }
+        
         allMessages.push({ 
           ...message, 
           source: 'history', 
           index: i,
           id: `history-${i}`,
-          displayMessage: message.parts?.[0]?.text || message.message || '',
+          displayMessage,
           role: message.role
         });
       });
     }
     
-    // Add ALL pending messages (no filtering at all)
+    // Add ALL pending messages (with deduplication)
     if (filteredPendingMessages?.length) {
       filteredPendingMessages.forEach((message, i) => {
+        const displayMessage = message.message || '';
+        const isLoadingIndicator = message.isLoadingMessage || message.isExternalDataFetch;
+        const loadingType = message.isExternalDataFetch ? 'external' : 
+                           (message.isGenericTyping ? 'typing' : null);
+        
+        // Skip duplicate regular messages based on content
+        if (!isLoadingIndicator && displayMessage && seenMessageContents.has(displayMessage)) {
+          return;
+        }
+        
+        // Skip duplicate loading indicators of the same type
+        if (isLoadingIndicator && loadingType && seenLoadingIndicators.has(loadingType)) {
+          return;
+        }
+        
+        // Add to tracking sets
+        if (!isLoadingIndicator && displayMessage) {
+          seenMessageContents.add(displayMessage);
+        }
+        
+        if (isLoadingIndicator && loadingType) {
+          seenLoadingIndicators.add(loadingType);
+        }
+        
         allMessages.push({ 
           ...message, 
           source: 'pending', 
           index: i,
           id: message.id || `pending-${i}`,
-          displayMessage: message.message || '',
+          displayMessage,
           role: message.role
         });
       });
     }
     
-    console.log("SIMPLE: All messages to display:", allMessages.map(m => ({
-      id: m.id,
-      role: m.role, 
-      message: (m.displayMessage || '').substring(0, 50) + '...',
-      source: m.source
-    })));
+    // Only log in development environment and not on every render
+    if (import.meta.env.DEV && allMessages.length % 5 === 0) {
+      console.log("SIMPLE: All messages to display:", allMessages.length);
+    }
     
     return allMessages;
   }, [data?.history, filteredPendingMessages]);
@@ -360,7 +416,7 @@ const ChatPage = () => {
     
     // Don't show state indicators if there's already a typing indicator visible
     const hasVisibleTypingIndicator = messagesToDisplay.some(
-      msg => msg.isLoadingMessage && msg.isGenericTyping
+      msg => msg.isLoadingMessage || msg.isExternalDataFetch || msg.isGenericTyping
     );
     
     if (hasVisibleTypingIndicator) {
@@ -392,6 +448,7 @@ const ChatPage = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="state-indicator flex items-center text-sm text-blue-300 mt-2 mb-2 bg-blue-500/10 px-4 py-2 rounded-lg ml-8 border-t border-l border-blue-500/20 shadow-md"
+          key="typing-indicator"
         >
           <motion.div 
             className="mr-2 text-blue-300 text-base"
@@ -602,7 +659,9 @@ const ChatPage = () => {
 
   // Log our message state for troubleshooting
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    // Only log in development and limit frequency
+    if (import.meta.env.DEV && 
+        ((data?.history?.length || 0) + (pendingMessages?.length || 0)) % 5 === 0) {
       console.log('Current message state:');
       console.log('- History messages:', data?.history?.length || 0);
       console.log('- Pending messages:', pendingMessages?.length || 0);
@@ -614,48 +673,200 @@ const ChatPage = () => {
   // Handler for missing field completion
   const [missingFieldsState, setMissingFieldsState] = useState({ fields: [], values: {}, messageId: null });
   const [localValues, setLocalValues] = useState({});
+  
+  // Initialize local values from missing fields state when it changes
+  // Use a ref to track the previous message ID to prevent unnecessary re-renders
+  const prevMessageIdRef = useRef(null);
 
   useEffect(() => {
+    // Only update local values when the message ID changes
+    if (missingFieldsState.messageId !== prevMessageIdRef.current) {
+      prevMessageIdRef.current = missingFieldsState.messageId;
     setLocalValues(missingFieldsState.values || {});
-    // eslint-disable-next-line
+    }
   }, [missingFieldsState.messageId]);
 
-  const isAllValid = missingFieldsState.fields.length > 0 &&
-    missingFieldsState.fields.every(f => {
-      const v = localValues[f];
-      return v !== undefined && v !== null && v.toString().trim() !== "";
-    });
-
-  const handleFieldChange = (field, value) => {
-    setLocalValues(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = () => {
-    if (!isAllValid) return;
-    // עדכון ה־state הגלובלי
-    if (window.__processingHookState?.setMissingFieldsState) {
-      window.__processingHookState.setMissingFieldsState({
-        ...missingFieldsState,
-        values: localValues,
+  // Handle form submission from MissingFieldsForm - MOVED UP before renderMissingFieldsForm
+  const handleMissingFieldsSubmit = React.useCallback((formValues) => {
+    // Prevent duplicate submissions
+    if (missingFieldsState.submitted === true) {
+      return;
+    }
+    
+    // First, update the local state to reflect the new values and mark as submitted
+    setMissingFieldsState(prev => ({
+      ...prev,
+      values: formValues,
+      submitted: true
+    }));
+    
+    // Generate a unique ID for this submission to prevent duplicates
+    const submissionId = `form-submission-${Date.now()}`;
+    
+    // Use the centralized processing function if available
+    if (window.__processingHookState?.processMissingFieldsSubmission) {
+      const result = window.__processingHookState.processMissingFieldsSubmission(formValues);
+      
+      if (result) {
+        // Successfully processed, no need for further action
+        return;
+      }
+    }
+    
+    // Fallback processing if the centralized function is not available or fails
+    console.log("Using fallback missing fields processing");
+    
+    // Create a structured message with the collected field values
+    const userMessage = missingFieldsState.fields.map(f => `${f}: ${formValues[f]}`).join(', ');
+    
+    // Check if this message already exists to prevent duplicates
+    const messageExists = pendingMessages.some(msg => 
+      msg.role === "user" && 
+      msg.message === userMessage
+    );
+    
+    if (messageExists) {
+      console.log("Message already exists, not adding duplicate");
+      return;
+    }
+    
+    // Add the submitted values as a user message to the chat FIRST
+    if (window.__processingHookState?.setPendingMessages) {
+      window.__processingHookState.setPendingMessages(prev => {
+        // First filter out any existing missing fields forms to prevent duplicates
+        const filteredMessages = prev.filter(msg => !msg.isMissingFields);
+        
+        // Then add the user message with the unique submission ID
+        return [
+          ...filteredMessages,
+          {
+            role: "user",
+            message: userMessage,
+            id: submissionId,
+            timestamp: new Date().toISOString(),
+            isFormSubmission: true // Mark as form submission to identify it later
+          }
+        ];
       });
     }
-    // עדכון מצב לשלב שליפה
-    if (window.__processingHookState?.transitionState) {
-      window.__processingHookState.transitionState(
-        window.__processingHookState.CONVERSATION_STATES?.FETCHING_EXTERNAL_DATA || "FETCHING_EXTERNAL_DATA"
-      );
+    
+    // IMPORTANT: Add a small delay before transitioning state and processing input
+    // This ensures the UI updates with the user message before showing loading indicators
+    setTimeout(() => {
+      // Transition to FETCHING_EXTERNAL_DATA state - prefer safeTransitionState if available
+      if (window.__processingHookState?.safeTransitionState) {
+        window.__processingHookState.safeTransitionState("fetching_external_data");
+      } else if (window.__processingHookState?.transitionState) {
+        window.__processingHookState.transitionState("fetching_external_data");
     }
-    // שליחה ל־processUserInput
+      
+      // Process the user input to trigger external data fetch
     if (window.__processingHookState?.processUserInput) {
-      const userMessage = missingFieldsState.fields.map(f => `${f}: ${localValues[f]}`).join(', ');
       window.__processingHookState.processUserInput(userMessage);
     }
-    // איפוס
+      
+      // Reset local values but keep submitted=true to prevent re-rendering
     setLocalValues({});
-    if (window.__processingHookState?.setMissingFieldsState) {
-      window.__processingHookState.setMissingFieldsState({ fields: [], values: {}, messageId: null });
+    }, 100);
+  }, [missingFieldsState.fields, missingFieldsState.submitted, setMissingFieldsState, setLocalValues, pendingMessages]);
+  
+  // Function to render the missing fields form when needed - wrapped in memo to prevent re-renders
+  const renderMissingFieldsForm = React.useCallback((message) => {
+    // Skip if no missing fields or form already submitted
+    if (!message.isMissingFields || 
+        !Array.isArray(message.missingFields) || 
+        message.missingFields.length === 0 ||
+        missingFieldsState.submitted === true) {
+      return null;
     }
-  };
+    
+    // Check if we already have a form with the same message ID to prevent duplicates
+    if (missingFieldsState.messageId === message.id) {
+      // Form is already being rendered with this message ID, just return it
+      return (
+        <div
+          key={message.id}
+          className="ml-5 mt-1 max-w-lg"
+          style={{ minWidth: 320, maxWidth: '90%' }}
+        >
+          <MissingFieldsForm
+            fields={message.missingFields}
+            initialValues={{...missingFieldsState.values, submitted: missingFieldsState.submitted}}
+            onSubmit={handleMissingFieldsSubmit}
+            submitLabel="שלח"
+            intent={message.intent || missingFieldsState.intent}
+          />
+        </div>
+      );
+    }
+    
+    // If this is a new form (different message ID), update state but don't render yet
+    // This prevents rendering during state updates which can cause loops
+    if (missingFieldsState.messageId !== message.id) {
+      // Use setTimeout to break the render cycle
+      setTimeout(() => {
+        setMissingFieldsState({
+          fields: message.missingFields,
+          values: {},
+          messageId: message.id,
+          intent: message.intent,
+          submitted: false
+        });
+      }, 0);
+      
+      // Return placeholder to show something is happening
+      return (
+        <div
+          key={`placeholder-${message.id}`}
+          className="ml-5 mt-1 max-w-lg bg-blue-500/10 p-2 rounded-lg border border-blue-500/20"
+        >
+          <div className="text-blue-300 text-sm">Loading form...</div>
+        </div>
+      );
+    }
+    
+    return (
+      <div
+        key={message.id}
+        className="ml-5 mt-1 max-w-lg"
+        style={{ minWidth: 320, maxWidth: '90%' }}
+      >
+        <MissingFieldsForm
+          fields={message.missingFields}
+          initialValues={{...missingFieldsState.values, submitted: missingFieldsState.submitted}}
+          onSubmit={handleMissingFieldsSubmit}
+          submitLabel="שלח"
+          intent={message.intent || missingFieldsState.intent}
+        />
+      </div>
+    );
+  }, [missingFieldsState, setMissingFieldsState, handleMissingFieldsSubmit]);
+  
+  // Optimize the effect that initializes missingFieldsState to prevent infinite loops
+  useEffect(() => {
+    // Only run this effect if pendingMessages changes and we don't already have fields
+    if (!pendingMessages?.length || missingFieldsState.fields.length > 0) {
+      return;
+    }
+    
+    // Check if there's a message with missing fields in pendingMessages
+    const missingFieldsMessage = pendingMessages.find(msg => 
+      msg.isMissingFields && 
+      Array.isArray(msg.missingFields) && 
+      msg.missingFields.length > 0
+    );
+    
+    if (missingFieldsMessage && missingFieldsState.messageId !== missingFieldsMessage.id) {
+      // Initialize missingFieldsState with the data from the message
+      setMissingFieldsState({
+        fields: missingFieldsMessage.missingFields,
+        values: {},
+        messageId: missingFieldsMessage.id,
+        intent: missingFieldsMessage.intent,
+        submitted: false
+      });
+    }
+  }, [pendingMessages, missingFieldsState.fields.length, missingFieldsState.messageId]);
 
   return (
     <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(25,28,40,0.97)] overflow-hidden">
@@ -719,51 +930,7 @@ const ChatPage = () => {
                   
                   // Render missing field UI if needed
                   if (message.isMissingFields && Array.isArray(message.missingFields)) {
-                    return (
-                      <div
-                        key={messageKey}
-                        className="missing-fields-ui ml-5 mt-1 p-5 rounded-2xl bg-gradient-to-br from-[#23263a] to-[#181a29] border border-blue-500/30 max-w-lg shadow-lg"
-                        style={{ minWidth: 320, maxWidth: '90%', color: '#e0e6ff' }}
-                      >
-                        <div className="font-bold text-blue-300 text-lg mb-2">נדרש מידע נוסף להמשך</div>
-                        <div className="text-xs text-blue-200 mb-4">אנא השלם את השדות הבאים כדי שנוכל להמשיך:</div>
-                        <form onSubmit={e => { e.preventDefault(); handleSubmit(); }}>
-                          {message.missingFields.map((field) => {
-                            const FieldComponent = fieldComponentMap[field];
-                            if (FieldComponent) {
-                              return (
-                                <FieldComponent
-                                  key={field}
-                                  value={localValues[field] || ""}
-                                  onComplete={value => handleFieldChange(field, value)}
-                                  label={field}
-                                />
-                              );
-                            }
-                            // fallback
-                            return (
-                              <div key={field} style={{ margin: "12px 0" }}>
-                                <label style={{ color: '#b3c6ff', fontWeight: 500 }}>{field}:</label>
-                                <input
-                                  value={localValues[field] || ""}
-                                  onChange={e => handleFieldChange(field, e.target.value)}
-                                  placeholder={`הכנס ${field}`}
-                                  style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: "1px solid #3a4060", background: '#23263a', color: '#e0e6ff', fontSize: '1rem' }}
-                                />
-                              </div>
-                            );
-                          })}
-                          <button
-                            type="submit"
-                            disabled={!isAllValid}
-                            className={`mt-6 w-full py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold text-base shadow-md transition ${isAllValid ? 'hover:from-blue-700 hover:to-blue-600' : 'opacity-50 cursor-not-allowed'}`}
-                            style={{ letterSpacing: '0.05em' }}
-                          >
-                            המשך
-                          </button>
-                        </form>
-                      </div>
-                    );
+                    return renderMissingFieldsForm(message);
                   }
                   
                   // Special rendering for external data loading indicators

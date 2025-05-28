@@ -9,8 +9,8 @@
  * Maps advice intents to their required fields
  */
 export const AdviceFieldSchemas = {
-  // Weather queries require city, country for accuracy, and time
-  "Weather-Request": ["city", "country", "time"],
+  // Weather queries require city, country for accuracy, and date
+  "Weather-Request": ["city", "country", "date"],
 
   // Travel restrictions require country and optionally citizenship
   "Travel-Restrictions": ["country"],
@@ -39,8 +39,8 @@ export const AdviceFieldSchemas = {
   // Restaurants need city
   "Find-Restaurants": ["city"],
 
-  // Flight information needs origin, destination and time
-  "Flight-Information": ["origin", "destination", "time"],
+  // Flight information needs origin, destination and date
+  "Flight-Information": ["origin", "destination", "date"],
 
   // Events need city and optionally dates/category
   "Local-Events": ["city"],
