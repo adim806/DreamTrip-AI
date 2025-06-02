@@ -4,7 +4,6 @@ import {
   updateTripDraft,
   checkTripDraftCompleteness,
   formatTripSummary,
-  generateFollowUpQuestion,
   validateRequiredTripFields,
   validateTripCompletion,
 } from "../tripUtils";
@@ -50,6 +49,7 @@ import {
   enhanceExtractedData,
   validateAndCleanData,
   deepMerge,
+  processDateFormats,
 } from "./core/dataTransformation";
 import {
   sanitizeIntent,
@@ -102,6 +102,11 @@ const detectTripConfirmationAction = (message, state) => {
 
   // Check if the system is in awaiting confirmation state
   if (state === "AWAITING_USER_TRIP_CONFIRMATION") {
+    console.log(
+      "[TripConfirmation] Checking if message is a confirmation action:",
+      lowerMsg
+    );
+
     // Check for confirmation keywords - expanded to catch more variations
     if (
       lowerMsg === "confirm" ||
@@ -130,8 +135,13 @@ const detectTripConfirmationAction = (message, state) => {
       lowerMsg.includes("generate the itinerary") ||
       lowerMsg.includes("create the itinerary") ||
       lowerMsg === "yes, please" ||
-      lowerMsg.includes("all good")
+      lowerMsg.includes("all good") ||
+      lowerMsg === "כן" || // Hebrew support
+      lowerMsg === "אישור" ||
+      lowerMsg === "מאשר" ||
+      lowerMsg.includes("נראה טוב")
     ) {
+      console.log("[TripConfirmation] Detected CONFIRM action");
       return "confirm";
     }
 
@@ -153,8 +163,12 @@ const detectTripConfirmationAction = (message, state) => {
       lowerMsg.includes("not correct") ||
       lowerMsg.includes("need to change") ||
       lowerMsg.includes("want to update") ||
-      lowerMsg.includes("isn't right")
+      lowerMsg.includes("isn't right") ||
+      lowerMsg === "לערוך" || // Hebrew support
+      lowerMsg === "שינוי" ||
+      lowerMsg.includes("לא נכון")
     ) {
+      console.log("[TripConfirmation] Detected EDIT action");
       return "edit";
     }
 
@@ -174,8 +188,12 @@ const detectTripConfirmationAction = (message, state) => {
       lowerMsg.includes("don't want") ||
       lowerMsg.includes("start again") ||
       lowerMsg.includes("not interested") ||
-      lowerMsg.includes("nevermind")
+      lowerMsg.includes("nevermind") ||
+      lowerMsg === "לא" || // Hebrew support
+      lowerMsg === "ביטול" ||
+      lowerMsg === "בטל"
     ) {
+      console.log("[TripConfirmation] Detected CANCEL action");
       return "cancel";
     }
   }
@@ -221,6 +239,186 @@ const debugTripData = (tripDetails) => {
 
   // Special flags
   console.log("- isTomorrow flag:", tripDetails.isTomorrow ? "YES" : "No");
+};
+
+/**
+ * Directly extracts trip data from user messages using pattern matching
+ * This complements the AI-based extraction for more reliable data capture
+ * @param {string} userMessage - The user's message
+ * @returns {Object} - Extracted trip data
+ */
+const extractDirectTripData = (userMessage) => {
+  if (!userMessage || typeof userMessage !== "string") return {};
+
+  const extractedData = {};
+  const lowerMessage = userMessage.toLowerCase();
+
+  // Extract duration - look for "X days" pattern
+  const durationRegex = /(\d+)\s*(day|days)/i;
+  const durationMatch = userMessage.match(durationRegex);
+  if (durationMatch && durationMatch[1]) {
+    const durationValue = parseInt(durationMatch[1], 10);
+    if (!isNaN(durationValue)) {
+      extractedData.duration = durationValue;
+      console.log("[DirectExtraction] Found duration:", durationValue);
+    }
+  }
+
+  // Extract location - look for "to [location]" pattern
+  const locationRegex =
+    /(?:travel|trip|go)\s+to\s+([a-z\s]+)(?:\s+for|\s+in|\s+on|\s*$)/i;
+  const locationMatch = userMessage.match(locationRegex);
+  if (locationMatch && locationMatch[1]) {
+    const location = locationMatch[1].trim();
+
+    // Check if location contains both city and country (e.g., "Berlin Germany")
+    const locationParts = location.split(/\s+/);
+    if (locationParts.length > 1) {
+      // Try to identify if we have city and country
+      const lastWord = locationParts[locationParts.length - 1];
+      const commonCountries = [
+        "Germany",
+        "France",
+        "USA",
+        "UK",
+        "Italy",
+        "Spain",
+        "Israel",
+        "Japan",
+        "China",
+      ];
+
+      // Check if the last word is a country
+      if (
+        commonCountries.some(
+          (country) => country.toLowerCase() === lastWord.toLowerCase()
+        )
+      ) {
+        // We have a country, so everything before it is the city
+        const country = lastWord;
+        const city = locationParts.slice(0, -1).join(" ");
+
+        extractedData.city = city;
+        extractedData.country = country;
+        extractedData.vacation_location = `${city}, ${country}`;
+        console.log(
+          "[DirectExtraction] Found city and country:",
+          city,
+          country
+        );
+      } else {
+        // Treat the whole thing as a location
+        extractedData.vacation_location = location;
+        console.log("[DirectExtraction] Found location:", location);
+      }
+    } else {
+      extractedData.vacation_location = location;
+      console.log("[DirectExtraction] Found location:", location);
+    }
+  }
+
+  // Extract travelers - look for "X people" or "just me" patterns
+  if (
+    lowerMessage.includes("just me") ||
+    lowerMessage.includes("only me") ||
+    lowerMessage.includes("by myself") ||
+    lowerMessage.includes("alone")
+  ) {
+    extractedData.travelers = 1;
+    console.log("[DirectExtraction] Found solo traveler");
+  } else {
+    const travelersRegex =
+      /(\d+)\s*(people|persons|travelers|travellers|adults|guests)/i;
+    const travelersMatch = userMessage.match(travelersRegex);
+    if (travelersMatch && travelersMatch[1]) {
+      const travelersValue = parseInt(travelersMatch[1], 10);
+      if (!isNaN(travelersValue)) {
+        extractedData.travelers = travelersValue;
+        console.log("[DirectExtraction] Found travelers:", travelersValue);
+      }
+    }
+  }
+
+  // Extract budget level - look for budget keywords
+  if (
+    lowerMessage.includes("cheap") ||
+    lowerMessage.includes("budget") ||
+    lowerMessage.includes("inexpensive") ||
+    lowerMessage.includes("affordable")
+  ) {
+    extractedData.budget_level = "cheap";
+    console.log("[DirectExtraction] Found budget level: cheap");
+  } else if (
+    lowerMessage.includes("luxury") ||
+    lowerMessage.includes("high-end") ||
+    lowerMessage.includes("expensive") ||
+    lowerMessage.includes("premium")
+  ) {
+    extractedData.budget_level = "luxury";
+    console.log("[DirectExtraction] Found budget level: luxury");
+  } else if (
+    lowerMessage.includes("moderate") ||
+    lowerMessage.includes("mid-range") ||
+    lowerMessage.includes("standard")
+  ) {
+    extractedData.budget_level = "moderate";
+    console.log("[DirectExtraction] Found budget level: moderate");
+  }
+
+  // Extract dates - look for date patterns
+  const dateRangePattern = /(?:from|dates:)\s*([\d-]+)\s*to\s*([\d-]+)/i;
+  const dateMatch = userMessage.match(dateRangePattern);
+
+  if (dateMatch && dateMatch[1] && dateMatch[2]) {
+    const from = dateMatch[1].trim();
+    const to = dateMatch[2].trim();
+    extractedData.dates = { from, to };
+    console.log("[DirectExtraction] Found date range:", from, "to", to);
+  }
+
+  return extractedData;
+};
+
+/**
+ * Enhanced processing of potential date strings in user messages
+ * Used to extract date ranges from messages or form submissions
+ */
+const extractDatesFromMessage = (message) => {
+  if (!message || typeof message !== "string") return null;
+
+  // Check for explicit date patterns like "dates: 2025-05-31 to 2025-06-07"
+  const dateRangePattern = /dates:\s*([\d-]+)\s*to\s*([\d-]+)/i;
+  const dateMatch = message.match(dateRangePattern);
+
+  if (dateMatch && dateMatch[1] && dateMatch[2]) {
+    const from = dateMatch[1].trim();
+    const to = dateMatch[2].trim();
+    console.log(
+      "[DateExtraction] Found date range in message:",
+      from,
+      "to",
+      to
+    );
+    return { from, to };
+  }
+
+  // Check for another common pattern "from 2025-05-31 to 2025-06-07"
+  const altDateRangePattern = /from\s*([\d-]+)\s*to\s*([\d-]+)/i;
+  const altDateMatch = message.match(altDateRangePattern);
+
+  if (altDateMatch && altDateMatch[1] && altDateMatch[2]) {
+    const from = altDateMatch[1].trim();
+    const to = altDateMatch[2].trim();
+    console.log(
+      "[DateExtraction] Found alternative date range in message:",
+      from,
+      "to",
+      to
+    );
+    return { from, to };
+  }
+
+  return null;
 };
 
 /**
@@ -454,6 +652,7 @@ export function useProcessUserInput(chatData) {
   const handleTripBuildingIntent = useCallback(
     async (data, responseText, loadingId) => {
       console.log("[ModularProcessing] Processing trip building data");
+      console.log("[ModularProcessing] Original data:", data);
 
       try {
         // Use modular data transformation
@@ -468,10 +667,68 @@ export function useProcessUserInput(chatData) {
           );
         }
 
+        // Process duration - ensure it's a number
+        if (processedData.duration !== undefined) {
+          const durationValue = parseInt(processedData.duration, 10);
+          if (!isNaN(durationValue)) {
+            processedData.duration = durationValue;
+            console.log(
+              "[ModularProcessing] Parsed duration to number:",
+              durationValue
+            );
+          }
+        }
+
+        // Ensure proper mapping of location fields to vacation_location
+        if (!processedData.vacation_location) {
+          // If we have location field but no vacation_location, use that
+          if (processedData.location) {
+            processedData.vacation_location = processedData.location;
+            console.log(
+              "[ModularProcessing] Mapped location to vacation_location:",
+              processedData.location
+            );
+          }
+          // If we have city and country but no vacation_location, combine them
+          else if (processedData.city) {
+            if (processedData.country) {
+              processedData.vacation_location = `${processedData.city}, ${processedData.country}`;
+              console.log(
+                "[ModularProcessing] Created vacation_location from city and country:",
+                processedData.vacation_location
+              );
+            } else {
+              processedData.vacation_location = processedData.city;
+              console.log(
+                "[ModularProcessing] Mapped city to vacation_location:",
+                processedData.city
+              );
+            }
+          }
+          // If we have destination but no vacation_location, use that
+          else if (processedData.destination) {
+            processedData.vacation_location = processedData.destination;
+            console.log(
+              "[ModularProcessing] Mapped destination to vacation_location:",
+              processedData.destination
+            );
+          }
+        }
+
+        // Handle budget field mapping
+        if (!processedData.budget && processedData.budget_level) {
+          // Map budget_level to budget field for compatibility
+          processedData.budget = processedData.budget_level;
+          console.log(
+            "[ModularProcessing] Mapped budget_level to budget:",
+            processedData.budget_level
+          );
+        }
+
         // Merge with existing trip data
         const mergedData = mergeWithExistingTripData(
           processedData,
-          ["vacation_location", "duration", "dates", "budget_level"],
+          ["vacation_location", "duration", "dates", "budget", "budget_level"],
           { preserve_context: true, merge_user_data: true }
         );
 
@@ -479,33 +736,81 @@ export function useProcessUserInput(chatData) {
 
         // Update trip details
         const updatedTripDetails = updateTripDraft(tripDetails, mergedData);
+        console.log(
+          "[ModularProcessing] Updated trip details:",
+          updatedTripDetails
+        );
         setTripDetails(updatedTripDetails);
 
         // Check if trip is complete
         const validationResult = validateRequiredTripFields(updatedTripDetails);
+        console.log("[ModularProcessing] Validation result:", validationResult);
+
+        // Log the missing fields for debugging
+        if (
+          validationResult.missingFields &&
+          validationResult.missingFields.length > 0
+        ) {
+          console.log(
+            "[ModularProcessing] Missing fields:",
+            validationResult.missingFields
+          );
+
+          // Check if date is present but budget is missing
+          const hasDate = !validationResult.missingFields.includes("dates");
+          const budgetMissing =
+            validationResult.missingFields.includes("budget");
+
+          if (hasDate && budgetMissing) {
+            console.log(
+              "[ModularProcessing] Date is present but budget is missing, will ask for budget"
+            );
+          }
+        }
 
         if (validationResult.success) {
           console.log(
             "[ModularProcessing] Trip is complete, transitioning to confirmation"
           );
+
+          // Use the model's response message if available, otherwise create a compact summary
+          let confirmationMessage = responseText;
+
+          // If the response is a JSON object, extract the response field
+          if (
+            typeof responseText === "string" &&
+            responseText.includes('"response"')
+          ) {
+            try {
+              const jsonResponse = JSON.parse(responseText);
+              if (jsonResponse.response) {
+                confirmationMessage = jsonResponse.response;
+              }
+            } catch (e) {
+              // If parsing fails, use the original response
+            }
+          }
+
+          // Transition to confirmation state
           transitionState(CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION);
 
+          // Replace loading message with the confirmation message
           replaceLoadingMessage(loadingId, {
             role: "model",
-            message:
-              formatTripSummary(updatedTripDetails) +
-              "\n\nWould you like me to generate your itinerary?",
+            message: confirmationMessage,
             id: `trip-summary-${Date.now()}`,
             isTripSummary: true,
           });
         } else {
-          // Ask for missing information
-          const followUpQuestion = generateFollowUpQuestion(
+          // Just show the AI response without appending a follow-up question
+          // The AI response already contains appropriate follow-up questions
+          console.log(
+            "[ModularProcessing] Trip is incomplete, missing fields:",
             validationResult.missingFields
           );
           replaceLoadingMessage(loadingId, {
             role: "model",
-            message: responseText + "\n\n" + followUpQuestion,
+            message: responseText,
             id: `follow-up-${Date.now()}`,
           });
         }
@@ -550,25 +855,71 @@ export function useProcessUserInput(chatData) {
         );
 
         try {
-          transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
+          // First, explicitly add a confirmation message to the chat
+          const generationMessage =
+            extractedData?.data?.confirmation_message ||
+            "Perfect! I'm now generating your personalized itinerary. This will take a moment...";
 
+          // Replace the loading message with a generation message
           replaceLoadingMessage(loadingId, {
             role: "model",
-            message:
-              "Perfect! I'm now generating your personalized itinerary. This will take a moment...",
+            message: generationMessage,
             id: `generating-${Date.now()}`,
             isGenerating: true,
           });
 
+          // Then transition to the generating state
+          transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
+
+          // Create a dedicated loading message for the itinerary and store its ID
+          // This ensures we have a loading message we can replace later
+          if (!window.__itineraryLoadingId) {
+            const itineraryLoadingId = addLoadingMessage({
+              isGenerating: true,
+              isItineraryGeneration: true,
+              message: "Creating your personalized travel itinerary...",
+            });
+            console.log(
+              "[handleUserConfirmation] Created itinerary loading ID:",
+              itineraryLoadingId
+            );
+            window.__itineraryLoadingId = itineraryLoadingId;
+          }
+
           // Generate itinerary
           const itineraryResult = await generateItinerary(tripDetails);
 
-          if (itineraryResult) {
-            setallTripData(itineraryResult);
-            transitionState(
-              CONVERSATION_STATES.DISPLAYING_ITINERARY,
+          if (itineraryResult && itineraryResult.success) {
+            console.log(
+              "[ModularProcessing] Itinerary generated successfully:",
               itineraryResult
             );
+
+            // הדפסת תוצאת המסלול המלאה לבדיקה
+            console.log("[ModularProcessing] Full itinerary content:");
+            console.log(itineraryResult.itinerary);
+
+            setallTripData(itineraryResult);
+
+            // Add a small delay to ensure UI updates before transitioning
+            setTimeout(() => {
+              transitionState(
+                CONVERSATION_STATES.DISPLAYING_ITINERARY,
+                itineraryResult
+              );
+            }, 500);
+          } else {
+            // Handle error in itinerary generation
+            console.error(
+              "[ModularProcessing] Error in itinerary result:",
+              itineraryResult
+            );
+
+            addSystemMessage(
+              "I apologize, but there was an error generating your itinerary. Please try again."
+            );
+
+            transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
           }
         } catch (error) {
           console.error(
@@ -602,6 +953,7 @@ export function useProcessUserInput(chatData) {
       tripDetails,
       setallTripData,
       generateItinerary,
+      addLoadingMessage,
     ]
   );
 
@@ -622,6 +974,234 @@ export function useProcessUserInput(chatData) {
       // Get relevant context for this intent
       const relevantContext = getRelevantContext(intent);
       console.log("[ModularProcessing] Relevant context:", relevantContext);
+
+      // Update conversation memory
+      updateConversationMemory(intent, data);
+
+      // Check if any location data is present and update trip details
+      if (data) {
+        const locationUpdates = {};
+        const tripUpdates = {};
+        let hasUpdates = false;
+
+        // Check for various location fields
+        if (data.location || data.city || data.destination) {
+          // Determine the vacation_location
+          if (data.city && data.country) {
+            locationUpdates.vacation_location = `${data.city}, ${data.country}`;
+            hasUpdates = true;
+          } else if (data.location) {
+            locationUpdates.vacation_location = data.location;
+            hasUpdates = true;
+          } else if (data.city) {
+            locationUpdates.vacation_location = data.city;
+            hasUpdates = true;
+          } else if (data.destination) {
+            locationUpdates.vacation_location = data.destination;
+            hasUpdates = true;
+          }
+
+          // Store country separately if available
+          if (data.country) {
+            locationUpdates.country = data.country;
+          }
+        }
+
+        // Extract duration information
+        if (data.duration !== undefined) {
+          // Handle duration as a number or string
+          const durationValue = parseInt(data.duration, 10);
+          if (!isNaN(durationValue)) {
+            tripUpdates.duration = durationValue;
+            hasUpdates = true;
+            console.log(
+              "[ModularProcessing] Extracted duration:",
+              durationValue
+            );
+          }
+        } else if (userMessage) {
+          // Try to extract duration from the user message if not in data object
+          const durationRegex = /(\d+)\s*(day|days)/i;
+          const durationMatch = userMessage.match(durationRegex);
+          if (durationMatch && durationMatch[1]) {
+            const durationValue = parseInt(durationMatch[1], 10);
+            if (!isNaN(durationValue)) {
+              tripUpdates.duration = durationValue;
+              hasUpdates = true;
+              console.log(
+                "[ModularProcessing] Extracted duration from message:",
+                durationValue
+              );
+            }
+          }
+        }
+
+        // Extract date information - handle both 'date' and 'dates' fields
+        if (data.date) {
+          // If we have a single date field, convert it to a dates object
+          const dateStr = data.date;
+          if (dateStr && typeof dateStr === "string") {
+            try {
+              // Create a dates object with from and to (to = from + duration days)
+              const fromDate = new Date(dateStr);
+              const toDate = new Date(fromDate);
+
+              // Use duration from tripDetails or default to 7 days
+              const duration = tripDetails.duration || data.duration || 7;
+              toDate.setDate(fromDate.getDate() + parseInt(duration, 10));
+
+              tripUpdates.dates = {
+                from: dateStr,
+                to: toDate.toISOString().split("T")[0],
+              };
+
+              hasUpdates = true;
+              console.log(
+                "[ModularProcessing] Converted date to dates object:",
+                tripUpdates.dates
+              );
+            } catch (err) {
+              console.error("[ModularProcessing] Error converting date:", err);
+            }
+          }
+        } else if (data.dates) {
+          // If we already have a dates object, use it directly
+          if (typeof data.dates === "object") {
+            tripUpdates.dates = data.dates;
+            hasUpdates = true;
+            console.log("[ModularProcessing] Using dates object:", data.dates);
+          }
+        }
+
+        // Extract budget information
+        if (data.budget_level) {
+          tripUpdates.budget = data.budget_level;
+          hasUpdates = true;
+          console.log(
+            "[ModularProcessing] Using budget_level:",
+            data.budget_level
+          );
+        } else if (data.budget) {
+          tripUpdates.budget = data.budget;
+          hasUpdates = true;
+          console.log("[ModularProcessing] Using budget:", data.budget);
+        }
+
+        // Update trip details if we found any updates
+        if (hasUpdates) {
+          console.log("[ModularProcessing] Updating trip details with data:", {
+            ...locationUpdates,
+            ...tripUpdates,
+          });
+          const updatedTripDetails = updateTripDraft(tripDetails, {
+            ...locationUpdates,
+            ...tripUpdates,
+          });
+          setTripDetails(updatedTripDetails);
+
+          // Trigger map update by transitioning to a state that will update the map
+          // This ensures the map shows the newly set location
+          if (locationUpdates.vacation_location) {
+            console.log(
+              "[ModularProcessing] Location detected, updating map view"
+            );
+            // If we're already in trip building mode, just update the state data
+            if (conversationState === CONVERSATION_STATES.TRIP_BUILDING_MODE) {
+              transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE, {
+                updateMap: true,
+                location: locationUpdates.vacation_location,
+              });
+            }
+          }
+        }
+      }
+
+      // NEW: Check if the model explicitly specified a next state to transition to
+      if (extractedData?.data?.next_state) {
+        const nextState = extractedData.data.next_state;
+        const nextAction = extractedData?.data?.next_action;
+        console.log(
+          `[ModularProcessing] Model requested state transition to: ${nextState} with action: ${nextAction}`
+        );
+
+        // If model explicitly asks for AWAITING_USER_TRIP_CONFIRMATION state
+        if (nextState === "AWAITING_USER_TRIP_CONFIRMATION") {
+          console.log(
+            "[ModularProcessing] Transitioning to AWAITING_USER_TRIP_CONFIRMATION as requested by model"
+          );
+
+          // Use the model's original response instead of the static template
+          const responseMessage =
+            extractedData?.data?.response ||
+            "Does this trip information look correct? I'll create your travel itinerary based on these details.";
+
+          // Replace loading message with the model's response for confirmation
+          replaceLoadingMessage(loadingId, {
+            role: "model",
+            message: responseMessage,
+            id: `trip-summary-${Date.now()}`,
+            isTripSummary: true,
+          });
+
+          // Transition to confirmation state
+          transitionState(CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION);
+          return responseMessage;
+        }
+
+        // Handle other special states and actions
+        if (
+          nextState === "GENERATING_ITINERARY" &&
+          nextAction === "generate_itinerary"
+        ) {
+          // Direct generation without confirmation (e.g., if user has already confirmed verbally)
+          console.log(
+            "[ModularProcessing] Directly generating itinerary as requested by model"
+          );
+
+          // Update UI first
+          replaceLoadingMessage(loadingId, {
+            role: "model",
+            message:
+              "I'll generate your personalized itinerary right away. This will take a moment...",
+            id: `direct-generating-${Date.now()}`,
+            isGenerating: true,
+          });
+
+          // Start generation process
+          transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
+
+          // Use setTimeout to allow the UI to update before the potentially heavy operation
+          setTimeout(async () => {
+            try {
+              const itineraryResult = await generateItinerary(tripDetails);
+
+              if (itineraryResult && itineraryResult.success) {
+                setallTripData(itineraryResult);
+                transitionState(
+                  CONVERSATION_STATES.DISPLAYING_ITINERARY,
+                  itineraryResult
+                );
+              } else {
+                addSystemMessage(
+                  "I apologize, but there was an error generating your itinerary. Please try again."
+                );
+                transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+              }
+            } catch (error) {
+              console.error(
+                "[ModularProcessing] Error in direct itinerary generation:",
+                error
+              );
+              addSystemMessage(
+                "I apologize, but there was an error generating your itinerary. Please try again."
+              );
+              transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+            }
+          }, 100);
+
+          return "Generating your personalized itinerary...";
+        }
+      }
 
       // Check if this is an advice intent
       if (isAdviceIntent(intent)) {
@@ -781,7 +1361,26 @@ export function useProcessUserInput(chatData) {
           // Handle advice results - both successful and failed ones with messages
           let finalAdviceResponse = responseText; // Default to original response
 
-          if (adviceResult?.needsFollowUp) {
+          // תיקון: בדיקה אם יש תשובה ישירות בנתונים המקוריים כשהכוונה לא דורשת נתונים חיצוניים
+          if (
+            extractedData?.data?.response &&
+            (!intentRequiresExternalData(intent) ||
+              extractedData?.data?.requires_external_data === false)
+          ) {
+            // במקרה של כוונות שאינן דורשות נתונים חיצוניים, השתמש ישירות בתשובה מהמודל
+            console.log(
+              `[ModularProcessing] Using direct response from model for ${intent}`
+            );
+
+            replaceLoadingMessage(loadingId, {
+              role: "model",
+              message: extractedData.data.response,
+              id: loadingId,
+              isAdviceResponse: true,
+            });
+
+            finalAdviceResponse = extractedData.data.response;
+          } else if (adviceResult?.needsFollowUp) {
             // This is a follow-up question, not an error
             console.log(
               `[ModularProcessing] Showing follow-up question, replacing loadingId: ${loadingId}`
@@ -826,7 +1425,13 @@ export function useProcessUserInput(chatData) {
 
             finalAdviceResponse = adviceResult.message;
           } else {
-            // Fallback for unexpected format
+            // שיפור הודעת השגיאה כך שתשתמש בתוכן המקורי אם קיים
+            const fallbackMessage =
+              extractedData?.data?.response ||
+              extractedData?.formattedResponse ||
+              responseText ||
+              "I received the information but had trouble formatting it. Please try asking again.";
+
             console.warn(
               "[ModularProcessing] Unexpected advice result format:",
               adviceResult
@@ -834,8 +1439,7 @@ export function useProcessUserInput(chatData) {
             console.log(
               `[ModularProcessing] Showing fallback message, replacing loadingId: ${loadingId}`
             );
-            const fallbackMessage =
-              "I received the information but had trouble formatting it. Please try asking again.";
+
             replaceLoadingMessage(loadingId, {
               role: "model",
               message: fallbackMessage,
@@ -884,7 +1488,11 @@ export function useProcessUserInput(chatData) {
       }
 
       // Handle trip building intents
-      if (intent === "Trip-Planning" || intent === "Trip-Building") {
+      if (
+        intent === "Trip-Planning" ||
+        intent === "Trip-Building" ||
+        intent === "Build-Trip"
+      ) {
         console.log("[ModularProcessing] Processing trip building intent");
         await handleTripBuildingIntent(data, responseText, loadingId);
         return responseText; // Return original response for trip building
@@ -903,10 +1511,14 @@ export function useProcessUserInput(chatData) {
       }
 
       // Default handling
+      // Ensure we're only showing the response field, not the entire JSON structure
       const messageToShow =
         extractedData?.data?.response ||
         extractedData?.formattedResponse ||
-        responseText;
+        (typeof responseText === "string"
+          ? responseText
+          : JSON.stringify(responseText));
+
       console.log(
         `[ModularProcessing] Default handling, replacing loadingId: ${loadingId}`
       );
@@ -934,6 +1546,12 @@ export function useProcessUserInput(chatData) {
       detectUserConfirmation,
       handleTripBuildingIntent,
       handleUserConfirmation,
+      updateConversationMemory,
+      setTripDetails,
+      formatTripSummary,
+      pendingMessages,
+      setMissingFieldsState,
+      intentRequiresExternalData,
     ]
   );
 
@@ -987,6 +1605,19 @@ export function useProcessUserInput(chatData) {
             userMessage.includes(`${field}:`)
           );
 
+        // Special handling for form data or date strings
+        let directFormData = {};
+
+        // Check for date patterns in the message for direct processing
+        const extractedDates = extractDatesFromMessage(userMessage);
+        if (extractedDates) {
+          directFormData.dates = extractedDates;
+          console.log(
+            "[ModularProcessing] Extracted dates from message:",
+            directFormData.dates
+          );
+        }
+
         // Use modular acknowledgment detection
         if (!isMissingFieldsResponse && isAcknowledgmentMessage(userMessage)) {
           console.log(
@@ -996,6 +1627,35 @@ export function useProcessUserInput(chatData) {
             "You're welcome! Is there anything else I can help you with?"
           );
           return;
+        }
+
+        // Pre-process user message for direct pattern matching
+        const directTripData = extractDirectTripData(userMessage);
+        if (directTripData && Object.keys(directTripData).length > 0) {
+          console.log(
+            "[ModularProcessing] Directly extracted trip data:",
+            directTripData
+          );
+
+          // Merge with any dates we found
+          const combinedDirectData = {
+            ...directTripData,
+            ...directFormData,
+          };
+
+          // Update trip details with directly extracted data
+          const updatedTripDetails = updateTripDraft(
+            tripDetails,
+            combinedDirectData
+          );
+          setTripDetails(updatedTripDetails);
+        } else if (directFormData && Object.keys(directFormData).length > 0) {
+          // If we have form data but no other direct data, update with just the form data
+          const updatedTripDetails = updateTripDraft(
+            tripDetails,
+            directFormData
+          );
+          setTripDetails(updatedTripDetails);
         }
 
         // RESTORED: Add the user message to pending messages first (like original code)
@@ -1035,7 +1695,20 @@ export function useProcessUserInput(chatData) {
             const regex = new RegExp(`${field}:\\s*([^,]+)`, "i");
             const match = userMessage.match(regex);
             if (match && match[1]) {
-              fieldValues[field] = match[1].trim();
+              // Special handling for dates to create proper object
+              if (field === "dates" && match[1].includes(" to ")) {
+                const [from, to] = match[1]
+                  .trim()
+                  .split(" to ")
+                  .map((d) => d.trim());
+                fieldValues[field] = { from, to };
+                console.log(
+                  "[ModularProcessing] Extracted date range:",
+                  fieldValues[field]
+                );
+              } else {
+                fieldValues[field] = match[1].trim();
+              }
             }
           });
 
@@ -1043,6 +1716,19 @@ export function useProcessUserInput(chatData) {
             "[ModularProcessing] Extracted field values:",
             fieldValues
           );
+
+          // Update trip details directly with the extracted field values
+          if (Object.keys(fieldValues).length > 0) {
+            const updatedTripDetails = updateTripDraft(
+              tripDetails,
+              fieldValues
+            );
+            setTripDetails(updatedTripDetails);
+            console.log(
+              "[ModularProcessing] Updated trip details from form:",
+              updatedTripDetails
+            );
+          }
 
           // Update missing fields state with the extracted values
           setMissingFieldsState((prev) => ({
@@ -1072,14 +1758,14 @@ export function useProcessUserInput(chatData) {
           extractedData?.data
         ) {
           // NEW: Use modular intent processing
-          const cleanIntent = sanitizeIntent(extractedData.data.intent);
+          const intent = sanitizeIntent(extractedData.data.intent);
           const contextAnalysis = analyzeMessageContext(
             userMessage,
             conversationMemory.intents[0],
             conversationMemory
           );
 
-          console.log("[ModularProcessing] Clean intent:", cleanIntent);
+          console.log("[ModularProcessing] Clean intent:", intent);
           console.log("[ModularProcessing] Context analysis:", contextAnalysis);
 
           // NEW: Use modular data transformation
@@ -1088,20 +1774,29 @@ export function useProcessUserInput(chatData) {
             extractedData.data
           );
 
-          const normalizedData = normalizeDataStructure(
-            extractedData.data,
-            tripDetails
-          );
+          const data = normalizeDataStructure(extractedData.data, tripDetails);
           console.log(
             "[ModularProcessing] After normalizeDataStructure:",
-            normalizedData
+            data
           );
 
-          const processedData = processTimeReferences(normalizedData);
+          const processedData = processTimeReferences(data);
           console.log(
             "[ModularProcessing] After processTimeReferences:",
             processedData
           );
+
+          // Enhance data with direct extracted values
+          if (directTripData && Object.keys(directTripData).length > 0) {
+            console.log(
+              "[ModularProcessing] Enhancing AI data with direct extractions"
+            );
+            Object.keys(directTripData).forEach((key) => {
+              if (!processedData[key] && directTripData[key] !== undefined) {
+                processedData[key] = directTripData[key];
+              }
+            });
+          }
 
           const cleanedData = validateAndCleanData(processedData);
           console.log(
@@ -1110,13 +1805,13 @@ export function useProcessUserInput(chatData) {
           );
 
           // Update conversation memory
-          updateConversationMemory(cleanIntent, cleanedData);
+          updateConversationMemory(intent, data);
 
           // Handle the processed intent and data
           finalResponseText = await handleProcessedIntent(
-            cleanIntent,
+            intent,
             cleanedData,
-            responseText,
+            extractedData?.data?.response || responseText, // Use the response field if available
             loadingId,
             userMessage,
             extractedData
@@ -1126,10 +1821,26 @@ export function useProcessUserInput(chatData) {
           console.log(
             "[ModularProcessing] No structured data found, displaying raw response"
           );
-          const messageToShow =
-            extractedData?.data?.response ||
-            extractedData?.formattedResponse ||
-            responseText;
+
+          // Ensure we're only showing the response field, not the entire JSON structure
+          let messageToShow = responseText;
+
+          try {
+            // Check if responseText is a JSON string
+            const parsedResponse = JSON.parse(responseText);
+            if (parsedResponse && typeof parsedResponse === "object") {
+              // If it's a JSON object, try to extract the response field
+              messageToShow =
+                parsedResponse.response ||
+                parsedResponse.message ||
+                parsedResponse.text ||
+                responseText;
+            }
+          } catch (e) {
+            // Not a JSON string, use as is
+            messageToShow = responseText;
+          }
+
           replaceLoadingMessage(loadingId, {
             role: "model",
             message: messageToShow,
@@ -1144,9 +1855,31 @@ export function useProcessUserInput(chatData) {
           // Only save if we have a meaningful response
           if (finalResponseText && finalResponseText.trim()) {
             console.log("[Database] Saving conversation to database...");
+
+            // Ensure we're not saving a JSON object as the response
+            let cleanResponseText = finalResponseText;
+            if (typeof cleanResponseText !== "string") {
+              cleanResponseText = JSON.stringify(cleanResponseText);
+            }
+
+            // Check if cleanResponseText is a stringified JSON object
+            try {
+              const parsedResponse = JSON.parse(cleanResponseText);
+              if (parsedResponse && typeof parsedResponse === "object") {
+                // If it's a JSON object, extract the response field
+                cleanResponseText =
+                  parsedResponse.response ||
+                  parsedResponse.message ||
+                  parsedResponse.text ||
+                  cleanResponseText;
+              }
+            } catch (e) {
+              // Not a JSON string, use as is
+            }
+
             const saveResult = await mutation.mutateAsync({
               userMessage,
-              aiResponse: finalResponseText,
+              aiResponse: cleanResponseText,
               image: imageData?.dbData?.filePath || null, // Extract just the file path
             });
 
@@ -1193,9 +1926,38 @@ export function useProcessUserInput(chatData) {
           // Switch to missing fields state
           transitionState(targetState);
 
+          // Enhance missing fields - if we're asking for date, also ask for budget if not already present
+          let enhancedMissingFields = [...extractedData.data.missingFields];
+
+          // Check if we're asking for date and budget is missing
+          const askingForDate = enhancedMissingFields.some(
+            (field) => field === "date" || field === "dates"
+          );
+
+          // Check if budget fields are already included
+          const budgetFieldIncluded = enhancedMissingFields.some(
+            (field) => field === "budget" || field === "budget_level"
+          );
+
+          // Safe check for tripDetails being null or undefined
+          const budgetMissing =
+            !tripDetails ||
+            (!tripDetails.budget &&
+              !tripDetails.budget_level &&
+              !(tripDetails.constraints && tripDetails.constraints.budget));
+
+          // If asking for date and budget is not already included in the fields, add it
+          // We always ask for budget when date is requested for a better user experience
+          if (askingForDate && !budgetFieldIncluded) {
+            console.log(
+              "[ModularProcessing] Adding budget to missing fields since we're asking for date"
+            );
+            enhancedMissingFields.push("budget");
+          }
+
           // Update missing fields state
           const newMissingFieldsState = {
-            fields: extractedData.data.missingFields,
+            fields: enhancedMissingFields,
             values: {},
             messageId: `missing-fields-${Date.now()}-${Math.random()
               .toString(36)
@@ -1213,10 +1975,9 @@ export function useProcessUserInput(chatData) {
           const hasDuplicateFields = pendingMessages.some(
             (msg) =>
               msg.isMissingFields &&
-              msg.missingFields?.length ===
-                extractedData.data.missingFields.length &&
+              msg.missingFields?.length === enhancedMissingFields.length &&
               msg.missingFields.every((field) =>
-                extractedData.data.missingFields.includes(field)
+                enhancedMissingFields.includes(field)
               )
           );
 
@@ -1239,7 +2000,7 @@ export function useProcessUserInput(chatData) {
             const missingFieldsMessage = {
               role: "model",
               isMissingFields: true,
-              missingFields: extractedData.data.missingFields,
+              missingFields: enhancedMissingFields,
               intent: detectedIntent, // Include the intent
               id: `missing-fields-${Date.now()}`,
             };
@@ -1370,7 +2131,7 @@ export function useProcessUserInput(chatData) {
           extractedData?.data
         ) {
           // NEW: Use modular intent processing
-          const cleanIntent = sanitizeIntent(extractedData.data.intent);
+          const intent = sanitizeIntent(extractedData.data.intent);
           const contextAnalysis = analyzeMessageContext(
             initialMessage,
             conversationMemory.intents[0],
@@ -1379,7 +2140,7 @@ export function useProcessUserInput(chatData) {
 
           console.log(
             "[ModularProcessing] Initial message clean intent:",
-            cleanIntent
+            intent
           );
           console.log(
             "[ModularProcessing] Initial message context analysis:",
@@ -1387,18 +2148,15 @@ export function useProcessUserInput(chatData) {
           );
 
           // NEW: Use modular data transformation
-          const normalizedData = normalizeDataStructure(
-            extractedData.data,
-            tripDetails
-          );
-          const processedData = processTimeReferences(normalizedData);
+          const data = normalizeDataStructure(extractedData.data, tripDetails);
+          const processedData = processTimeReferences(data);
           const cleanedData = validateAndCleanData(processedData);
 
           // Update conversation memory
-          updateConversationMemory(cleanIntent, cleanedData);
+          updateConversationMemory(intent, data);
 
           // Check if this is an advice intent that needs special handling
-          if (isAdviceIntent(cleanIntent)) {
+          if (isAdviceIntent(intent)) {
             console.log(
               "[ModularProcessing] Initial message is advice intent, using handleProcessedIntent"
             );
@@ -1406,7 +2164,7 @@ export function useProcessUserInput(chatData) {
             // Use handleProcessedIntent for advice intents to get proper external data handling
             try {
               finalResponseText = await handleProcessedIntent(
-                cleanIntent,
+                intent,
                 cleanedData,
                 responseText,
                 `initial-${Date.now()}`, // Create a temporary loading ID
@@ -1445,10 +2203,32 @@ export function useProcessUserInput(chatData) {
 
             // Add the message to pendingMessages for non-advice intents
             const messageToShow = finalResponseText || responseText;
+
+            // Ensure we're not showing a JSON object
+            let cleanMessageToShow = messageToShow;
+            if (typeof cleanMessageToShow !== "string") {
+              cleanMessageToShow = JSON.stringify(cleanMessageToShow);
+            }
+
+            // Check if cleanMessageToShow is a stringified JSON object
+            try {
+              const parsedResponse = JSON.parse(cleanMessageToShow);
+              if (parsedResponse && typeof parsedResponse === "object") {
+                // If it's a JSON object, extract the response field
+                cleanMessageToShow =
+                  parsedResponse.response ||
+                  parsedResponse.message ||
+                  parsedResponse.text ||
+                  cleanMessageToShow;
+              }
+            } catch (e) {
+              // Not a JSON string, use as is
+            }
+
             setPendingMessages([
               {
                 role: "model",
-                message: messageToShow,
+                message: cleanMessageToShow,
                 id: `initial-response-${Date.now()}`,
               },
             ]);
@@ -1456,10 +2236,32 @@ export function useProcessUserInput(chatData) {
         } else {
           // No structured data found, add the raw response
           finalResponseText = responseText;
+
+          // Ensure we're not showing a JSON object
+          let cleanResponseText = responseText;
+          if (typeof cleanResponseText !== "string") {
+            cleanResponseText = JSON.stringify(cleanResponseText);
+          }
+
+          // Check if cleanResponseText is a stringified JSON object
+          try {
+            const parsedResponse = JSON.parse(cleanResponseText);
+            if (parsedResponse && typeof parsedResponse === "object") {
+              // If it's a JSON object, extract the response field
+              cleanResponseText =
+                parsedResponse.response ||
+                parsedResponse.message ||
+                parsedResponse.text ||
+                cleanResponseText;
+            }
+          } catch (e) {
+            // Not a JSON string, use as is
+          }
+
           setPendingMessages([
             {
               role: "model",
-              message: responseText,
+              message: cleanResponseText,
               id: `initial-response-${Date.now()}`,
             },
           ]);
@@ -1472,11 +2274,32 @@ export function useProcessUserInput(chatData) {
               "[Database] Saving initial message response to database..."
             );
 
+            // Ensure we're not saving a JSON object
+            let cleanFinalResponseText = finalResponseText;
+            if (typeof cleanFinalResponseText !== "string") {
+              cleanFinalResponseText = JSON.stringify(cleanFinalResponseText);
+            }
+
+            // Check if cleanFinalResponseText is a stringified JSON object
+            try {
+              const parsedResponse = JSON.parse(cleanFinalResponseText);
+              if (parsedResponse && typeof parsedResponse === "object") {
+                // If it's a JSON object, extract the response field
+                cleanFinalResponseText =
+                  parsedResponse.response ||
+                  parsedResponse.message ||
+                  parsedResponse.text ||
+                  cleanFinalResponseText;
+              }
+            } catch (e) {
+              // Not a JSON string, use as is
+            }
+
             // FIXED: Don't send null userMessage - this causes server errors
             // For initial messages, we only save the AI response since the user message is already in history
             await mutation.mutateAsync({
               userMessage: "", // Send empty string instead of null
-              aiResponse: finalResponseText,
+              aiResponse: cleanFinalResponseText,
               image: null, // No image data for initial messages
             });
 
@@ -1578,6 +2401,38 @@ export function useProcessUserInput(chatData) {
     CONVERSATION_STATES,
   ]);
 
+  /**
+   * Process form values and convert to proper trip data format
+   * @param {Object} formValues - Values from the missing fields form
+   * @returns {Object} - Formatted data suitable for trip object
+   */
+  const processFormValues = (formValues) => {
+    let processedData = { ...formValues };
+
+    // First use the generic date processing from the core module
+    processedData = processDateFormats(processedData);
+
+    // Additional processing specific to form inputs
+    // Process date string if it's in "YYYY-MM-DD to YYYY-MM-DD" format
+    if (
+      formValues.dates &&
+      typeof formValues.dates === "string" &&
+      formValues.dates.includes(" to ") &&
+      !processedData.dates.from
+    ) {
+      const [from, to] = formValues.dates.split(" to ").map((d) => d.trim());
+      processedData.dates = { from, to };
+      console.log(
+        "[FormProcessing] Converted date string to object:",
+        processedData.dates
+      );
+    }
+
+    console.log("[FormProcessing] Final processed form data:", processedData);
+    return processedData;
+  };
+
+  // Modify the function that handles missing fields submissions
   // Register hook state globally for ChatPage access
   useEffect(() => {
     window.__processingHookState = {
@@ -1612,12 +2467,19 @@ export function useProcessUserInput(chatData) {
           return false;
         }
 
+        // Process form values to ensure correct data format
+        const processedFormValues = processFormValues(formValues);
+        console.log(
+          "[MissingFields] Processed form values:",
+          processedFormValues
+        );
+
         // Update missing fields state with submitted values
         setMissingFieldsState((prev) => ({
           ...prev,
           values: {
             ...prev.values,
-            ...formValues,
+            ...processedFormValues,
           },
           submitted: true, // Mark as submitted to prevent re-rendering
         }));
@@ -1628,9 +2490,27 @@ export function useProcessUserInput(chatData) {
         );
         transitionState(CONVERSATION_STATES.FETCHING_EXTERNAL_DATA);
 
-        // Create a message with the collected field values
+        // Format field values properly to avoid [object Object] in the message
         const userMessage = missingFieldsState.fields
-          .map((field) => `${field}: ${formValues[field]}`)
+          .map((field) => {
+            // Get the value for this field
+            const value = processedFormValues[field];
+
+            // Format the value based on its type
+            let formattedValue = value;
+
+            // Handle date objects (from/to format)
+            if (value && typeof value === "object" && value.from) {
+              // If it's a date range with both from and to, use a nice format
+              if (value.to) {
+                formattedValue = `${value.from} to ${value.to}`;
+              } else {
+                formattedValue = value.from;
+              }
+            }
+
+            return `${field}: ${formattedValue}`;
+          })
           .join(", ");
 
         // Check if this message already exists in pendingMessages to prevent duplicates
@@ -1653,6 +2533,7 @@ export function useProcessUserInput(chatData) {
                 id: `user-${Date.now()}`,
                 timestamp: new Date().toISOString(),
                 isFormSubmission: true, // Mark as form submission
+                formValues: processedFormValues, // Store processed values for processing
               },
             ];
           });
@@ -1677,6 +2558,19 @@ export function useProcessUserInput(chatData) {
             isLoadingMessage: true,
             isExternalDataFetch: true,
           });
+
+          // Add processed values to trip details directly to ensure validation works correctly
+          if (processedFormValues.dates || processedFormValues.budget) {
+            console.log(
+              "[MissingFields] Updating trip details with form data:",
+              processedFormValues
+            );
+            const updatedTripDetails = updateTripDraft(
+              tripDetails,
+              processedFormValues
+            );
+            setTripDetails(updatedTripDetails);
+          }
 
           // Process the message to fetch external data
           processUserInput(userMessage);

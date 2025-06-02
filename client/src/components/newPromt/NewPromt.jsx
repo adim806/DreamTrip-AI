@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useCallback, useReducer } from "react";
 import "./newPromt.css";
 import { useRef, useEffect } from "react";
 import Upload from "../upload/Upload";
@@ -149,6 +149,9 @@ const LoadingDots = () => {
   );
 };
 
+// Create a simple reducer for forcing updates
+const forceUpdateReducer = (state) => state + 1;
+
 const NewPromt = ({ data }) => {
   // Get the trip context
   const { 
@@ -156,8 +159,15 @@ const NewPromt = ({ data }) => {
     CONVERSATION_STATES, 
     transitionState,
     startNewTrip,
-    tripDetails
+    tripDetails,
+    handleGenerateItinerary
   } = useContext(TripContext);
+  
+  // State to control when to show trip summary
+  const [showTripSummary, setShowTripSummary] = useState(false);
+  
+  // Add a force update reducer for when we need to force DOM updates
+  const [forceUpdateCounter, forceUpdate] = useReducer(forceUpdateReducer, 0);
   
   // Image handling state
   const [img, setImg] = useState({
@@ -177,8 +187,7 @@ const NewPromt = ({ data }) => {
   const {
     processUserInput,
     pendingMessages,
-    isTyping,
-    handleGenerateItinerary
+    isTyping
   } = processingHook;
   
   // Share the hook with the parent component by exposing it on window (temporary solution)
@@ -190,7 +199,13 @@ const NewPromt = ({ data }) => {
         ...processingHook,
         // Always provide most current reference to functions
         processInitialMessage: processingHook.processInitialMessage,
-        processUserInput: processingHook.processUserInput
+        processUserInput: processingHook.processUserInput,
+        // Add access to the showTripSummary state
+        setShowTripSummary: setShowTripSummary,
+        // Add the forceUpdate function
+        forceUpdate: forceUpdate,
+        // Add pendingMessages for access from other components
+        pendingMessages: processingHook.pendingMessages
       };
     };
     
@@ -211,7 +226,7 @@ const NewPromt = ({ data }) => {
         window.__processingHookState.isTyping = false;
       }
     };
-  }, [processingHook]);
+  }, [processingHook, forceUpdate]);
   
   // Auto-scroll handling
   useEffect(() => {
@@ -239,6 +254,37 @@ const NewPromt = ({ data }) => {
     }
   }, [data, pendingMessages]);
 
+  // Monitor conversation state to control when to show trip summary
+  useEffect(() => {
+    // Immediately hide the summary if we're generating an itinerary
+    if (conversationState === CONVERSATION_STATES.GENERATING_ITINERARY) {
+      if (showTripSummary) {
+        console.log("Hiding trip summary due to itinerary generation");
+        setShowTripSummary(false);
+      }
+      return;
+    }
+    
+    if (conversationState === CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION && tripDetails) {
+      // Check if typing has finished before showing the summary
+      if (!isTyping && pendingMessages && pendingMessages.length > 0) {
+        // Delay showing the summary slightly to ensure the response is visible first
+        const timer = setTimeout(() => {
+          setShowTripSummary(true);
+          console.log("Showing trip summary after response completed");
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      // Hide summary when not in confirmation state
+      // Especially hide it during GENERATING_ITINERARY state
+      if (showTripSummary) {
+        console.log("Hiding trip summary due to state change to:", conversationState);
+        setShowTripSummary(false);
+      }
+    }
+  }, [conversationState, isTyping, pendingMessages, tripDetails, showTripSummary]);
+
   // Monitor conversation state changes to debug TripSummary rendering
   useEffect(() => {
     // Debounce to prevent excessive monitoring and logging
@@ -255,7 +301,9 @@ const NewPromt = ({ data }) => {
           conversationState,
           hasTripDetails: !!tripDetails,
           tripDetailsKeys: tripDetails ? Object.keys(tripDetails) : [],
-          shouldDisplaySummary: conversationState === CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION && !!tripDetails
+          shouldDisplaySummary: showTripSummary && 
+            conversationState === CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION && 
+            !!tripDetails
         });
         
         // Check if all the required trip data is present
@@ -274,33 +322,91 @@ const NewPromt = ({ data }) => {
             isTomorrow: !!tripDetails.isTomorrow,
             budget: !!(tripDetails.budget || (tripDetails.constraints && tripDetails.constraints.budget))
           });
-          
-          // Force state transition if data is complete but we're not in the right state
-          if (hasRequiredFields && conversationState !== CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION) {
-            console.log("🔶 Trip data is complete but not in AWAITING_USER_TRIP_CONFIRMATION state");
-          }
         }
       }
     }, 300); // 300ms debounce
 
     // Cleanup timeout on unmount or when dependencies change
     return () => clearTimeout(debounceTimeout);
-  }, [conversationState, tripDetails]);
+  }, [conversationState, tripDetails, showTripSummary]);
+
+  // Add an explicit function to hide the trip summary with force update
+  const hideTripSummary = useCallback(() => {
+    if (showTripSummary) {
+      console.log("Explicitly hiding trip summary");
+      setShowTripSummary(false);
+      // Force an immediate update to ensure the DOM changes
+      forceUpdate();
+      // Also set the global flag
+      window.__tripSummaryHidden = true;
+    }
+  }, [showTripSummary]);
 
   // Trip summary action handlers
   const handleConfirmTrip = () => {
-    // Display a system message before generating itinerary
-    if (window.__processingHookState && window.__processingHookState.addSystemMessage) {
-      window.__processingHookState.addSystemMessage(
-        "Great! I'll generate your personalized travel itinerary now. This might take a moment..."
-      );
+    // Hide trip summary BEFORE anything else happens
+    hideTripSummary();
+    
+    // Force component to re-render to ensure trip summary is gone
+    setShowTripSummary(false);
+    forceUpdate();
+    
+    // Set a flag to indicate generation has started
+    window.__itineraryGenerationStarted = true;
+    
+    console.log("Trip summary hidden, beginning itinerary generation");
+    
+    // Immediately transition to generating state to show proper UI
+    transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
+    
+    // Add a loading indicator to the chat
+    if (window.__processingHookState && window.__processingHookState.addLoadingMessage) {
+      // First check if we should add a system message
+      if (window.__processingHookState.addSystemMessage) {
+        console.log("Adding initial system message before generation");
+        window.__processingHookState.addSystemMessage(
+          "Great! I'll generate your personalized travel itinerary now. This might take a moment..."
+        );
+      }
+      
+      // Create loading indicator and store its ID globally so it can be replaced later
+      console.log("Creating loading indicator for itinerary generation");
+      const loadingId = window.__processingHookState.addLoadingMessage({
+        isGenerating: true,
+        isItineraryGeneration: true,
+        message: "Generating your personalized travel itinerary... This might take a few moments."
+      });
+      
+      console.log("Created itinerary loading message with ID:", loadingId);
+      window.__itineraryLoadingId = loadingId;
     }
     
-    // Generate the itinerary
-    handleGenerateItinerary();
+    // Add a slight delay before triggering generation to ensure UI updates
+    setTimeout(() => {
+      console.log("Starting itinerary generation");
+      // Check if handleGenerateItinerary exists before calling it
+      if (typeof handleGenerateItinerary === 'function') {
+        try {
+          // Generate the itinerary
+          console.log("Calling itinerary generator function");
+          handleGenerateItinerary();
+        } catch (error) {
+          console.error("Error calling handleGenerateItinerary:", error);
+          // Fallback: Directly transition to generating state
+          transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
+        }
+      } else {
+        console.error("handleGenerateItinerary is not a function");
+        // Fallback: Directly transition to generating state
+        transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
+      }
+    }, 100);
   };
   
   const handleEditTrip = () => {
+    // Hide trip summary first
+    hideTripSummary();
+    
     // Transition back to trip building mode to edit details
     transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
     
@@ -313,6 +419,9 @@ const NewPromt = ({ data }) => {
   };
   
   const handleCancelTrip = () => {
+    // Hide trip summary first
+    hideTripSummary();
+    
     // Reset and transition back to idle
     startNewTrip();
     transitionState(CONVERSATION_STATES.IDLE);
@@ -355,6 +464,11 @@ const NewPromt = ({ data }) => {
 
   // Determine if we should disable input based on state
   const isInputDisabled = conversationState === CONVERSATION_STATES.GENERATING_ITINERARY;
+  
+  // Custom message for input placeholder during generation
+  const inputPlaceholder = isInputDisabled 
+    ? "Creating your travel itinerary..." 
+    : "Ask DreamTrip-AI about your next vacation...";
 
   return (
     <>
@@ -362,32 +476,34 @@ const NewPromt = ({ data }) => {
         {/* Trip selector component */}
         <TripSelector />
         
-        {/* Trip summary with confirm/edit/cancel buttons */}
-        <TripSummary 
-          onConfirm={handleConfirmTrip}
-          onEdit={handleEditTrip}
-          onCancel={handleCancelTrip}
-        />
+        {/* Trip summary with confirm/edit/cancel buttons - only show when showTripSummary is true */}
+        {showTripSummary && (
+          <TripSummary 
+            onConfirm={handleConfirmTrip}
+            onEdit={handleEditTrip}
+            onCancel={handleCancelTrip}
+          />
+        )}
         
         {/* Itinerary display component */}
-        <ItineraryDisplay />
+        <ItineraryDisplay inChatView={true} />
         
         {/* Itinerary editor component */}
         <ItineraryEditor />
         
         {/* Input form only - messages are displayed in the parent component */}
         <form 
-          className="w-full relative bg-[#1a1e2d] flex items-center gap-4 mb-3 px-5 py-4 z-20 shadow-[0_-4px_15px_rgba(0,0,0,0.35)] border-t-2 border-blue-500/20 min-h-[70px] rounded-t-lg" 
+          className={`w-full relative bg-[#1a1e2d] flex items-center gap-4 mb-3 px-5 py-4 z-20 shadow-[0_-4px_15px_rgba(0,0,0,0.35)] border-t-2 ${isInputDisabled ? 'border-blue-500/40' : 'border-blue-500/20'} min-h-[70px] rounded-t-lg`} 
           onSubmit={handleSubmit} 
           ref={formRef}
         >
-          <Upload setImg={setImg} />
-          {img.isLoading && (
+          {!isInputDisabled && <Upload setImg={setImg} />}
+          {img.isLoading && !isInputDisabled && (
             <div className="flex items-center justify-center bg-blue-500/15 rounded-lg px-2 h-6 ml-1">
               <LoadingDots />
             </div>
           )}
-          {img.dbData?.filePath && (
+          {img.dbData?.filePath && !isInputDisabled && (
             <div className="flex items-center justify-center bg-blue-500/20 rounded-lg px-2 h-6 ml-1" title="Image attached">
               <div className="text-sm text-gray-300">📎</div>
             </div>
@@ -397,17 +513,23 @@ const NewPromt = ({ data }) => {
             type="text"
             name="text"
             ref={inputRef}
-            placeholder="Ask DreamTrip-AI about your next vacation..."
+            placeholder={inputPlaceholder}
             disabled={isInputDisabled}
-            className="flex-1 px-4 py-3 border-none outline-none bg-[#2a2d3c] text-gray-100 text-base rounded-xl h-[45px] shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)] focus:ring-2 focus:ring-blue-500/40"
+            className={`flex-1 px-4 py-3 border-none outline-none bg-[#2a2d3c] text-gray-100 text-base rounded-xl h-[45px] shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)] ${isInputDisabled ? 'bg-[#232532] text-gray-500 italic' : 'focus:ring-2 focus:ring-blue-500/40'}`}
           />
-          <button 
-            type="submit" 
-            disabled={isInputDisabled}
-            className="rounded-full bg-blue-500 border-none p-2.5 w-[45px] h-[45px] flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0 shadow-[0_3px_8px_rgba(59,130,246,0.4)] hover:bg-blue-600 hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(59,130,246,0.5)] active:translate-y-[1px] active:shadow-[0_1px_3px_rgba(59,130,246,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <IoSend className="text-white text-xl" />
-          </button>
+          {isInputDisabled ? (
+            <div className="rounded-full bg-blue-500/40 border-none p-2.5 w-[45px] h-[45px] flex items-center justify-center flex-shrink-0">
+              <LoadingDots />
+            </div>
+          ) : (
+            <button 
+              type="submit" 
+              disabled={isInputDisabled}
+              className="rounded-full bg-blue-500 border-none p-2.5 w-[45px] h-[45px] flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0 shadow-[0_3px_8px_rgba(59,130,246,0.4)] hover:bg-blue-600 hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(59,130,246,0.5)] active:translate-y-[1px] active:shadow-[0_1px_3px_rgba(59,130,246,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <IoSend className="text-white text-xl" />
+            </button>
+          )}
         </form>
       </div>
     </>

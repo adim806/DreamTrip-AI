@@ -263,6 +263,11 @@ export const generateItinerary = async (tripDetails) => {
 
     console.log("Itinerary generated successfully");
 
+    // DEBUG: הדפסת המסלול המלא לקונסול לנוחות הדיבוג
+    console.log("========= GENERATED ITINERARY START =========");
+    console.log(itinerary);
+    console.log("========= GENERATED ITINERARY END =========");
+
     return {
       success: true,
       itinerary,

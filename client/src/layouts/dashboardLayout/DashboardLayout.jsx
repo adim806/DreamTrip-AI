@@ -1,6 +1,6 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import './dashboardLayout.css';
 import { SidebarNavigation } from "@/components/ui/sidebar";
 import { TripProvider } from '@/components/tripcontext/TripProvider';
@@ -30,6 +30,15 @@ const DashboardLayout = () => {
   // Destructure `userId` and `isLoaded` from Clerk's useAuth hook to manage authentication state
   const {userId, isLoaded}= useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Determine if a map should be shown based on the current route
+  const shouldShowMap = useMemo(() => {
+    // Check if the current route is related to chat and should display a map
+    return location.pathname.includes('/chat') && 
+           (location.pathname.includes('map') || 
+            location.search.includes('map=true'));
+  }, [location.pathname, location.search]);
 
   // Store userId in localStorage for easier access in utility functions
   useEffect(() => {
@@ -56,7 +65,7 @@ const DashboardLayout = () => {
       <SidebarNavigation />
 
       {/* Main content area rendering nested routes via Outlet */}
-      <div className="content"><Outlet/></div>
+      <div className={`content ${shouldShowMap ? 'with-map' : ''}`}><Outlet/></div>
     </div>
     </TripProvider>
   );

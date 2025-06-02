@@ -1,7 +1,7 @@
 .DashboardLayout {
   display: flex;
-  gap: 1px;
-  padding-top: 3px;
+  gap: 0;
+  padding-top: 0;
   height: 100%;
   background-color: #111827;
   color: #e5e7eb;
@@ -15,7 +15,8 @@
     background-color: #1f2937;
     border-radius: 8px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-    padding: 16px;
+    padding: 4px;
+    padding-top: 0;
   }
 }
 
@@ -68,4 +69,27 @@
 body {
   background-color: var(--background);
   color: var(--foreground);
+}
+
+/* Optimized layout for chat with map */
+.DashboardLayout .content.with-map {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  padding-top: 0;
+}
+
+/* Ensure full height for chat container */
+.DashboardLayout .content > div {
+  height: 100%;
+  max-height: calc(100vh - 8px);
+  margin-top: 0;
+}
+
+/* Compact sidebar when map is visible */
+@media (max-width: 1280px) {
+  .DashboardLayout .content.with-map {
+    grid-template-columns: 1fr;
+  }
 }

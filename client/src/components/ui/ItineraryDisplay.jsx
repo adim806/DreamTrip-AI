@@ -11,8 +11,11 @@ import Markdown from 'react-markdown';
  * - Provides options to edit or make changes to the itinerary
  * - Button to view full trip details in a more structured view
  * - Support for dynamic itinerary updates
+ * 
+ * NOTE: This component is NOT meant to be displayed in the chat flow
+ * It is for a dedicated section/view for examining the complete itinerary
  */
-const ItineraryDisplay = () => {
+const ItineraryDisplay = ({ inChatView = false }) => {
   const { 
     allTripData, 
     tripDetails,
@@ -22,6 +25,12 @@ const ItineraryDisplay = () => {
   } = useContext(TripContext);
   
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // If this component is being used in the chat view, don't render it
+  // The itinerary should be displayed as a regular message in the chat flow instead
+  if (inChatView) {
+    return null;
+  }
 
   // Don't render if no itinerary data or not in the right state
   if (!allTripData || !allTripData.itinerary || 

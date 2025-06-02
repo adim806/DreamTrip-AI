@@ -258,7 +258,7 @@ export function TripProvider({ children }) {
 
   // Function to generate an itinerary - will be implemented by NewPromt/useProcessUserInput
   const [handleGenerateItinerary, setHandleGenerateItinerary] = useState(() => () => {
-    console.log("handleGenerateItinerary not yet initialized");
+    console.log("Default handleGenerateItinerary called - not yet initialized");
     // Default implementation will just transition to the generating state
     // The actual implementation will be set by the useProcessUserInput hook
     transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
@@ -267,7 +267,14 @@ export function TripProvider({ children }) {
   // Allow components to provide the implementation for generating itineraries
   const registerItineraryGenerator = useCallback((generatorFn) => {
     if (typeof generatorFn === 'function') {
-      setHandleGenerateItinerary(() => generatorFn);
+      console.log("Registering itinerary generator function");
+      // Wrap the function to add proper logging
+      setHandleGenerateItinerary(() => (...args) => {
+        console.log("Calling registered itinerary generator");
+        return generatorFn(...args);
+      });
+    } else {
+      console.warn("Attempted to register invalid itinerary generator:", generatorFn);
     }
   }, []);
 
@@ -376,6 +383,30 @@ export function TripProvider({ children }) {
           console.log("User chose to edit trip details");
           // No need to clear trip details - we want to keep them for editing
         }
+        
+        // Handle map updates when location is detected
+        if (contextData && contextData.updateMap && contextData.location) {
+          console.log("Updating map with location:", contextData.location);
+          
+          // If we have a vacation_location but no explicit location in contextData,
+          // use the vacation_location for the map
+          const locationToShow = contextData.location || tripDetails?.vacation_location;
+          
+          if (locationToShow) {
+            // Update the active layer to show the map
+            setActiveLayer("location");
+            
+            // Force a re-render of the map by updating trip details
+            if (!tripDetails) {
+              setTripDetails({ vacation_location: locationToShow });
+            } else if (tripDetails.vacation_location !== locationToShow) {
+              setTripDetails({
+                ...tripDetails,
+                vacation_location: locationToShow
+              });
+            }
+          }
+        }
         break;
         
       case CONVERSATION_STATES.GENERATING_ITINERARY:
@@ -383,6 +414,34 @@ export function TripProvider({ children }) {
         setActiveTripChatId(window.location.pathname.split('/').pop());
         // Reset cancellation flag when starting to generate itinerary
         setWasTripCancelled(false);
+        
+        // Inform the processing hook that we're generating an itinerary
+        // This ensures that any UI components related to trip summary are hidden
+        if (window.__processingHookState) {
+          // If there's a stale trip summary still showing, force hide it
+          if (window.__processingHookState.setShowTripSummary) {
+            window.__processingHookState.setShowTripSummary(false);
+          }
+          
+          // Ensure there's a loading indicator in the chat
+          if (window.__processingHookState.addLoadingMessage && 
+              !window.__itineraryGenerationStarted) {
+            window.__itineraryGenerationStarted = true;
+            // Add a loading message and ALWAYS store its ID globally
+            window.__itineraryLoadingId = window.__processingHookState.addLoadingMessage({
+              isGenerating: true,
+              isItineraryGeneration: true,
+              message: "Generating your personalized travel itinerary... This might take a few moments."
+            });
+            
+            console.log("Created itinerary loading message with ID:", window.__itineraryLoadingId);
+            
+            // Reset the flag when the generation completes
+            setTimeout(() => {
+              window.__itineraryGenerationStarted = false;
+            }, 30000); // Reset after 30 seconds as a safeguard
+          }
+        }
         break;
         
       case CONVERSATION_STATES.DISPLAYING_ITINERARY:
@@ -390,14 +449,88 @@ export function TripProvider({ children }) {
         if (contextData && !wasTripCancelled) {
           completeTrip(contextData);
           
-          // After transitioning to displaying itinerary, inform the main model
-          // This will notify the main model that the itinerary is ready
-          if (window.__processingHookState && window.__processingHookState.addSystemMessage) {
-            setTimeout(() => {
-              window.__processingHookState.addSystemMessage(
-                `Your itinerary for ${contextData.tripDetails.vacation_location} is now ready. Is there anything specific about the itinerary you'd like me to explain or modify?`
+          // Clear any loading indicators that might still be displayed
+          if (window.__processingHookState) {
+            // Reset the itinerary generation flag
+            window.__itineraryGenerationStarted = false;
+            
+            // Display the itinerary in the chat directly as a model message
+            console.log("Showing itinerary in chat");
+            
+            // DEBUG: הדפסת המידע המלא למסלול שהתקבל מהמודל
+            console.log("========= ITINERARY RAW RESPONSE START =========");
+            console.log(contextData.itinerary);
+            console.log("========= ITINERARY RAW RESPONSE END =========");
+            
+            // Format the itinerary for chat display - הצגת המסלול המלא בשיחה
+            // הסרנו את הפורמט המיוחד והכותרת כדי להציג את התשובה המלאה כפי שהתקבלה מהמודל
+            const itineraryMessage = contextData.itinerary;
+
+            // IMPORTANT: Always display the itinerary message even if we don't have a loading ID
+            // Try to replace the loading message first if we have an ID
+            if (window.__processingHookState.replaceLoadingMessage && window.__itineraryLoadingId) {
+              // Use the stored loading ID if available
+              console.log("Replacing loading message with itinerary using ID:", window.__itineraryLoadingId);
+              window.__processingHookState.replaceLoadingMessage(window.__itineraryLoadingId, {
+                role: "model",
+                message: itineraryMessage,
+                id: `itinerary-${Date.now()}`,
+                isItinerary: true,
+              });
+              
+              // Clear the loading ID
+              window.__itineraryLoadingId = null;
+            } 
+            // If no replaceLoadingMessage or no stored ID, try to find a loading message to replace
+            else if (window.__processingHookState.replaceLoadingMessage) {
+              // Get the pending messages from the hook state
+              const pendingMessages = window.__processingHookState.pendingMessages || [];
+              
+              // Look for any loading messages to replace
+              const loadingMessages = pendingMessages.filter(msg => 
+                msg.isLoadingMessage || msg.isGenerating || msg.isItineraryGeneration
               );
-            }, 1000);
+              
+              if (loadingMessages.length > 0) {
+                const loadingId = loadingMessages[0].id;
+                console.log("Found loading message to replace:", loadingId);
+                window.__processingHookState.replaceLoadingMessage(loadingId, {
+                  role: "model",
+                  message: itineraryMessage,
+                  id: `itinerary-${Date.now()}`,
+                  isItinerary: true,
+                });
+              } else {
+                // No loading message found, add a new message instead
+                console.log("No loading message found, adding new system message with itinerary");
+                if (window.__processingHookState.addSystemMessage) {
+                  window.__processingHookState.addSystemMessage(itineraryMessage);
+                }
+              }
+            } 
+            // Last resort - add a new system message
+            else if (window.__processingHookState.addSystemMessage) {
+              console.log("Adding itinerary as new system message");
+              window.__processingHookState.addSystemMessage(itineraryMessage);
+            }
+            
+            // IMPORTANT - תמיד להוסיף את המסלול כהודעה חדשה בשיחה
+            // אפילו אם כבר הוחלפה הודעת הטעינה, ככה נוודא שהמסלול תמיד מוצג
+            setTimeout(() => {
+              // בדיקה שעדיין יש לנו גישה למצב השיחה
+              if (window.__processingHookState && window.__processingHookState.addSystemMessage) {
+                console.log("Adding itinerary as additional message for guaranteed visibility");
+                window.__processingHookState.addSystemMessage(
+                  itineraryMessage
+                );
+              }
+              
+              // IMPORTANT: Clear all loading messages after displaying the itinerary
+              if (window.__processingHookState.clearLoadingMessages) {
+                console.log("Clearing any remaining loading messages");
+                window.__processingHookState.clearLoadingMessages();
+              }
+            }, 500);
           }
         }
         break;
@@ -421,7 +554,7 @@ export function TripProvider({ children }) {
     
     // Update the state
     setConversationState(newState);
-  }, [conversationState, completeTrip, wasTripCancelled]);
+  }, [conversationState, completeTrip, wasTripCancelled, setActiveLayer, setTripDetails, tripDetails]);
 
   // Listen to state changes to detect when a trip is cancelled
   useEffect(() => {
@@ -438,32 +571,48 @@ export function TripProvider({ children }) {
     }
   }, [conversationState, tripDetails, wasTripCancelled]);
 
-  // This effect monitors trip details changes and forces display of trip summary when appropriate
+  // Monitor trip details changes and auto-transition to confirmation when complete
   useEffect(() => {
-    // Add debouncing to prevent infinite loop
-    let debounceTimer = null;
+    let debounceTimer;
     
-    if (tripDetails) {
-      // Clear any existing timer
-      if (debounceTimer) clearTimeout(debounceTimer);
+    // Only run this effect if we have trip details and we're in a relevant state
+    if (tripDetails && 
+        (conversationState === CONVERSATION_STATES.TRIP_BUILDING_MODE ||
+         conversationState === CONVERSATION_STATES.AWAITING_MISSING_INFO)) {
       
-      // Set a new timer to delay validation by 500ms
+      // Debounce the check to avoid excessive validation
       debounceTimer = setTimeout(() => {
         // Import validateRequiredTripFields function to check if trip is complete
-        import('../../utils/tripUtils').then(({ validateRequiredTripFields }) => {
+        import('../../utils/tripUtils').then(({ validateRequiredTripFields, validateTripCompletion }) => {
           // Check if trip has all required fields
           const validationResult = validateRequiredTripFields(tripDetails);
           
+          // Enhanced logging with more details
           console.log("TripProvider checking if trip should trigger summary:", {
             validationResult,
             currentState: conversationState,
             tripDetails: {
+              vacation_location: tripDetails.vacation_location || "missing",
+              duration: tripDetails.duration || "missing",
+              dates: tripDetails.dates ? 
+                `from: ${tripDetails.dates.from || "missing"}, to: ${tripDetails.dates.to || "missing"}` : 
+                "missing",
+              budget: tripDetails.budget || (tripDetails.constraints?.budget) || "missing",
+              travelers: tripDetails.travelers || "missing",
               hasLocation: !!tripDetails.vacation_location,
               hasDuration: !!tripDetails.duration,
-              hasDates: tripDetails.dates && tripDetails.dates.from && tripDetails.dates.to,
-              hasBudget: tripDetails.budget || (tripDetails.constraints && tripDetails.constraints.budget)
+              hasDates: !!(tripDetails.dates && (
+                (tripDetails.dates.from && tripDetails.dates.to) || 
+                (tripDetails.dates.from && tripDetails.isTomorrow) ||
+                (tripDetails.dates.from && tripDetails.duration)
+              )),
+              hasBudget: !!(tripDetails.budget || (tripDetails.constraints && tripDetails.constraints.budget))
             }
           });
+          
+          // Get a more detailed validation if needed
+          const detailedValidation = validateTripCompletion(tripDetails);
+          console.log("Detailed validation result:", detailedValidation);
           
           // If trip is valid but we're not in awaiting confirmation state,
           // force transition to that state

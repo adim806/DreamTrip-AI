@@ -139,105 +139,79 @@ export const mergeWithExistingTripData = (
 };
 
 /**
- * Splits a combined location field into separate city and country fields
- * @param {Object} data - Data object with location field
- * @returns {Object} - Data with separate city and country fields
+ * Process date entries from various formats
+ */
+export const processDateFormats = (data) => {
+  if (!data) return data;
+
+  const processedData = { ...data };
+
+  // Process date string in "YYYY-MM-DD to YYYY-MM-DD" format
+  if (
+    data.dates &&
+    typeof data.dates === "string" &&
+    data.dates.includes(" to ")
+  ) {
+    const [from, to] = data.dates.split(" to ").map((d) => d.trim());
+    processedData.dates = { from, to };
+    console.log(
+      "[DataTransformation] Processed date string to object:",
+      processedData.dates
+    );
+  }
+
+  return processedData;
+};
+
+/**
+ * Splits a combined location field into city and country when possible
+ * @param {Object} data - The data object containing location information
+ * @returns {Object} - The transformed data object with separated fields
  */
 export const splitLocationField = (data) => {
-  if (!data) return data;
-  if (!data.location && data.city && data.country) return data; // Already has separate fields
+  // Early return if there's no data or it's not an object
+  if (!data || typeof data !== "object") return data;
 
-  const result = { ...data };
+  // Process date formats first
+  const processedData = processDateFormats({ ...data });
 
-  // Check if location field exists
-  if (data.location && typeof data.location === "string") {
-    const locationStr = data.location.trim();
+  // Check if it's already in the desired format
+  if (processedData.city && processedData.country) {
+    return processedData;
+  }
 
-    // Check if there's a comma separating city and country
-    if (locationStr.includes(",")) {
-      const [city, country] = locationStr.split(",").map((part) => part.trim());
+  // Create a copy to avoid mutating the original
+  const transformedData = { ...processedData };
 
-      // Update only if we have meaningful values
-      if (city) result.city = city;
-      if (country) result.country = country;
-    }
-    // Special case for "Tel Aviv Israel" type patterns
-    else if (
-      locationStr.toLowerCase().includes("tel aviv") &&
-      locationStr.toLowerCase().includes("israel")
-    ) {
-      result.city = "Tel Aviv";
-      result.country = "Israel";
-      console.log("[DataTransformation] Detected Tel Aviv Israel pattern");
-    }
-    // If no comma but has space, try to separate by last word as country
-    else if (locationStr.includes(" ")) {
-      const parts = locationStr.split(" ");
+  // If there is an explicit location field, try to split it
+  if (
+    transformedData.location &&
+    typeof transformedData.location === "string"
+  ) {
+    const locationParts = transformedData.location.split(/,\s*/);
 
-      // List of common countries for validation
-      const commonCountries = [
-        "Israel",
-        "USA",
-        "UK",
-        "France",
-        "Italy",
-        "Spain",
-        "Germany",
-        "Australia",
-        "Japan",
-        "China",
-        "Russia",
-        "Brazil",
-        "Canada",
-        "Mexico",
-        "India",
-        "Thailand",
-        "Greece",
-        "Turkey",
-        "Portugal",
-        "Netherlands",
-        "Belgium",
-        "Switzerland",
-        "Austria",
-        "Sweden",
-        "Norway",
-        "Denmark",
-        "Finland",
-        "Poland",
-        "Czech",
-      ];
-
-      // Check if last word is a known country
-      const lastWord = parts[parts.length - 1];
-      if (commonCountries.includes(lastWord)) {
-        result.country = lastWord;
-        result.city = parts.slice(0, -1).join(" ");
-        console.log(
-          `[DataTransformation] Extracted city: "${result.city}", country: "${result.country}"`
-        );
-      }
-      // If more than one word but last word isn't a known country, assume last word is still country
-      else if (parts.length > 1) {
-        const country = parts.pop(); // Last word
-        const city = parts.join(" "); // Everything else
-
-        result.city = city;
-        result.country = country;
-        console.log(
-          `[DataTransformation] Assumed city: "${result.city}", country: "${result.country}"`
-        );
-      } else {
-        // If only one word, assume it's the city
-        result.city = locationStr;
-      }
-    } else {
-      // No separator, assume entire value is city
-      result.city = locationStr;
+    if (locationParts.length >= 2) {
+      transformedData.city = locationParts[0].trim();
+      transformedData.country = locationParts[locationParts.length - 1].trim();
+      transformedData.vacation_location = transformedData.location; // Keep the original as vacation_location
     }
   }
 
-  console.log(`[DataTransformation] splitLocationField result:`, result);
-  return result;
+  // If there's a vacation_location, try to split it too
+  if (
+    transformedData.vacation_location &&
+    typeof transformedData.vacation_location === "string" &&
+    !transformedData.city
+  ) {
+    const locationParts = transformedData.vacation_location.split(/,\s*/);
+
+    if (locationParts.length >= 2) {
+      transformedData.city = locationParts[0].trim();
+      transformedData.country = locationParts[locationParts.length - 1].trim();
+    }
+  }
+
+  return transformedData;
 };
 
 /**

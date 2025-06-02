@@ -125,16 +125,45 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
   
   // Default handlers if not provided as props
   const handleConfirm = () => {
+    // First hide this component directly to ensure it disappears
+    if (window.__processingHookState && window.__processingHookState.setShowTripSummary) {
+      window.__processingHookState.setShowTripSummary(false);
+      // Force the UI to update immediately
+      if (window.__processingHookState.forceUpdate) {
+        window.__processingHookState.forceUpdate();
+      }
+    }
+    
     // First try to use the provided handler
     if (onConfirm) {
       onConfirm();
     } 
     // Otherwise use our own implementation with the context
     else {
+      // Hide this component using global hook if available
+      if (window.__processingHookState && window.__processingHookState.setShowTripSummary) {
+        window.__processingHookState.setShowTripSummary(false);
+      }
+
       // Trigger itinerary generation
       if (typeof handleGenerateItinerary === 'function') {
-        handleGenerateItinerary();
+        try {
+          // Add a loading message first
+          if (window.__processingHookState && window.__processingHookState.addSystemMessage) {
+            window.__processingHookState.addSystemMessage(
+              "Great! I'll generate your personalized travel itinerary now. This might take a moment..."
+            );
+          }
+          
+          // Call the generator function
+          handleGenerateItinerary();
+        } catch (error) {
+          console.error("Error calling handleGenerateItinerary:", error);
+          // Fallback to direct state transition
+          transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
+        }
       } else {
+        console.warn("handleGenerateItinerary is not a function, falling back to direct state transition");
         transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
         
         // Emit a system message about generation starting
@@ -142,20 +171,29 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
           window.__processingHookState.addSystemMessage(
             "Great! I'll generate your personalized travel itinerary now. This might take a moment..."
           );
-          
-          // REMOVING SYNTHETIC MESSAGE - This was causing infinite loop
-          // setTimeout(() => {
-          //   window.__processingHookState.processUserInput("Confirm the trip details and generate the itinerary");
-          // }, 500);
         }
       }
     }
   };
   
   const handleEdit = () => {
+    // First hide this component directly to ensure it disappears
+    if (window.__processingHookState && window.__processingHookState.setShowTripSummary) {
+      window.__processingHookState.setShowTripSummary(false);
+      // Force the UI to update immediately
+      if (window.__processingHookState.forceUpdate) {
+        window.__processingHookState.forceUpdate();
+      }
+    }
+    
     if (onEdit) {
       onEdit();
     } else {
+      // Hide this component using global hook if available
+      if (window.__processingHookState && window.__processingHookState.setShowTripSummary) {
+        window.__processingHookState.setShowTripSummary(false);
+      }
+      
       // Transition back to trip building mode
       transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
       
@@ -164,19 +202,28 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
         window.__processingHookState.addSystemMessage(
           "Let's edit your trip details. What would you like to change?"
         );
-        
-        // REMOVING SYNTHETIC MESSAGE - This was causing infinite loop
-        // setTimeout(() => {
-        //   window.__processingHookState.processUserInput("I want to edit the trip details");
-        // }, 500);
       }
     }
   };
   
   const handleCancel = () => {
+    // First hide this component directly to ensure it disappears
+    if (window.__processingHookState && window.__processingHookState.setShowTripSummary) {
+      window.__processingHookState.setShowTripSummary(false);
+      // Force the UI to update immediately
+      if (window.__processingHookState.forceUpdate) {
+        window.__processingHookState.forceUpdate();
+      }
+    }
+    
     if (onCancel) {
       onCancel();
     } else {
+      // Hide this component using global hook if available
+      if (window.__processingHookState && window.__processingHookState.setShowTripSummary) {
+        window.__processingHookState.setShowTripSummary(false);
+      }
+      
       // Mark the trip as cancelled
       setWasTripCancelled(true);
       
@@ -188,11 +235,6 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
         window.__processingHookState.addSystemMessage(
           "Trip planning cancelled. How else can I assist you today?"
         );
-        
-        // REMOVING SYNTHETIC MESSAGE - This was causing infinite loop
-        // setTimeout(() => {
-        //   window.__processingHookState.processUserInput("Cancel the trip planning");
-        // }, 500);
       }
     }
   };

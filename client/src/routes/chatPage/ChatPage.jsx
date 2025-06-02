@@ -5,11 +5,12 @@ import { useLocation } from "react-router-dom";
 import Markdown from "react-markdown";
 import { IKImage } from "imagekitio-react";
 import { TripContext, CONVERSATION_STATES } from "../../components/tripcontext/TripProvider";
-import { RiUser3Fill, RiRobot2Fill, RiCompass3Fill } from "react-icons/ri";
+import { RiUser3Fill, RiCompassDiscoverLine, RiPlaneLine, RiMapPinLine, RiSendPlaneFill } from "react-icons/ri";
 import { motion } from "framer-motion";
 import { useAuth } from "@clerk/clerk-react";
 import { fieldComponentMap } from "../../components/FieldCompletion/FieldComponents";
 import MissingFieldsForm from "../../components/FieldCompletion/MissingFieldsForm";
+import "./chatPage.css";
 
 const ChatPage = () => {
   const path = useLocation().pathname;
@@ -18,6 +19,12 @@ const ChatPage = () => {
   const chatContainerRef = useRef(null);
   const displayedMessagesRef = useRef(new Set());
   const { userId, isLoaded, isSignedIn, getToken } = useAuth();
+
+  // Check if map is being displayed (based on trip details or URL params)
+  const isMapVisible = useMemo(() => {
+    // This is a placeholder - implement your actual logic to determine if map is visible
+    return tripDetails?.showMap || path.includes('map');
+  }, [tripDetails, path]);
 
   const { isPending, error, data } = useQuery({
     queryKey: ["chat", chatId, userId],
@@ -374,7 +381,7 @@ const ChatPage = () => {
               ease: "easeInOut" 
             }}
           >
-            <RiCompass3Fill className="text-blue-400 text-sm" />
+            <RiCompassDiscoverLine className="text-blue-400 text-sm" />
           </motion.div>
         </div>
         <div className="typing-indicator-content flex items-center">
@@ -453,15 +460,15 @@ const ChatPage = () => {
           <motion.div 
             className="mr-2 text-blue-300 text-base"
             animate={{ 
-              scale: [1, 1.2, 1]
+              rotate: [0, 360],
+              scale: [1, 1.1, 1]
             }}
             transition={{ 
-              duration: 1.5, 
-              repeat: Infinity,
-              ease: "easeInOut" 
+              rotate: { duration: 3, repeat: Infinity, ease: "linear" },
+              scale: { duration: 1.5, repeat: Infinity }
             }}
           >
-            💬
+            <RiCompassDiscoverLine />
           </motion.div>
           <span className="font-medium">Preparing response</span>
           <div className="flex space-x-1 ml-2">
@@ -497,7 +504,6 @@ const ChatPage = () => {
             <motion.div 
               className="mr-2 text-blue-300 text-base"
               animate={{ 
-                scale: [1, 1.2, 1],
                 rotate: [0, 10, 0, -10, 0],
               }}
               transition={{ 
@@ -506,7 +512,7 @@ const ChatPage = () => {
                 ease: "easeInOut" 
               }}
             >
-              🔍
+              <RiCompassDiscoverLine />
             </motion.div>
             <span className="font-medium">Analyzing your request</span>
             <div className="flex space-x-1 ml-2">
@@ -547,7 +553,7 @@ const ChatPage = () => {
                 scale: { duration: 1.2, repeat: Infinity }
               }}
             >
-              🔍
+              <RiCompassDiscoverLine />
             </motion.div>
             <span className="font-medium">Fetching external data</span>
             <div className="flex space-x-1 ml-2">
@@ -588,7 +594,7 @@ const ChatPage = () => {
                 scale: { duration: 1.5, repeat: Infinity }
               }}
             >
-              ✨
+              <RiCompassDiscoverLine />
             </motion.div>
             <span className="font-medium">Generating your personalized itinerary</span>
             <div className="flex space-x-1 ml-2">
@@ -630,7 +636,7 @@ const ChatPage = () => {
                 ease: "easeInOut"
               }}
             >
-              ✏️
+              <RiCompassDiscoverLine />
             </motion.div>
             <span className="font-medium">Editing your itinerary</span>
             <div className="flex space-x-1 ml-2">
@@ -717,7 +723,26 @@ const ChatPage = () => {
     console.log("Using fallback missing fields processing");
     
     // Create a structured message with the collected field values
-    const userMessage = missingFieldsState.fields.map(f => `${f}: ${formValues[f]}`).join(', ');
+    // Format field values properly to avoid [object Object] in the message
+    const userMessage = missingFieldsState.fields.map(f => {
+      // Get the value for this field
+      const value = formValues[f];
+      
+      // Format the value based on its type
+      let formattedValue = value;
+      
+      // Handle date objects (from/to format)
+      if (value && typeof value === 'object' && value.from) {
+        formattedValue = value.from;
+        
+        // If it's a date range with both from and to, use a nice format
+        if (value.to) {
+          formattedValue = `${value.from} to ${value.to}`;
+        }
+      }
+      
+      return `${f}: ${formattedValue}`;
+    }).join(', ');
     
     // Check if this message already exists to prevent duplicates
     const messageExists = pendingMessages.some(msg => 
@@ -744,7 +769,8 @@ const ChatPage = () => {
             message: userMessage,
             id: submissionId,
             timestamp: new Date().toISOString(),
-            isFormSubmission: true // Mark as form submission to identify it later
+            isFormSubmission: true, // Mark as form submission to identify it later
+            formValues: formValues // Store original form values for processing
           }
         ];
       });
@@ -786,8 +812,8 @@ const ChatPage = () => {
       return (
         <div
           key={message.id}
-          className="ml-5 mt-1 max-w-lg"
-          style={{ minWidth: 320, maxWidth: '90%' }}
+          className="ml-4 mt-1 max-w-lg compact-form-container"
+          style={{ minWidth: 280, maxWidth: '90%' }}
         >
           <MissingFieldsForm
             fields={message.missingFields}
@@ -818,9 +844,10 @@ const ChatPage = () => {
       return (
         <div
           key={`placeholder-${message.id}`}
-          className="ml-5 mt-1 max-w-lg bg-blue-500/10 p-2 rounded-lg border border-blue-500/20"
+          className="ml-4 mt-1 max-w-lg bg-blue-500/10 p-2 rounded-lg border border-blue-500/20"
+          style={{ minWidth: 280, maxWidth: '90%' }}
         >
-          <div className="text-blue-300 text-sm">Loading form...</div>
+          <div className="text-blue-300 text-xs">Loading form...</div>
         </div>
       );
     }
@@ -828,8 +855,8 @@ const ChatPage = () => {
     return (
       <div
         key={message.id}
-        className="ml-5 mt-1 max-w-lg"
-        style={{ minWidth: 320, maxWidth: '90%' }}
+        className="ml-4 mt-1 max-w-lg compact-form-container"
+        style={{ minWidth: 280, maxWidth: '90%' }}
       >
         <MissingFieldsForm
           fields={message.missingFields}
@@ -868,98 +895,168 @@ const ChatPage = () => {
     }
   }, [pendingMessages, missingFieldsState.fields.length, missingFieldsState.messageId]);
 
+  // TripSummaryView component - improves display of trip summaries
+  const TripSummaryView = ({ message }) => {
+    // If the message starts with an emoji and contains bullets
+    if (message.includes('🧳') && message.includes('•')) {
+      // Split into lines
+      const lines = message.split('\n');
+      
+      // Extract title and details
+      const title = lines[0];
+      const details = lines.slice(1);
+      
+      return (
+        <div className="trip-summary">
+          <div className="text-lg font-medium text-blue-200 mb-1">{title}</div>
+          <ul className="pl-1 space-y-1">
+            {details.map((line, i) => (
+              line.trim() && (
+                <li key={i} className="trip-bullet flex items-start">
+                  <span className="trip-emoji">{line.substring(0, 2)}</span>
+                  <span>{line.substring(2)}</span>
+                </li>
+              )
+            ))}
+          </ul>
+          <p className="mt-2 text-sm text-blue-200">Would you like to generate this itinerary?</p>
+        </div>
+      );
+    }
+    
+    // For all other messages, let Markdown handle it
+    return <Markdown>{message}</Markdown>;
+  };
+
   return (
-    <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(25,28,40,0.97)] overflow-hidden">
-      {/* Chat Header - עיצוב משופר */}
-      <div className="flex items-center justify-between py-2 px-4 bg-gradient-to-r from-[#1E293B] to-[#1E1F2A] border-b border-gray-800/60">
-        <div className="flex items-center space-x-2">
-          <div className="bg-blue-600/20 p-1.5 rounded-full flex items-center justify-center">
-            <RiCompass3Fill className="text-blue-400 text-lg" />
+    <div className={`chat-with-map ${isMapVisible ? 'with-map' : ''}`}>
+      <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(25,28,40,0.97)] overflow-hidden compact-chat-container">
+        {/* Chat Header - עיצוב משופר */}
+        <div className="flex items-center justify-between py-2 px-4 bg-gradient-to-r from-[#1E293B] to-[#1E1F2A] border-b border-gray-800/60">
+          <div className="flex items-center space-x-2">
+            <div className="bg-blue-600/20 p-1.5 rounded-full flex items-center justify-center">
+              <RiCompassDiscoverLine className="text-blue-400 text-lg" />
+            </div>
+            <div>
+              <h3 className="text-white font-medium text-base tracking-wide">DreamTrip AI</h3>
+              <div className="flex items-center">
+                <motion.div
+                  className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1.5"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
+                <span className="text-xs text-gray-400">Travel Assistant</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <h3 className="text-white font-medium text-base tracking-wide">DreamTrip AI</h3>
-            <div className="flex items-center">
-              <motion.div
-                className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1.5"
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              />
-              <span className="text-xs text-gray-400">Active</span>
+          
+          <div className="flex items-center space-x-2">
+            <div className="text-xs py-1 px-2 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800/30 flex items-center">
+              <RiPlaneLine className="mr-1 text-xs" />
+              <span>AI Travel Guide</span>
             </div>
           </div>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          <div className="text-xs py-1 px-2 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800/30">
-            Travel Assistant
-          </div>
-        </div>
-      </div>
 
-      {/* Chat Content with History and Input */}
-      <div className="flex-1 flex flex-col bg-[#171923] overflow-hidden relative">
-        {/* Message History */}
-        <div 
-          ref={chatContainerRef}
-          id="chat-messages-container"
-          className="flex-1 overflow-y-auto p-4 pb-28"
-          style={{ maxHeight: "calc(100vh - 130px)" }}
-        >
-          <div className="flex flex-col gap-4">
-            {isPending ? (
-              <div className="flex justify-center items-center h-full">
-                <div className="animate-pulse flex space-x-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="w-2 h-2 bg-blue-400 rounded-full" 
-                      style={{ animationDelay: `${i * 0.15}s` }} />
-                  ))}
+        {/* Chat Content with History and Input */}
+        <div className="flex-1 flex flex-col bg-[#171923] overflow-hidden relative">
+          {/* Message History */}
+          <div 
+            ref={chatContainerRef}
+            id="chat-messages-container"
+            className="flex-1 overflow-y-auto p-4 pb-28"
+          >
+            <div className="flex flex-col gap-4">
+              {isPending ? (
+                <div className="flex justify-center items-center h-full">
+                  <div className="animate-pulse flex space-x-2">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="w-2 h-2 bg-blue-400 rounded-full" 
+                        style={{ animationDelay: `${i * 0.15}s` }} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : error ? (
-              <div className="text-center p-4 text-red-400 bg-red-900/20 rounded-lg border border-red-800/30">
-                Error loading chat
-              </div>
-            ) : (
-              <>
-                {/* Use our filtered combined history and pending messages */}
-                {messagesToDisplay.map((message, i) => {
-                  // Determine which key to use based on message source
-                  const messageKey = message.source === 'history' 
-                    ? `history-${message.index}` 
-                    : `pending-${message.id || message.index}`;
+              ) : error ? (
+                <div className="text-center p-4 text-red-400 bg-red-900/20 rounded-lg border border-red-800/30">
+                  Error loading chat
+                </div>
+              ) : (
+                <>
+                  {/* Use our filtered combined history and pending messages */}
+                  {messagesToDisplay.map((message, i) => {
+                    // Determine which key to use based on message source
+                    const messageKey = message.source === 'history' 
+                      ? `history-${message.index}` 
+                      : `pending-${message.id || message.index}`;
+                    
+                    // Render missing field UI if needed
+                    if (message.isMissingFields && Array.isArray(message.missingFields)) {
+                      return renderMissingFieldsForm(message);
+                    }
+                    
+                    // Special rendering for external data loading indicators
+                    if (message.isExternalDataFetch && message.isLoadingMessage) {
+                      return (
+                        <motion.div
+                          key={messageKey}
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="external-data-loading-wrapper ml-5 mt-1"
+                        >
+                          <div className="external-data-loading px-4 py-3 rounded-lg text-white text-sm shadow-md bg-gradient-to-r from-[#2a3856] to-[#2c3e69] self-start border-t border-l border-purple-500/30 inline-flex gap-3 items-center">
+                            <RiMapPinLine className="text-purple-400 text-base" />
+                            <div className="flex items-center">
+                              <span className="mr-3">{message.message}</span>
+                              <div className="typing-dots flex">
+                                {[0, 1, 2].map((dot) => (
+                                  <motion.div
+                                    key={dot}
+                                    className="w-1.5 h-1.5 bg-purple-400/80 rounded-full mx-0.5"
+                                    animate={{
+                                      y: ["0%", "-50%", "0%"],
+                                      opacity: [0.6, 1, 0.6],
+                                      scale: [1, 1.2, 1],
+                                    }}
+                                    transition={{
+                                      duration: 0.8,
+                                      repeat: Infinity,
+                                      delay: dot * 0.2,
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    }
                   
-                  // Render missing field UI if needed
-                  if (message.isMissingFields && Array.isArray(message.missingFields)) {
-                    return renderMissingFieldsForm(message);
-                  }
-                  
-                  // Special rendering for external data loading indicators
-                  if (message.isExternalDataFetch && message.isLoadingMessage) {
-                    return (
-                      <motion.div
-                        key={messageKey}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="external-data-loading-wrapper ml-5 mt-1"
-                      >
-                        <div className="external-data-loading px-4 py-3 rounded-lg text-white text-sm shadow-md bg-gradient-to-r from-[#2a3856] to-[#2c3e69] self-start border-t border-l border-purple-500/30 inline-flex gap-3 items-center">
-                          <RiCompass3Fill className="text-purple-400 text-base" />
-                          <div className="flex items-center">
-                            <span className="mr-3">{message.message}</span>
+                    // Special rendering for generic typing indicators
+                    if (message.isGenericTyping) {
+                      return (
+                        <motion.div
+                          key={messageKey}
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="typing-indicator-wrapper ml-5 mt-1"
+                        >
+                          <div className="typing-indicator px-3 py-2 rounded-lg text-white text-sm shadow-md bg-gradient-to-r from-[#293348] to-[#2d3346] self-start border-t border-l border-blue-500/20 inline-flex gap-2 items-center">
+                            <RiCompassDiscoverLine className="text-blue-400 text-sm" />
                             <div className="typing-dots flex">
                               {[0, 1, 2].map((dot) => (
                                 <motion.div
                                   key={dot}
-                                  className="w-1.5 h-1.5 bg-purple-400/80 rounded-full mx-0.5"
+                                  className="w-1.5 h-1.5 bg-blue-400/80 rounded-full mx-0.5"
                                   animate={{
-                                    y: ["0%", "-50%", "0%"],
+                                    y: ["0%", "-40%", "0%"],
                                     opacity: [0.6, 1, 0.6],
-                                    scale: [1, 1.2, 1],
                                   }}
                                   transition={{
-                                    duration: 0.8,
+                                    duration: 0.6,
                                     repeat: Infinity,
                                     delay: dot * 0.2,
                                   }}
@@ -967,190 +1064,158 @@ const ChatPage = () => {
                               ))}
                             </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    );
-                  }
-                
-                  // Special rendering for generic typing indicators
-                  if (message.isGenericTyping) {
+                        </motion.div>
+                      );
+                    }
+                  
+                    // Regular message rendering
                     return (
-                      <motion.div
-                        key={messageKey}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="typing-indicator-wrapper ml-5 mt-1"
-                      >
-                        <div className="typing-indicator px-3 py-2 rounded-lg text-white text-sm shadow-md bg-gradient-to-r from-[#293348] to-[#2d3346] self-start border-t border-l border-blue-500/20 inline-flex gap-2 items-center">
-                          <RiCompass3Fill className="text-blue-400 text-sm" />
-                          <div className="typing-dots flex">
-                            {[0, 1, 2].map((dot) => (
-                              <motion.div
-                                key={dot}
-                                className="w-1.5 h-1.5 bg-blue-400/80 rounded-full mx-0.5"
-                                animate={{
-                                  y: ["0%", "-40%", "0%"],
-                                  opacity: [0.6, 1, 0.6],
-                                }}
-                                transition={{
-                                  duration: 0.6,
-                                  repeat: Infinity,
-                                  delay: dot * 0.2,
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  }
-                
-                  // Regular message rendering
-                  return (
-                    <React.Fragment key={messageKey}>
-                      <motion.div
-                        initial={{ 
-                          opacity: message.source === 'pending' && !message.isDisplayStable ? 0 : 0.8, 
-                          y: message.source === 'pending' && !message.isDisplayStable ? 15 : 0,
-                          scale: message.source === 'pending' && !message.isDisplayStable ? 0.98 : 1
-                        }}
-                        animate={{ 
-                          opacity: 1, 
-                          y: 0,
-                          scale: 1,
-                          ...(message.isTransitioning ? { opacity: [1, 0.7] } : {})
-                        }}
-                        transition={{ 
-                          duration: message.source === 'pending' && !message.isDisplayStable ? 0.4 : 0.3,
-                          ease: "easeOut",
-                          opacity: { duration: 0.4 },
-                          y: { type: "spring", stiffness: 120, damping: 14 }
-                        }}
-                        className={`px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 ${
-                          message.role === "user"
-                            ? "bg-gradient-to-r from-blue-600/30 to-blue-500/20 text-[#f9f9f9] self-end flex-row-reverse border-t border-r border-blue-500/20"
-                            : message.isSystemMessage
-                              ? "bg-gradient-to-r from-[#2a3856] to-[#2c3e69] self-start border-t border-l border-blue-400/30"
-                                : message.isLoadingMessage
-                                  ? "bg-gradient-to-r from-[#2a2d3c] to-[#2a3856] self-start border-t border-l border-blue-400/20"
-                                : message.isTransitioning
-                                  ? "bg-gradient-to-r from-[#2a2d3c] to-[#2a3046] self-start border-t border-l border-gray-700/30"
-                              : "bg-gradient-to-r from-[#2a2d3c] to-[#30324a] self-start border-t border-l border-gray-700/30 hover:shadow-lg hover:border-gray-700/50 transition-all duration-200"
-                        }`}
-                      >
-                        {message.role === "user" ? (
-                          <div className="message-header">
-                            <motion.div 
-                              className="bg-blue-500/30 p-1 rounded-full"
-                              initial={{ scale: 0.9 }}
-                              animate={{ scale: 1 }}
-                              transition={{ duration: 0.3 }}
-                            >
-                              <RiUser3Fill className="text-white text-xs" />
-                            </motion.div>
-                          </div>
-                        ) : (
-                          <div className="message-header">
-                            <motion.div 
-                              className="ai-avatar-container"
-                              initial={{ scale: 0.9, rotate: -10 }}
-                              animate={{ scale: 1, rotate: 0 }}
-                              transition={{ duration: 0.3, type: "spring" }}
-                            >
-                              <RiCompass3Fill className={`${
-                                message.isSystemMessage 
-                                  ? "text-blue-300" 
+                      <React.Fragment key={messageKey}>
+                        <motion.div
+                          initial={{ 
+                            opacity: message.source === 'pending' && !message.isDisplayStable ? 0 : 0.8, 
+                            y: message.source === 'pending' && !message.isDisplayStable ? 15 : 0,
+                            scale: message.source === 'pending' && !message.isDisplayStable ? 0.98 : 1
+                          }}
+                          animate={{ 
+                            opacity: 1, 
+                            y: 0,
+                            scale: 1,
+                            ...(message.isTransitioning ? { opacity: [1, 0.7] } : {})
+                          }}
+                          transition={{ 
+                            duration: message.source === 'pending' && !message.isDisplayStable ? 0.4 : 0.3,
+                            ease: "easeOut",
+                            opacity: { duration: 0.4 },
+                            y: { type: "spring", stiffness: 120, damping: 14 }
+                          }}
+                          className={`px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 ${
+                            message.role === "user"
+                              ? "bg-gradient-to-r from-blue-600/30 to-blue-500/20 text-[#f9f9f9] self-end flex-row-reverse border-t border-r border-blue-500/20"
+                              : message.isSystemMessage
+                                ? "bg-gradient-to-r from-[#2a3856] to-[#2c3e69] self-start border-t border-l border-blue-400/30"
                                   : message.isLoadingMessage
-                                    ? "text-blue-400 animate-pulse"
-                                    : message.isTransitioning
-                                      ? "text-blue-400"
-                                      : "text-blue-400"
-                              } text-sm`} />
-                            </motion.div>
-                          </div>
-                        )}
-                        
-                        <div className="message-content overflow-wrap-break-word" style={{ maxWidth: "calc(100% - 30px)" }}>
-                          {message.img && (
-                            <motion.div 
-                              className="image-container mb-2"
-                              initial={{ opacity: 0, y: 5 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.4, delay: 0.2 }}
-                            >
-                              <IKImage
-                                urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
-                                path={message.img}
-                                width="100%"
-                                height="auto"
-                                transformation={[{ width: 300 }]}
-                                loading="lazy"
-                                lqip={{ active: true, quality: 20 }}
-                                className="message-image rounded-lg shadow hover:shadow-md transition-all duration-200"
-                              />
-                            </motion.div>
+                                    ? "bg-gradient-to-r from-[#2a2d3c] to-[#2a3856] self-start border-t border-l border-blue-400/20"
+                                  : message.isTransitioning
+                                    ? "bg-gradient-to-r from-[#2a2d3c] to-[#2a3046] self-start border-t border-l border-gray-700/30"
+                                : "bg-gradient-to-r from-[#2a2d3c] to-[#30324a] self-start border-t border-l border-gray-700/30 hover:shadow-lg hover:border-gray-700/50 transition-all duration-200"
+                          }`}
+                        >
+                          {message.role === "user" ? (
+                            <div className="message-header">
+                              <motion.div 
+                                className="bg-blue-500/30 p-1 rounded-full"
+                                initial={{ scale: 0.9 }}
+                                animate={{ scale: 1 }}
+                                transition={{ duration: 0.3 }}
+                              >
+                                <RiUser3Fill className="text-white text-xs" />
+                              </motion.div>
+                            </div>
+                          ) : (
+                            <div className="message-header">
+                              <motion.div 
+                                className="ai-avatar-container"
+                                initial={{ scale: 0.9, rotate: -10 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                transition={{ duration: 0.3, type: "spring" }}
+                              >
+                                {message.isSystemMessage ? (
+                                  <RiPlaneLine className="text-blue-300 text-sm" />
+                                ) : message.isLoadingMessage ? (
+                                  <RiMapPinLine className="text-blue-400 animate-pulse text-sm" />
+                                ) : message.isTransitioning ? (
+                                  <RiCompassDiscoverLine className="text-blue-400 text-sm" />
+                                ) : (
+                                  <RiCompassDiscoverLine className="text-blue-400 text-sm" />
+                                )}
+                              </motion.div>
+                            </div>
                           )}
-                          <Markdown>{message.displayMessage || message.message || (message.parts && message.parts[0]?.text) || ''}</Markdown>
+                          
+                          <div className="message-content overflow-wrap-break-word" style={{ maxWidth: "calc(100% - 30px)" }}>
+                            {message.img && (
+                              <motion.div 
+                                className="image-container mb-2"
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, delay: 0.2 }}
+                              >
+                                <IKImage
+                                  urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
+                                  path={message.img}
+                                  width="100%"
+                                  height="auto"
+                                  transformation={[{ width: 300 }]}
+                                  loading="lazy"
+                                  lqip={{ active: true, quality: 20 }}
+                                  className="message-image rounded-lg shadow hover:shadow-md transition-all duration-200"
+                                />
+                              </motion.div>
+                            )}
+                            {message.isTripSummary ? 
+                              <TripSummaryView message={message.displayMessage || message.message || (message.parts && message.parts[0]?.text) || ''} /> :
+                              <Markdown>{message.displayMessage || message.message || (message.parts && message.parts[0]?.text) || ''}</Markdown>
+                            }
+                          </div>
+                        </motion.div>
+                        
+                        {/* Show state indicator right after user message */}
+                        {message.role === "user" && 
+                         i === messagesToDisplay.findIndex(m => m.role === "user" && m.id === message.id) && 
+                         (isTyping || 
+                          conversationState === CONVERSATION_STATES.ANALYZING_INPUT ||
+                          conversationState === CONVERSATION_STATES.FETCHING_EXTERNAL_DATA ||
+                          parallelDataFetch?.inProgress) && 
+                         renderStateIndicator()}
+                      </React.Fragment>
+                    );
+                  })}
+                  
+                  {/* Show itinerary generation indicator */}
+                  {isGeneratingItinerary && (
+                    <div className="px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md bg-gradient-to-r from-[#2a2d3c] to-[#30324a] self-start border-t border-l border-gray-700/30 flex gap-3">
+                      <div className="message-header">
+                        <div className="ai-avatar-container">
+                          <RiCompassDiscoverLine className="text-blue-400 text-sm" />
                         </div>
-                      </motion.div>
-                      
-                      {/* Show state indicator right after user message */}
-                      {message.role === "user" && 
-                       i === messagesToDisplay.findIndex(m => m.role === "user" && m.id === message.id) && 
-                       (isTyping || 
-                        conversationState === CONVERSATION_STATES.ANALYZING_INPUT ||
-                        conversationState === CONVERSATION_STATES.FETCHING_EXTERNAL_DATA ||
-                        parallelDataFetch?.inProgress) && 
-                       renderStateIndicator()}
-                    </React.Fragment>
-                  );
-                })}
-                
-                {/* Show itinerary generation indicator */}
-                {isGeneratingItinerary && (
-                  <div className="px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md bg-gradient-to-r from-[#2a2d3c] to-[#30324a] self-start border-t border-l border-gray-700/30 flex gap-3">
-                    <div className="message-header">
-                      <div className="ai-avatar-container">
-                        <RiCompass3Fill className="text-blue-400 text-sm" />
+                      </div>
+                      <div className="typing-indicator-content flex items-center">
+                        <span className="typing-text mr-2">Generating your itinerary</span>
+                        <div className="typing-dots flex">
+                          {[0, 1, 2].map((dot) => (
+                            <motion.div
+                              key={dot}
+                              className="w-1.5 h-1.5 bg-blue-400 rounded-full mx-0.5"
+                              animate={{
+                                y: ["0%", "-40%", "0%"],
+                                opacity: [0.6, 1, 0.6],
+                                scale: [1, 1.2, 1],
+                              }}
+                              transition={{
+                                duration: 0.6,
+                                repeat: Infinity,
+                                delay: dot * 0.2,
+                                ease: "easeInOut",
+                              }}
+                            />
+                          ))}
+                        </div>
                       </div>
                     </div>
-                    <div className="typing-indicator-content flex items-center">
-                      <span className="typing-text mr-2">Generating your itinerary</span>
-                      <div className="typing-dots flex">
-                        {[0, 1, 2].map((dot) => (
-                          <motion.div
-                            key={dot}
-                            className="w-1.5 h-1.5 bg-blue-400 rounded-full mx-0.5"
-                            animate={{
-                              y: ["0%", "-40%", "0%"],
-                              opacity: [0.6, 1, 0.6],
-                              scale: [1, 1.2, 1],
-                            }}
-                            transition={{
-                              duration: 0.6,
-                              repeat: Infinity,
-                              delay: dot * 0.2,
-                              ease: "easeInOut",
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+                  )}
+                </>
+              )}
+            </div>
           </div>
+          
+          {/* Input Component */}
+          {data && (
+            <div className="sticky bottom-0 z-20 flex-shrink-0 mt-auto w-full chat-input-container">
+              <NewPromt data={data} />
+            </div>
+          )}
         </div>
-        
-        {/* Input Component */}
-        {data && (
-          <div className="sticky bottom-0 z-20 flex-shrink-0 mt-auto w-full">
-            <NewPromt data={data} />
-          </div>
-        )}
       </div>
     </div>
   );

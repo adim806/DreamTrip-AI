@@ -3,184 +3,57 @@
  */
 
 /**
- * Extracts structured JSON data from AI responses
- * @param {string} aiResponse - The raw AI response text
- * @returns {Object} - The parsed JSON data and formatted response
+ * Extracts structured data from AI response text
+ * @param {string} responseText - The raw response from the AI
+ * @returns {Object} - Extracted structured data or null
  */
-export const extractStructuredDataFromResponse = (aiResponse) => {
-  if (!aiResponse) {
-    return {
-      success: false,
-      formattedResponse: "No response received",
-      data: null,
-    };
-  }
+export const extractStructuredDataFromResponse = (responseText) => {
+  if (!responseText) return { success: false };
 
   try {
-    // Find JSON object within the response using regex
-    const jsonMatch = aiResponse.match(/{[\s\S]*}/);
+    // Try to find JSON content within the response
+    const jsonMatch =
+      responseText.match(/```json\s*([\s\S]*?)\s*```/) ||
+      responseText.match(/\{[\s\S]*\}/);
+
     if (jsonMatch) {
-      try {
-        // Attempt to parse the matched JSON
-        let jsonString = jsonMatch[0];
-        let jsonObject;
+      // Extract the JSON string
+      const jsonStr = jsonMatch[1] || jsonMatch[0];
 
-        try {
-          // First clean attempt
-          jsonObject = JSON.parse(jsonString);
-        } catch (initialError) {
-          console.warn("Initial JSON parse failed:", initialError.message);
+      // Parse the JSON
+      const data = JSON.parse(jsonStr);
 
-          // Try to repair common JSON parsing errors
-          const errorPosition = initialError.message.match(/position (\d+)/);
-          if (errorPosition && errorPosition[1]) {
-            const pos = parseInt(errorPosition[1]);
-            console.log(`Attempting to repair JSON at position ${pos}`);
-
-            // Log a snippet of the problematic area
-            const start = Math.max(0, pos - 20);
-            const end = Math.min(jsonString.length, pos + 20);
-            console.log(
-              `JSON issue area: "${jsonString.substring(start, end)}"`
-            );
-
-            // Fix common syntax errors
-            jsonString = jsonString
-              // Fix trailing commas in objects and arrays
-              .replace(/,\s*}/g, "}")
-              .replace(/,\s*\]/g, "]")
-              // Fix missing quotes around property names
-              .replace(/([{,]\s*)([a-zA-Z0-9_$]+)(\s*:)/g, '$1"$2"$3')
-              // Fix unquoted property values
-              .replace(/:(\s*)([a-zA-Z0-9_$]+)(\s*[,}])/g, ':"$2"$3')
-              // Fix single quotes to double quotes for properties
-              .replace(/([{,]\s*)'([^']+)'(\s*:)/g, '$1"$2"$3')
-              // Fix single quotes to double quotes for values
-              .replace(/(\s*:\s*)'([^']+)'(\s*[,}])/g, '$1"$2"$3');
-
-            try {
-              // Try parsing the repaired JSON
-              jsonObject = JSON.parse(jsonString);
-              console.log("JSON repair successful!");
-            } catch (repairError) {
-              console.error("JSON repair failed:", repairError.message);
-              // Last resort: use a more lenient JSON5 parse approach or throw the original error
-              throw initialError;
-            }
-          } else {
-            throw initialError;
-          }
-        }
-
-        // Ensure meta field exists with default values if not provided
-        if (!jsonObject.meta) {
-          jsonObject.meta = {
-            modelManagedFields: [],
-            hasNewTripData: false,
-            hasNewAdviceData: false,
-            mergedFields: [],
-          };
-        } else {
-          // Make sure hasNewAdviceData exists
-          if (jsonObject.meta.hasNewAdviceData === undefined) {
-            jsonObject.meta.hasNewAdviceData = false;
-          }
-          // Ensure all meta fields exist
-          jsonObject.meta.modelManagedFields =
-            jsonObject.meta.modelManagedFields || [];
-          jsonObject.meta.hasNewTripData =
-            jsonObject.meta.hasNewTripData === true;
-          jsonObject.meta.mergedFields = jsonObject.meta.mergedFields || [];
-        }
-
-        // Ensure collectedData field exists
-        if (!jsonObject.collectedData) {
-          jsonObject.collectedData = jsonObject.data
-            ? { ...jsonObject.data }
-            : {};
-        }
-
-        // Ensure rules field exists with default values
-        if (!jsonObject.rules) {
-          jsonObject.rules = {
-            preserve_context: true,
-            merge_user_data: true,
-            require_all_fields_before_confirmation: true,
-          };
-        }
-
-        // Ensure missingFields is an array
-        if (!jsonObject.missingFields) {
-          jsonObject.missingFields = [];
-        } else if (!Array.isArray(jsonObject.missingFields)) {
-          if (typeof jsonObject.missingFields === "string") {
-            jsonObject.missingFields = jsonObject.missingFields
-              .split(",")
-              .map((f) => f.trim());
-          } else {
-            jsonObject.missingFields = [];
-          }
-        }
-
-        // Validate and normalize critical fields
-        if (!jsonObject.intent) {
-          jsonObject.intent = "General-Query";
-        }
-
-        if (!jsonObject.mode) {
-          jsonObject.mode = jsonObject.intent.includes("Trip")
-            ? "Trip-Building"
-            : "Advice";
-        }
-
-        if (!jsonObject.status) {
-          jsonObject.status =
-            jsonObject.missingFields.length > 0 ? "Incomplete" : "Complete";
-        }
-
-        // Validate next_state based on intent
-        if (
-          intentRequiresExternalData(jsonObject.intent) &&
-          !jsonObject.next_state
-        ) {
-          jsonObject.next_state = "FETCHING_EXTERNAL_DATA";
-          jsonObject.requires_external_data = true;
-          jsonObject.next_action = "fetch_external_data";
-        }
+      // Ensure we're extracting the response field if it exists
+      if (data.response) {
+        // Create a formatted response that only includes the response field
+        const formattedResponse = data.response;
 
         return {
           success: true,
-          formattedResponse: jsonObject.response || aiResponse,
-          data: jsonObject,
-        };
-      } catch (parseError) {
-        console.error("Failed to parse JSON from response:", parseError);
-
-        // Return detailed error information
-        return {
-          success: false,
-          formattedResponse: aiResponse,
-          data: null,
-          parseError: {
-            message: parseError.message,
-            jsonFragment: jsonMatch[0].substring(0, 100) + "...",
-          },
+          data,
+          formattedResponse,
+          rawResponse: responseText,
         };
       }
+
+      return {
+        success: true,
+        data,
+        rawResponse: responseText,
+      };
     }
 
-    // If JSON extraction fails, return the original response
+    // If no JSON found, return the original text
     return {
       success: false,
-      formattedResponse: aiResponse,
-      data: null,
+      rawResponse: responseText,
     };
   } catch (error) {
-    console.error("Error processing AI response:", error);
+    console.error("Error extracting structured data:", error);
     return {
       success: false,
-      formattedResponse: aiResponse,
-      data: null,
+      error: error.message,
+      rawResponse: responseText,
     };
   }
 };
@@ -201,7 +74,12 @@ export const getInitialSystemInstruction = () => {
     - Extract structured data based on intent
     - Maintain context between messages
     - Generate natural language responses
-    
+    - For any advice-mode query (mode="Advice") where the user's input is general but meaningful (e.g., “what are the destinations i should see in spain” or “Where should I go in Japan?”), the assistant must provide a detailed and informative response — even if optional or intent-specific fields are missing.
+      - The response should:
+      - Contain useful travel content based on the user's known information (such as location, intent).
+      - Include structured recommendations like cities, landmarks, travel tips, or lists, depending on the intent type.
+      - Always default to helpfulness rather than requesting unnecessary clarification when a complete and valuable answer can be given.
+
     ### State Machine:
     - IDLE: Initial state waiting for user input
     - ANALYZING_INPUT: Processing user query to determine intent
@@ -227,11 +105,24 @@ export const getInitialSystemInstruction = () => {
     - provide_advice: Give travel advice or recommendations
     - ask_missing_fields: Ask for specific missing fields in a natural way
     
-    ### Intent Categories:
+    ### Mode Categories:
     - Trip-Building: Intents related to planning a trip (Build-Trip, Modify-Trip, etc.)
     - Advice: Intents asking for specific information (Capabilities-Inquiry, Help-Request, Weather-Request, Find-Hotel, etc.)
-    - Interactive: Intents for managing the conversation (Confirmation, Greeting, Thanks)
-    
+   
+    ### General Advice Handling Rules
+
+    When mode="Advice" and the user provides a high-level or general question that relates to travel recommendations, and there is at least one valid field such as "location", the assistant should:
+
+    - Respond with a rich and professional travel summary.
+    - Include structured bullet points or categorized tips where appropriate (e.g., cities, attractions, transport, food).
+    - Treat the response as status="Complete" even if fields like "topic", "duration", or "preferences" are not given.
+    - Avoid unnecessary follow-up questions if the question can be meaningfully answered using known context.
+    - Include a followUpQuestion only if it helps the user dive deeper or personalize further (e.g., “Would you like tips on food, nature, or culture?”).
+    - For all intents under "Advice", if the user's input can be reasonably answered with general knowledge (based on location or type), provide a meaningful and helpful response in the response field.
+    - In all Advice responses, add "highlightedPlaces" under "meta" as a list of locations referenced in the response (e.g., cities or landmarks) to support map rendering and visual components.
+
+    The assistant should behave as a knowledgeable travel agent and always prioritize helping the user with real, usable travel advice, not just asking for missing fields.
+
     ### Valid Intent Types:
     - Build-Trip: User wants to plan a new trip
     - Modify-Trip: User wants to change trip details
@@ -306,12 +197,11 @@ export const getInitialSystemInstruction = () => {
       },
       "Travel-Tips": {
         "required": ["location"],
-        "optional": ["topic", "duration"]
       }
     }
     
     When asking for missing fields, create a natural follow-up question focused on the most important missing field. Make the question specific but conversational, providing context where helpful. For example, rather than just asking "What's the location?", ask "Which city are you looking to find hotels in?".
-    
+
     When handling intents that require budget level information (like Find-Hotel), please specifically ask for one of three options: "cheap", "moderate", or "luxury".
     
     ### State Transition Rules:
@@ -329,6 +219,9 @@ export const getInitialSystemInstruction = () => {
     - Track missing fields and request them
     - Only transition to next_state="AWAITING_USER_TRIP_CONFIRMATION" when ALL required fields are present
     - Maintain previous information while adding new data
+    - IMPORTANT: When asking for date information, ALWAYS also ask for budget information in the same response
+    - When detecting a location and duration but no dates or budget, include both date and budget in missingFields
+    - Required fields for trip building are: vacation_location, duration, dates, and budget
     
     #### AWAITING_USER_TRIP_CONFIRMATION:
     - Detect if user is confirming, editing, or canceling
@@ -505,6 +398,7 @@ export const getInitialSystemInstruction = () => {
         "modelManagedFields": string[],   // Fields explicitly managed by model
         "hasNewTripData": boolean,        // Whether new trip data was detected
         "hasNewAdviceData": boolean,      // Whether new advice data was detected
+        "highlightedPlaces": string[],     // List of locations referenced in the response
         "mergedFields": string[]          // Fields that were updated
       }
     }

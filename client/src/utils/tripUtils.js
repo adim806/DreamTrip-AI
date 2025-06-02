@@ -91,15 +91,38 @@ export const validateTripCompletion = (tripDetails, options = {}) => {
   }
 
   // בדיקת תאריכי החופשה - הבדיקה המורכבת ביותר
-  const datesValid =
-    tripDetails.dates &&
-    ((tripDetails.dates.from && tripDetails.dates.to) ||
+  let datesValid = false;
+
+  // Check if dates is a string with 'to' format
+  if (
+    typeof tripDetails.dates === "string" &&
+    tripDetails.dates.includes(" to ")
+  ) {
+    datesValid = true;
+    console.log("[Validation] Found valid date string:", tripDetails.dates);
+  }
+  // Check if dates is an object with from/to properties
+  else if (tripDetails.dates && typeof tripDetails.dates === "object") {
+    datesValid =
+      (tripDetails.dates.from && tripDetails.dates.to) ||
       (tripDetails.dates.from && tripDetails.isTomorrow) ||
-      (tripDetails.dates.from && tripDetails.duration));
+      (tripDetails.dates.from && tripDetails.duration);
+    console.log("[Validation] Checking dates object validity:", datesValid);
+  }
+  // Special case when dates came from a form or message
+  else if (
+    tripDetails.dates === "from form" ||
+    (typeof tripDetails.dates === "string" &&
+      tripDetails.dates.match(/\d{4}-\d{2}-\d{2}/))
+  ) {
+    datesValid = true;
+    console.log("[Validation] Found valid date marker:", tripDetails.dates);
+  }
 
   if (!datesValid) {
     missingFields.push("dates");
     validatedFields.dates = false;
+    console.log("[Validation] Dates not valid:", tripDetails.dates);
   } else {
     validatedFields.dates = true;
   }
@@ -107,7 +130,8 @@ export const validateTripCompletion = (tripDetails, options = {}) => {
   // בדיקת תקציב - יכול להיות במספר מקומות במבנה הנתונים
   const hasBudget =
     (tripDetails.constraints && tripDetails.constraints.budget) ||
-    tripDetails.budget;
+    tripDetails.budget ||
+    tripDetails.budget_level;
 
   if (!hasBudget) {
     missingFields.push("budget");
@@ -194,74 +218,66 @@ export const generateFollowUpQuestion = (missingFields) => {
     return null;
   }
 
-  // Prioritize the most important missing field for the follow-up
-  const priorityField = missingFields[0];
-
-  const questions = {
-    vacation_location: "Where would you like to travel to?",
-    duration: "How many days are you planning to travel?",
-    dates: "When are you planning to travel? I need the start and end dates.",
-    budget: "What's your budget for this trip?",
-    travel_type:
-      "What type of travel are you interested in? (Adventure, Relaxation, Cultural, etc.)",
-    hotel_preferences: "Do you have any preferences for accommodation?",
-    preferred_activity:
-      "What kind of activities do you enjoy during your trips?",
-    special_requirements:
-      "Do you have any special requirements or preferences for your trip?",
-  };
-
-  return (
-    questions[priorityField] ||
-    "Could you provide more details about your trip?"
-  );
+  // Return empty string instead of static question to avoid duplicates
+  // The AI response already contains appropriate follow-up questions
+  return "";
 };
 
 /**
- * Formats a trip summary for display
- * Enhanced with icons and better visual formatting
- * @param {Object} tripDetails - The trip details to format
- * @returns {string} - Formatted trip summary
+ * Create a compact, formatted summary of trip details for display
+ * @param {Object} tripDetails - The trip details object
+ * @returns {string} - A formatted string representation of the trip summary
  */
-export const formatTripSummary = (tripDetails) => {
-  if (!tripDetails) {
-    return "No trip details available.";
-  }
+export const formatTripSummary = (tripDetails = {}) => {
+  if (!tripDetails) return "Trip details not available.";
 
-  // Function to format date in a more readable format
-  const formatDate = (dateString) => {
+  // Helper function to format dates in a nice way
+  const formatDate = (dateStr) => {
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString(undefined, {
-        weekday: "short",
+      const date = new Date(dateStr);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
         month: "short",
         day: "numeric",
-        year: "numeric",
       });
     } catch (e) {
-      return dateString || "Not specified";
+      return dateStr;
     }
   };
 
-  // Get trip budget from either constraints or direct budget property
-  const budget =
-    tripDetails.constraints?.budget || tripDetails.budget || "Not specified";
+  // Get the budget from constraints or directly from tripDetails
+  let formattedBudget = "Not specified";
+  if (tripDetails.constraints && tripDetails.constraints.budget) {
+    formattedBudget = tripDetails.constraints.budget;
+  } else if (tripDetails.budget) {
+    formattedBudget = tripDetails.budget;
+  } else if (tripDetails.budget_level) {
+    formattedBudget = tripDetails.budget_level;
+  }
 
-  // Format budget to be more readable
-  const formattedBudget =
-    typeof budget === "number"
-      ? new Intl.NumberFormat(undefined, {
-          style: "currency",
-          currency: "USD",
-        }).format(budget)
-      : budget;
+  // Format travelers info
+  const travelers = tripDetails.travelers
+    ? `${tripDetails.travelers}`
+    : `1 person`;
 
-  // Get travelers information with default to 1
-  const travelers = tripDetails.travelers || 1;
+  // Format the destination without duplicate country references
+  let destination =
+    tripDetails.vacation_location || "Destination not specified";
 
-  // Create a more compact summary with just the essentials
-  const location = tripDetails.vacation_location || "Destination not specified";
-  const country = tripDetails.country ? `, ${tripDetails.country}` : "";
+  // If vacation_location already has country information, don't add it again
+  const hasCountryInDestination = destination
+    .toLowerCase()
+    .includes((tripDetails.country || "").toLowerCase());
+
+  // Only add country if it exists and isn't already part of the destination
+  const country =
+    tripDetails.country && !hasCountryInDestination
+      ? `, ${tripDetails.country}`
+      : "";
+
+  const location = `${destination}${country}`;
+
+  // Format duration
   const duration = tripDetails.duration
     ? `${tripDetails.duration} days`
     : "Duration not specified";
@@ -282,43 +298,27 @@ export const formatTripSummary = (tripDetails) => {
     dateInfo = `Starting tomorrow (${formatDate(tomorrow)})`;
   }
 
-  // Create a compact display of preferences if available
+  // Create a compact version of preferences if important
   let preferencesList = "";
   if (tripDetails.preferences) {
-    const prefs = [];
-    Object.entries(tripDetails.preferences).forEach(([key, value]) => {
-      if (value && key !== "budget") {
-        prefs.push(`${key}: ${value}`);
-      }
-    });
+    const importantPrefs = [];
+    // Only include the most relevant preferences
+    if (tripDetails.preferences.accommodation_type) {
+      importantPrefs.push(
+        `Stay: ${tripDetails.preferences.accommodation_type}`
+      );
+    }
+    if (tripDetails.preferences.transportation_mode) {
+      importantPrefs.push(
+        `Transport: ${tripDetails.preferences.transportation_mode}`
+      );
+    }
 
-    if (prefs.length > 0) {
-      preferencesList = "\n**Preferences:** " + prefs.join(", ");
+    if (importantPrefs.length > 0) {
+      preferencesList = `\n${importantPrefs.join(" | ")}`;
     }
   }
 
-  // Create compact version of constraints if available (excluding budget)
-  let constraintsList = "";
-  if (tripDetails.constraints) {
-    const constraints = [];
-    Object.entries(tripDetails.constraints).forEach(([key, value]) => {
-      if (value && key !== "budget") {
-        constraints.push(`${key}: ${value}`);
-      }
-    });
-
-    if (constraints.length > 0) {
-      constraintsList = "\n**Constraints:** " + constraints.join(", ");
-    }
-  }
-
-  // Return a clean, compact trip summary
-  return `### 🧳 Trip Summary
-**Destination:** ${location}${country}
-**Duration:** ${duration}
-**Dates:** ${dateInfo}
-**Budget:** ${formattedBudget}
-**Travelers:** ${travelers}${preferencesList}${constraintsList}
-
-Does this look correct? I'll create your travel itinerary based on these details.`;
+  // Return a clean, compact trip summary without the large heading
+  return `🧳 Trip to ${location}\n• ${duration}, ${dateInfo}\n• Budget: ${formattedBudget}\n• Travelers: ${travelers}${preferencesList}`;
 };
