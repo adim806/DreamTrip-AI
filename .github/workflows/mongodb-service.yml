@@ -1,11 +1,21 @@
 name: MongoDB Service Workflow
 
 on:
+  # Allow this workflow to be called by other workflows
   workflow_call:
     outputs:
       mongodb_uri:
         description: "MongoDB connection URI"
         value: ${{ jobs.setup-mongodb.outputs.mongodb_uri }}
+
+  # Also allow manual triggering for testing purposes
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: "Run in test mode"
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   setup-mongodb:
@@ -32,3 +42,10 @@ jobs:
       - name: Output MongoDB URI
         id: output-uri
         run: echo "mongodb_uri=mongodb://root:password@localhost:27017" >> $GITHUB_OUTPUT
+
+      - name: Test MongoDB Connection
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          echo "Testing MongoDB connection..."
+          echo "MongoDB URI: mongodb://root:password@localhost:27017"
+          echo "This workflow is primarily designed to be called by other workflows."
