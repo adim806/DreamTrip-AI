@@ -116,7 +116,7 @@ async function testHaifaWeather() {
 
     // Third request with slightly different case to check normalization
     console.log(
-      `\n${colors.yellow}THIRD REQUEST - DIFFERENT CASE:${colors.reset}`
+      `\n${colors.yellow}THIRD REQUEST -121 DIFFERENT CASE:${colors.reset}`
     );
     console.log(
       `${colors.yellow}======================================================${colors.reset}`
