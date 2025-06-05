@@ -1,0 +1,82 @@
+# NOTE: This deployment workflow is currently disabled as we're still in development phase.
+# Uncomment this file once we're ready for staging deployments.
+
+# name: Deploy to Staging
+#
+# on:
+#   workflow_run:
+#     workflows: ["CI"]
+#     branches: [main]
+#     types:
+#       - completed
+#
+# jobs:
+#   deploy-frontend:
+#     name: Deploy Frontend to Vercel (Staging)
+#     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v3
+#
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+#           cache: "npm"
+#           cache-dependency-path: "client/package-lock.json"
+#
+#       - name: Install dependencies
+#         working-directory: client
+#         run: npm ci
+#
+#       - name: Build frontend
+#         working-directory: client
+#         run: npm run build
+#
+#       - name: Deploy to Vercel
+#         uses: amondnet/vercel-action@v25
+#         with:
+#           vercel-token: ${{ secrets.VERCEL_TOKEN }}
+#           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+#           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_FRONTEND }}
+#           working-directory: client
+#           vercel-args: "--prod"
+#
+#   deploy-backend:
+#     name: Deploy Backend to Render (Staging)
+#     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v3
+#
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+#
+#       - name: Deploy to Render
+#         env:
+#           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+#           RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID_BACKEND }}
+#         run: |
+#           curl -X POST \
+#             -H "Authorization: Bearer $RENDER_API_KEY" \
+#             -H "Content-Type: application/json" \
+#             https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys
+#
+#   notify:
+#     name: Notify Deployment Status
+#     needs: [deploy-frontend, deploy-backend]
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Notify Success
+#         run: echo "Staging deployment completed successfully!"
+#       # Optionally add notification mechanisms like Slack, Discord, or email
+#       # - name: Slack Notification
+#       #   uses: rtCamp/action-slack-notify@v2
+#       #   env:
+#       #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+#       #     SLACK_CHANNEL: deployments
+#       #     SLACK_TITLE: Staging Deployment Complete

@@ -1,0 +1,119 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "client/**"
+      - "server/**"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: ["client", "server"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: "${{ matrix.app }}/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.app }}
+        run: npm ci
+
+      - name: Run lint
+        working-directory: ${{ matrix.app }}
+        run: npm run lint
+
+  test-client:
+    name: Test Client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: "client/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Run tests
+        working-directory: client
+        run: npm test
+
+  test-server:
+    name: Test Server
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: root
+          MONGO_INITDB_ROOT_PASSWORD: password
+        options: >-
+          --health-cmd mongosh --eval "db.adminCommand('ping')"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: "server/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run tests
+        working-directory: server
+        run: npm test
+        env:
+          MONGODB_URI: mongodb://root:password@localhost:27017
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: ["client", "server"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: "${{ matrix.app }}/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.app }}
+        run: npm ci
+
+      - name: Build
+        working-directory: ${{ matrix.app }}
+        run: npm run build
