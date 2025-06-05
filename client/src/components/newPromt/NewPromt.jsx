@@ -354,7 +354,7 @@ const NewPromt = ({ data }) => {
     // Set a flag to indicate generation has started
     window.__itineraryGenerationStarted = true;
     
-    console.log("Trip summary hidden, beginning itinerary generation");
+    console.log("Trip summary hidden, beginning itinerary generationnnnnnn");
     
     // Immediately transition to generating state to show proper UI
     transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
