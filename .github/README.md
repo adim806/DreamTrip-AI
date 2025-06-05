@@ -26,6 +26,7 @@ This directory contains the GitHub Actions workflows for the DreamTrip-AI monore
 - Manually triggered workflow with component selection (client/backend/both)
 - Validates code and generates development reports
 - Helpful for sprint reviews and code quality checks
+  -dam bro
 
 ### 5. Deployment Workflow (Currently Disabled)
 
