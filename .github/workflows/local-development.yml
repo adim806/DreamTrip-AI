@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       component:
-        description: "Component to check (client/server/both)"
+        description: "Component to check (client/backend/both)"
         required: true
         default: "both"
         type: choice
         options:
           - client
-          - server
+          - backend
           - both
 
 jobs:
@@ -34,8 +34,8 @@ jobs:
           npm run lint || echo "Linting issues found"
           npm run build || echo "Build failed"
 
-      - name: Setup MongoDB for server validation
-        if: ${{ github.event.inputs.component == 'server' || github.event.inputs.component == 'both' }}
+      - name: Setup MongoDB for backend validation
+        if: ${{ github.event.inputs.component == 'backend' || github.event.inputs.component == 'both' }}
         uses: supercharge/mongodb-github-action@v1.10.0
         with:
           mongodb-version: "6.0"
@@ -43,10 +43,10 @@ jobs:
           mongodb-password: password
           mongodb-db: dreamtrip
 
-      - name: Validate server
-        if: ${{ github.event.inputs.component == 'server' || github.event.inputs.component == 'both' }}
+      - name: Validate backend
+        if: ${{ github.event.inputs.component == 'backend' || github.event.inputs.component == 'both' }}
         run: |
-          cd server
+          cd backend
           npm ci
           npm run lint || echo "Linting issues found"
           npm test || echo "Tests failed"

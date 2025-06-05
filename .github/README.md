@@ -23,7 +23,7 @@ This directory contains the GitHub Actions workflows for the DreamTrip-AI monore
 
 ### 4. Local Development Helper (`workflows/local-development.yml`)
 
-- Manually triggered workflow with component selection (client/server/both)
+- Manually triggered workflow with component selection (client/backend/both)
 - Validates code and generates development reports
 - Helpful for sprint reviews and code quality checks
 
@@ -68,7 +68,7 @@ For future reference, the following secrets will need to be set in your GitHub r
 
 The Local Development Helper workflow can be triggered manually from the GitHub Actions tab and offers several benefits during development:
 
-1. **Component-specific validation**: Select which part of your application to validate (client, server, or both)
+1. **Component-specific validation**: Select which part of your application to validate (client, backend, or both)
 2. **Quick feedback**: Get linting, testing, and build validation without running the full CI pipeline
 3. **Development reports**: Automatically generates a repository structure report that's uploaded as an artifact
 4. **Sprint reviews**: Use this workflow before sprint reviews to ensure code quality
@@ -78,5 +78,5 @@ To run the workflow:
 1. Go to the "Actions" tab in your GitHub repository
 2. Select "Local Development Helper" from the workflows list
 3. Click "Run workflow"
-4. Choose the component you want to validate (client/server/both)
+4. Choose the component you want to validate (client/backend/both)
 5. Review results and download the development report if needed
