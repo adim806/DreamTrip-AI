@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { Canvas } from "@react-three/fiber";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import HomePage from "./routes/homepage/Homepage";
+
 import HomePage2 from "./routes/homepage2/Homepage2";
 import DashboardPage from "./routes/dashboardPage/DashboardPage";
 import ChatPage from "./routes/chatPage/ChatPage";
@@ -12,7 +12,7 @@ import RootLayout from "./layouts/rootLayout/RootLayout";
 import DashboardLayout from "./layouts/dashboardLayout/DashboardLayout";
 import "./index.css";
 import ViewTripData from "./routes/createTrip/ViewTripData";
-import logoo from "./logo-2.png";
+
 
 /**
  * Main entry point for the React application using Vite and React Router DOM.

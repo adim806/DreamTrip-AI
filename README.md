@@ -121,3 +121,179 @@ npm run dev
 1. קבלו מפתח API של Google AI (Gemini API)
 2. הוסיפו את המפתח לקובץ הסביבה כמתואר למעלה
 3. המערכת תשתמש במודל ה-RAG המיוחד באופן אוטומטי לעיבוד מידע חיצוני
+
+## Testing Documentation
+
+This project includes comprehensive testing setup for both client and server sides using Jest for unit tests and Cypress for E2E tests.
+
+### Client-side Testing
+
+#### Unit Tests with Jest
+
+The client-side unit tests use Jest with React Testing Library to test React components and utility functions.
+
+To run client-side unit tests:
+
+```bash
+cd client
+npm test                # Run all tests
+npm run test:watch      # Run tests in watch mode
+npm run test:coverage   # Run tests with coverage report
+```
+
+#### E2E Tests with Cypress
+
+End-to-end tests use Cypress to test the full application flow including frontend and backend integration.
+
+To run E2E tests:
+
+```bash
+cd client
+npm run cypress:open    # Open Cypress test runner
+npm run cypress:run     # Run Cypress tests headlessly
+npm run e2e            # Run E2E tests in CI mode
+```
+
+### Backend Testing
+
+The backend uses Jest with Supertest for API testing.
+
+To run backend tests:
+
+```bash
+cd backend
+npm test                # Run all tests
+npm run test:watch      # Run tests in watch mode
+npm run test:coverage   # Run tests with coverage report
+```
+
+### CI Integration
+
+The project includes GitHub Actions workflows that run all tests on push and pull requests:
+
+- Unit tests for client
+- Unit tests for backend (with MongoDB service)
+- E2E tests (running both client and backend servers)
+
+## Test Structure
+
+### Client Tests
+
+- Unit tests: `client/src/__tests__/`
+  - Component tests: `client/src/__tests__/components/`
+  - Utility tests: `client/src/__tests__/utils/`
+
+### E2E Tests
+
+- Cypress tests: `client/cypress/e2e/`
+- Cypress custom commands: `client/cypress/support/commands.js`
+
+### Backend Tests
+
+- API tests: `backend/__tests__/`
+- Utility tests: `backend/__tests__/utils.test.js`
+
+## Adding New Tests
+
+### Adding Client Unit Tests
+
+1. Create a new file in `client/src/__tests__/` with the naming pattern `*.test.jsx`
+2. Import React Testing Library and Jest
+3. Write your tests using the Jest syntax
+
+### Adding E2E Tests
+
+1. Create a new file in `client/cypress/e2e/` with the naming pattern `*.cy.js`
+2. Use Cypress commands to interact with your application
+3. Add custom commands in `client/cypress/support/commands.js` if needed
+
+### Adding Backend Tests
+
+1. Create a new file in `backend/__tests__/` with the naming pattern `*.test.js`
+2. Import Supertest for API testing
+3. Write your tests using the Jest syntax
+
+## בדיקות מקיפות למערכת
+
+פרויקט זה כולל מערך בדיקות מקיף עבור פונקציונליות מלאה בצד השרת והלקוח, הכולל הן בדיקות יחידה והן בדיקות End-to-End.
+
+### בדיקות יחידה בצד השרת (Backend)
+
+#### בדיקות רישום והתחברות משתמשים
+
+- בדיקת תהליך רישום משתמש מלא (`user-registration.test.js`)
+- בדיקת הצפנת סיסמאות באמצעות bcrypt
+- בדיקת תקינות נתוני משתמש וטיפול בשגיאות
+- בדיקת תהליך התחברות והנפקת טוקנים JWT (`user-auth.test.js`)
+- בדיקת אימות הרשאות משתמשים
+
+#### בדיקות מודל נתונים של טיול
+
+- בדיקות CRUD מלאות למודל הטיול (`trip-model.test.js`)
+- בדיקת תקינות שדות חובה בטיול
+- בדיקת לוגיקה עסקית כגון חישוב משך טיול ואימות תאריכים
+- בדיקת יחסים בין טיולים למשתמשים
+
+#### בדיקות אינטגרציה מלאות לתכנון טיול
+
+- בדיקת זרימת העבודה המלאה מתחילת תכנון ועד ליצירת טיול (`trip-planning-integration.test.js`)
+- אינטגרציה בין שירותי מזג אוויר, מלונות ואטרקציות
+- בדיקת טיפול בשגיאות במהלך תהליך תכנון הטיול
+
+### בדיקות End-to-End (Cypress)
+
+#### בדיקת תהליך תכנון טיול מקצה לקצה
+
+- בדיקת תהליך תכנון טיול מלא כולל כל השלבים (`trip-planning.cy.js`):
+  1. התחברות המשתמש
+  2. בחירת יעד וזמן
+  3. קבלת נתוני מזג אוויר
+  4. בחירת מלון מתאים
+  5. בחירת אטרקציות
+  6. סיכום וביצוע הזמנה
+- בדיקות טיפול בשגיאות ומצבי קיצון
+- בדיקת מצבי טעינה וריענון נתונים
+
+## איך להריץ את הבדיקות
+
+### הרצת בדיקות שרת (Backend)
+
+```bash
+cd backend
+npm test                     # הרצת כל הבדיקות
+npm test -- user-auth.test.js  # הרצת קובץ בדיקה ספציפי
+npm run test:coverage        # הרצת בדיקות עם דוח כיסוי
+```
+
+### הרצת בדיקות E2E
+
+```bash
+cd client
+npm run cypress:open         # פתיחת ממשק Cypress
+npm run cypress:run          # הרצת בדיקות Cypress ללא ממשק
+npm run e2e                  # הרצת כל בדיקות ה-E2E במצב CI
+```
+
+## מבנה הבדיקות
+
+```
+backend/
+  ├── __tests__/
+  │   ├── user-registration.test.js  # בדיקות רישום משתמש
+  │   ├── user-auth.test.js          # בדיקות אימות משתמש
+  │   ├── trip-model.test.js         # בדיקות מודל טיול
+  │   └── trip-planning-integration.test.js  # בדיקות אינטגרציה
+
+client/
+  ├── cypress/
+  │   ├── e2e/
+  │   │   ├── trip-planning.cy.js    # בדיקת זרימת תכנון טיול
+  │   │   └── ...
+  │   └── support/
+  │       ├── commands.js             # פקודות מותאמות אישית
+  │       └── ...
+  └── src/
+      └── __tests__/
+          └── components/
+              └── ...                 # בדיקות רכיבים
+```

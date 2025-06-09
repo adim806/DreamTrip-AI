@@ -2,114 +2,100 @@ name: CI
 
 on:
   push:
-    branches:
-      - "**"
-    paths:
-      - "client/**"
-      - "backend/**"
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        app: ["client", "backend"]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: "npm"
-          cache-dependency-path: "${{ matrix.app }}/package-lock.json"
-
-      - name: Install dependencies
-        working-directory: ${{ matrix.app }}
-        run: npm ci
-
-      - name: Run lint
-        working-directory: ${{ matrix.app }}
-        run: npm run lint || echo "Linting failed but continuing"
-
   test-client:
-    name: Test Client
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: "18"
           cache: "npm"
-          cache-dependency-path: "client/package-lock.json"
+          cache-dependency-path: client/package-lock.json
 
-      - name: Install dependencies
-        working-directory: client
+      - name: Install client dependencies
+        working-directory: ./client
         run: npm ci
 
-      - name: Run tests
-        working-directory: client
-        run: npm test || echo "No tests found"
+      - name: Run client linting
+        working-directory: ./client
+        run: npm run lint
+
+      - name: Run client unit tests
+        working-directory: ./client
+        run: npm test
 
   test-backend:
-    name: Test Backend
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
 
-      - name: Setup MongoDB
-        uses: supercharge/mongodb-github-action@v1.10.0
-        with:
-          mongodb-version: "6.0"
-          mongodb-port: 27017
-          mongodb-username: root
-          mongodb-password: password
-          mongodb-db: dreamtrip
+    services:
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+
+    steps:
+      - uses: actions/checkout@v3
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: "18"
           cache: "npm"
-          cache-dependency-path: "backend/package-lock.json"
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install dependencies
-        working-directory: backend
+      - name: Install backend dependencies
+        working-directory: ./backend
         run: npm ci
 
-      - name: Run tests
-        working-directory: backend
-        run: npm test || echo "No tests found"
+      - name: Run backend tests
+        working-directory: ./backend
+        run: npm test
         env:
-          MONGODB_URI: mongodb://root:password@localhost:27017/dreamtrip
+          MONGODB_URI: mongodb://localhost:27017/test
 
-  build:
-    name: Build
+  e2e-tests:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        app: ["client", "backend"]
+    needs: [test-client, test-backend]
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: "18"
           cache: "npm"
-          cache-dependency-path: "${{ matrix.app }}/package-lock.json"
+          cache-dependency-path: client/package-lock.json
 
-      - name: Install dependencies
-        working-directory: ${{ matrix.app }}
+      - name: Install client dependencies
+        working-directory: ./client
         run: npm ci
 
-      - name: Build
-        working-directory: ${{ matrix.app }}
-        run: npm run build || echo "Build failed but continuing"
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Start backend server
+        working-directory: ./backend
+        run: npm start &
+        env:
+          MONGODB_URI: mongodb://localhost:27017/test
+
+      - name: Start client server
+        working-directory: ./client
+        run: npm run dev &
+
+      - name: Wait for servers
+        run: sleep 10
+
+      - name: Run E2E tests
+        working-directory: ./client
+        run: npm run e2e
