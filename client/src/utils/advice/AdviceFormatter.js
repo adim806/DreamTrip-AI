@@ -5,7 +5,8 @@
  * Provides intent-specific formatting for various types of external data.
  */
 
-import { formatLocation } from "../core/LocationResolver";
+import { EXTERNAL_DATA_INTENTS, ADVICE_INTENTS } from "./AdviceFieldSchemas";
+import { formatLocation } from "../cityCountryMapper";
 
 /**
  * Main formatting function to convert external data to user-friendly text
@@ -62,8 +63,30 @@ export const formatAdviceResponse = (intent, data) => {
     case "Find-Restaurants":
       leadIn = ""; // No lead-in to keep it concise
       break;
+    case "Itinerary-Question":
+      leadIn = ""; // No lead-in to keep it concise
+      break;
+    case "Day-Specific-Advice":
+      leadIn = ""; // No lead-in to keep it concise
+      break;
     default:
       leadIn = "";
+  }
+
+  // Check if this is a day-specific query
+  const hasDayInfo = data.dayInfo || data.daySpecificInfo || data.specificDay;
+
+  // Add a day-specific prefix if applicable
+  let dayPrefix = "";
+  if (hasDayInfo) {
+    const dayInfo = data.dayInfo || data.daySpecificInfo || {};
+    if (dayInfo.dayNumber) {
+      if (dayInfo.dayNumber === "last") {
+        dayPrefix = `ליום האחרון של הטיול - `;
+      } else {
+        dayPrefix = `ליום ${dayInfo.dayNumber} של הטיול - `;
+      }
+    }
   }
 
   // Format the response based on intent
@@ -106,6 +129,12 @@ export const formatAdviceResponse = (intent, data) => {
     case "Find-Restaurants":
       formattedResponse = formatRestaurantsResponse(data);
       break;
+    case "Itinerary-Question":
+      formattedResponse = formatItineraryQuestionResponse(data);
+      break;
+    case "Day-Specific-Advice":
+      formattedResponse = formatDaySpecificAdviceResponse(data);
+      break;
     default:
       formattedResponse = formatGenericResponse(intent, data);
   }
@@ -125,6 +154,11 @@ export const formatAdviceResponse = (intent, data) => {
     .replace(/format/g, "")
     .replace(/API/g, "sources")
     .replace(/required information/g, "important details");
+
+  // Add the day prefix if necessary
+  if (dayPrefix && formattedResponse) {
+    formattedResponse = dayPrefix + formattedResponse;
+  }
 
   // Add the lead-in if we have a formatted response
   if (formattedResponse && leadIn) {
@@ -191,6 +225,173 @@ function formatWeatherResponse(data) {
     return formatErrorResponse("Weather-Request", data);
   }
 
+  // Check if this is a specific day from an itinerary
+  let dayPrefix = "";
+  let dateContext = "";
+
+  // First check if the date is beyond the 5-day forecast limit
+  if (data.beyondForecastLimit) {
+    // Format date for display
+    let dateStr = "";
+    try {
+      if (data.requestData && data.requestData.date) {
+        const requestDate = new Date(data.requestData.date);
+        dateStr = requestDate.toLocaleDateString(undefined, {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      } else {
+        dateStr = `${data.daysInFuture || "more than 5"} days from now`;
+      }
+    } catch (error) {
+      console.error(
+        "Error formatting date for beyond forecast limit message:",
+        error
+      );
+      dateStr = "the requested future date";
+    }
+
+    // Include day information in the error message if available
+    let dayInfo = "";
+    if (data.requestData && data.requestData.dayInfo) {
+      const dayNumber =
+        data.requestData.dayInfo.dayNumber ||
+        data.requestData.daySpecificInfo?.dayNumber;
+
+      if (dayNumber) {
+        if (dayNumber === "last") {
+          dayInfo = " (the last day of your trip)";
+        } else {
+          dayInfo = ` (day ${dayNumber} of your trip)`;
+        }
+      }
+    }
+
+    return `I can only provide accurate weather forecasts for up to 5 days in the future. The date you requested${dayInfo} (${dateStr}) is ${
+      data.daysInFuture || "more than 5"
+    } days from now.\n\nFor more distant forecasts, I recommend checking a weather service website closer to your travel date for the most up-to-date information.`;
+  }
+
+  // Extract day-specific information if available
+  if (data.dayInfo || data.daySpecificInfo) {
+    const dayInfo = data.dayInfo || data.daySpecificInfo;
+
+    if (dayInfo.dayNumber) {
+      if (dayInfo.dayNumber === "last") {
+        dayPrefix = `ליום האחרון של הטיול: `;
+      } else {
+        dayPrefix = `ליום ${dayInfo.dayNumber} של הטיול: `;
+      }
+    }
+
+    // Add date context
+    if (dayInfo.date) {
+      try {
+        // If we have explicit year information, make sure to use it
+        let dayDate;
+        if (dayInfo.year && typeof dayInfo.year === "number") {
+          // If we have a date string like "2025-06-15" it will parse correctly
+          // But for partial dates, we need to ensure the year is set
+          dayDate = new Date(dayInfo.date);
+
+          // Check if the parsed date has a different year
+          if (dayDate.getFullYear() !== dayInfo.year) {
+            console.log(
+              `Date parsed with incorrect year (${dayDate.getFullYear()}), using explicit year ${
+                dayInfo.year
+              }`
+            );
+            // Try to extract month and day and create a new date with correct year
+            const dateParts = dayInfo.date.split("-");
+            if (dateParts.length >= 3) {
+              // If we have YYYY-MM-DD format
+              dayDate = new Date(
+                dayInfo.year,
+                parseInt(dateParts[1]) - 1,
+                parseInt(dateParts[2])
+              );
+            } else {
+              // Just set the year
+              dayDate.setFullYear(dayInfo.year);
+            }
+          }
+        } else {
+          dayDate = new Date(dayInfo.date);
+        }
+
+        if (!isNaN(dayDate.getTime())) {
+          const dateOptions = {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          };
+          dateContext = ` (${dayDate.toLocaleDateString(
+            undefined,
+            dateOptions
+          )})`;
+          console.log(`Formatted date context with full date: ${dateContext}`);
+        } else {
+          dateContext = ` (${dayInfo.date})`;
+          console.log(`Using original date string: ${dayInfo.date}`);
+        }
+      } catch (e) {
+        console.warn("Error formatting day date:", e);
+        dateContext = ` (${dayInfo.date})`;
+      }
+    }
+  }
+  // If no day info but we have specific date info
+  else if (data.requestData && data.requestData.date) {
+    try {
+      let requestDate;
+
+      // If we have explicit year information, make sure to use it
+      if (data.requestData.year && typeof data.requestData.year === "number") {
+        requestDate = new Date(data.requestData.date);
+
+        // Check if the parsed date has a different year
+        if (requestDate.getFullYear() !== data.requestData.year) {
+          console.log(
+            `Request date parsed with incorrect year (${requestDate.getFullYear()}), using explicit year ${
+              data.requestData.year
+            }`
+          );
+
+          // Try to extract month and day and create a new date with correct year
+          const dateParts = data.requestData.date.split("-");
+          if (dateParts.length >= 3) {
+            // If we have YYYY-MM-DD format
+            requestDate = new Date(
+              data.requestData.year,
+              parseInt(dateParts[1]) - 1,
+              parseInt(dateParts[2])
+            );
+          } else {
+            // Just set the year
+            requestDate.setFullYear(data.requestData.year);
+          }
+        }
+      } else {
+        requestDate = new Date(data.requestData.date);
+      }
+
+      if (!isNaN(requestDate.getTime())) {
+        dateContext = ` (${requestDate.toLocaleDateString(undefined, {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })})`;
+        console.log(`Formatted request date context: ${dateContext}`);
+      }
+    } catch (e) {
+      console.warn("Error formatting request date:", e);
+    }
+  }
+
   // Check for any type of weather data (current or forecasted)
   const hasForecast = data.forecast && Object.keys(data.forecast).length > 0;
   const hasForecasts = data.forecasts && data.forecasts.length > 0;
@@ -199,275 +400,213 @@ function formatWeatherResponse(data) {
     console.warn("Weather data is missing both forecast and forecasts:", data);
     return `Sorry, I couldn't find detailed weather information for ${formatLocation(
       data.requestData || { location: data.location, country: data.country }
-    )}.`;
+    )}${dateContext}.`;
   }
 
-  // Format the location with proper case and country
-  // Prioritize requestData for location formatting
-  let locationData = data.requestData || {};
+  // Start building the response with location and date information
+  let locationDisplay = "";
+  try {
+    const locationData = {
+      city:
+        data.city ||
+        data.location ||
+        data.requestData?.city ||
+        data.requestData?.location,
+      country:
+        data.country || data.returnedCountry || data.requestData?.country,
+    };
 
-  // If location field is empty, try using city field
-  if (!locationData.location && locationData.city) {
-    locationData.location = locationData.city;
+    locationDisplay = formatLocation(locationData);
+  } catch (e) {
+    locationDisplay = data.location || "the requested location";
   }
 
-  // If still empty, fall back to data.location or data.city
-  if (!locationData.location) {
-    locationData.location = data.city || data.location;
-  }
+  // Build the response heading
+  let responseText = `${dayPrefix}מזג האוויר ב${locationDisplay}${dateContext}:\n\n`;
 
-  // If no country in request data, try to get it from top-level data
-  if (!locationData.country) {
-    locationData.country = data.country || data.returnedCountry;
-  }
-
-  const location = formatLocation(locationData);
-
-  // If location is still empty after all attempts, use a generic fallback
-  const displayLocation = location || "the requested location";
-
-  // Helper function to format time information
-  const getTimeInfoDisplay = (data) => {
-    if (data.isCurrentTime || data.requestData?.isCurrentTime) {
-      return "right now";
-    } else if (data.isTomorrow || data.requestData?.isTomorrow) {
-      return "tomorrow";
-    } else if (data.isToday || data.requestData?.isToday) {
-      return "today";
-    } else if (
-      data.time === "all day" ||
-      data.requestData?.time === "all day"
-    ) {
-      return "throughout the day";
-    } else if (data.time && typeof data.time === "string") {
-      return `for ${data.time}`;
-    } else if (data.displayDate) {
-      return `on ${data.displayDate}`;
-    } else if (data.date) {
-      try {
-        const dateObj = new Date(data.date);
-        return `on ${dateObj.toLocaleDateString(undefined, {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-        })}`;
-      } catch (e) {
-        return `on ${data.date}`;
-      }
-    }
-    return ""; // Default empty string if no time info
-  };
-
-  // Get time/date information
-  const timeInfo = getTimeInfoDisplay(data);
-
-  // Format the date - could be "current" or a specific date
-  // Default language is English
-  const language = data.language || "en";
-
-  // Set date phrase based on language and available time data
-  let datePhrase = language === "he" ? "כרגע" : "currently";
-
-  // Check request data first, then fall back to top-level data
-  const timeData =
-    data.requestData?.time ||
-    data.requestData?.date ||
-    data.time ||
-    data.date ||
-    null;
-
-  const isCurrentTime =
-    data.requestData?.isCurrentTime || data.isCurrentTime || timeData === "now";
-  const isToday =
-    data.requestData?.isToday || data.isToday || timeData === "today";
-  const isTomorrow =
-    data.requestData?.isTomorrow || data.isTomorrow || timeData === "tomorrow";
-  const isWeekend =
-    data.requestData?.isWeekend || data.isWeekend || timeData === "weekend";
-
-  if (isCurrentTime) {
-    datePhrase = language === "he" ? "עכשיו" : "right now";
-  } else if (isToday) {
-    datePhrase = language === "he" ? "היום" : "today";
-  } else if (isTomorrow) {
-    datePhrase = language === "he" ? "מחר" : "tomorrow";
-  } else if (isWeekend) {
-    datePhrase = language === "he" ? "בסוף השבוע" : "this weekend";
-  } else if (timeData) {
-    // If there's a specific date that's not one of the special cases
-    try {
-      const dateObj = new Date(timeData);
-      // Check if this is a valid date
-      if (!isNaN(dateObj.getTime())) {
-        datePhrase =
-          language === "he"
-            ? `בתאריך ${formatDate(timeData)}`
-            : `on ${formatDate(timeData)}`;
-      } else {
-        // If not a valid date, just use the time string directly
-        datePhrase = language === "he" ? `ב${timeData}` : `for ${timeData}`;
-      }
-    } catch (e) {
-      // If date parsing fails, use the time string directly
-      datePhrase = language === "he" ? `ב${timeData}` : `for ${timeData}`;
-    }
-  }
-
-  // Determine which weather data to use
-  const weather = hasForecast
-    ? data.forecast
-    : hasForecasts
-    ? data.forecasts[0]
-    : null;
-
-  if (!weather) {
-    return `Sorry, I couldn't find detailed weather information for ${displayLocation}.`;
-  }
-
-  // Main weather conditions
-  const temperature = hasForecast
-    ? weather.temperature.current
-    : weather.temperature.current;
-  const conditions = weather.conditions;
-  const precipitation = hasForecast
-    ? weather.precipitation
-      ? weather.precipitation.chance
-      : 0
-    : weather.precipitation
-    ? weather.precipitation.chance
-    : 0;
-  const wind = hasForecast
-    ? weather.wind
-      ? weather.wind.speed
-      : null
-    : weather.wind
-    ? weather.wind.speed
-    : null;
-
-  // Format temperature with units
-  const tempStr = temperature ? `${Math.round(temperature)}°C` : "";
-
-  // Add weather emoji based on conditions
-  const weatherEmoji = getWeatherEmoji(conditions);
-
-  // Build a more concise, professional response
-  let response = "";
-
-  // Get additional data for enhanced response
-  const tempMin = hasForecast ? weather.temperature.min : null;
-  const tempMax = hasForecast ? weather.temperature.max : null;
-  const feelsLike = hasForecast ? weather.temperature.feels_like : null;
-  const humidity = hasForecast ? weather.humidity : null;
-  const description = weather.description || "";
-
-  if (language === "he") {
-    // Hebrew response - more concise and professional
-    response = `${weatherEmoji} **${displayLocation} ${datePhrase}**: ${tempStr}, ${translateWeatherCondition(
-      conditions,
-      "he"
-    )}`;
+  if (hasForecast) {
+    // Format current or daily forecast
+    const forecast = data.forecast;
+    responseText += `🌡️ **טמפרטורה**: ${forecast.temperature.current}°C (מרגיש כמו ${forecast.temperature.feels_like}°C)\n`;
 
     // Add temperature range if available
-    if (tempMin && tempMax) {
-      response += `\nטווח טמפרטורות: ${tempMin}°C עד ${tempMax}°C`;
-    }
-
-    // Add feels like if available and significantly different
-    if (feelsLike && Math.abs(feelsLike - temperature) > 3) {
-      response += `\nמרגיש כמו: ${feelsLike}°C`;
-    }
-
-    // Add wind and humidity in a second line for better formatting
-    if (wind || humidity) {
-      response += "\n";
-      if (wind) {
-        response += `🌬️ רוח: ${wind} קמ"ש `;
-      }
-      if (humidity) {
-        response += `💧 לחות: ${humidity}%`;
-      }
-    }
-
-    // Add recommendation based on weather on a new line
-    if (weather.recommendation) {
-      response += `\n\n${translateRecommendation(
-        weather.recommendation,
-        "he"
-      )}`;
-    }
-  } else {
-    // English response - more professional and concise
-    response = `${weatherEmoji} **${displayLocation} ${datePhrase}**: ${tempStr}, ${conditions.toLowerCase()}`;
-
-    // Add brief description if available and meaningful
     if (
-      description &&
-      description !== conditions &&
-      !conditions.includes(description)
+      forecast.temperature.min !== undefined &&
+      forecast.temperature.max !== undefined
     ) {
-      response += ` (${description.toLowerCase()})`;
+      responseText += `📊 **טווח טמפרטורות**: ${forecast.temperature.min}°C עד ${forecast.temperature.max}°C\n`;
     }
 
-    // Add temperature range if available
-    if (tempMin && tempMax) {
-      response += `\nTemperature range: ${tempMin}°C to ${tempMax}°C`;
+    // Add conditions with emoji
+    const weatherEmoji = getWeatherEmoji(forecast.conditions);
+    responseText += `${weatherEmoji} **מצב**: ${translateWeatherCondition(
+      forecast.description,
+      "he"
+    )} (${forecast.description})\n`;
+
+    // Add humidity and pressure
+    responseText += `💧 **לחות**: ${forecast.humidity}%\n`;
+
+    // Add wind info
+    if (forecast.wind && forecast.wind.speed) {
+      const windDirection = forecast.wind.direction
+        ? ` מכיוון ${forecast.wind.direction}`
+        : "";
+      responseText += `💨 **רוח**: ${forecast.wind.speed} מ'/שנייה${windDirection}\n`;
     }
 
-    // Add feels like if available and significantly different
-    if (feelsLike && Math.abs(feelsLike - temperature) > 3) {
-      response += `\nFeels like: ${feelsLike}°C`;
+    // Add precipitation if available
+    if (forecast.precipitation && forecast.precipitation.amount > 0) {
+      responseText += `☔ **משקעים**: ${forecast.precipitation.amount} מ"מ\n`;
+    } else if (forecast.precipitation && forecast.precipitation.chance > 0) {
+      responseText += `☔ **סיכוי לגשם**: ${forecast.precipitation.chance}%\n`;
     }
 
-    // Add wind and humidity in a second line for better readability
-    if (wind || (humidity && (humidity > 70 || humidity < 30))) {
-      response += "\n";
-      if (wind) {
-        response += `🌬️ Wind: ${wind} km/h `;
-      }
-      if (humidity && (humidity > 70 || humidity < 30)) {
-        response += `💧 Humidity: ${humidity}%`;
-      }
+    // Add sunrise/sunset if available
+    if (forecast.sunrise && forecast.sunset) {
+      const sunriseTime = new Date(forecast.sunrise * 1000).toLocaleTimeString(
+        [],
+        { hour: "2-digit", minute: "2-digit" }
+      );
+      const sunsetTime = new Date(forecast.sunset * 1000).toLocaleTimeString(
+        [],
+        { hour: "2-digit", minute: "2-digit" }
+      );
+      responseText += `🌅 **זריחה**: ${sunriseTime}\n`;
+      responseText += `🌇 **שקיעה**: ${sunsetTime}\n`;
     }
 
-    // Add precipitation if significant
-    if (precipitation && precipitation > 20) {
-      response += `\nPrecipitation chance: ${precipitation}%`;
+    // Add summary if available
+    if (forecast.summary) {
+      responseText += `\n${forecast.summary}\n`;
     }
+  } else if (hasForecasts) {
+    // Handle detailed forecast intervals
+    responseText += "תחזית לשעות היום:\n\n";
 
-    // Add recommendation based on weather on a new line
-    if (weather.recommendation) {
-      response += `\n\n${weather.recommendation}`;
-    } else {
-      // Generate a generic recommendation based on conditions
-      const temp = parseFloat(tempStr);
-      let recommendation = "";
+    data.forecasts.forEach((forecast, index) => {
+      // Format the time for display
+      const forecastTime = new Date(forecast.time);
+      const timeStr = forecastTime.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
-      if (temp > 30) {
-        recommendation = "Stay hydrated and try to keep cool.";
-      } else if (temp < 10) {
-        recommendation = "Dress warmly and consider layers.";
-      } else if (conditions.toLowerCase().includes("rain")) {
-        recommendation = "Remember to bring an umbrella.";
-      } else if (
-        conditions.toLowerCase().includes("sun") ||
-        conditions.toLowerCase().includes("clear")
+      // Add a header for each forecast interval
+      responseText += `⏰ **${timeStr}**:\n`;
+
+      // Add temperature
+      responseText += `🌡️ ${forecast.temperature.current}°C (מרגיש כמו ${forecast.temperature.feels_like}°C)\n`;
+
+      // Add conditions with emoji
+      const weatherEmoji = getWeatherEmoji(forecast.conditions);
+      responseText += `${weatherEmoji} ${translateWeatherCondition(
+        forecast.description,
+        "he"
+      )} (${forecast.description})\n`;
+
+      // Add precipitation chance if available
+      if (
+        forecast.precipitation &&
+        forecast.precipitation.chance !== undefined
       ) {
-        recommendation = "It's a good day to enjoy outdoor activities.";
+        responseText += `☔ סיכוי לגשם: ${forecast.precipitation.chance}%\n`;
       }
 
-      if (recommendation) {
-        response += `\n\n${recommendation}`;
+      // Add wind info
+      if (forecast.wind && forecast.wind.speed) {
+        responseText += `💨 רוח: ${forecast.wind.speed} מ'/שנייה\n`;
+      }
+
+      // Add separator between forecast intervals
+      if (index < data.forecasts.length - 1) {
+        responseText += "\n";
+      }
+    });
+  }
+
+  // If this is for a specific day in an itinerary, add relevant activities info
+  if (data.dayInfo || data.daySpecificInfo) {
+    const dayInfo = data.dayInfo || data.daySpecificInfo;
+
+    // Check if we have activity information for the day
+    if (dayInfo.activities) {
+      responseText += "\n\n**תכנון היום שלך:**\n";
+
+      // Add planned activities with weather relevance
+      const activities = dayInfo.activities;
+      const isRainy =
+        data.forecast?.conditions?.toLowerCase().includes("rain") ||
+        data.forecast?.description?.toLowerCase().includes("rain");
+
+      // Morning activities
+      if (activities.morning && activities.morning.length > 0) {
+        responseText += "🌅 **בבוקר**: ";
+        if (isRainy && isOutdoorActivity(activities.morning.join(" "))) {
+          responseText +=
+            "שים לב שמתוכנן גשם - כדאי להכין מטריה או לשקול פעילות פנימית. ";
+        }
+        responseText += activities.morning.join(", ").substring(0, 100) + "\n";
+      }
+
+      // Afternoon activities
+      if (activities.afternoon && activities.afternoon.length > 0) {
+        responseText += "☀️ **אחר הצהריים**: ";
+        if (isRainy && isOutdoorActivity(activities.afternoon.join(" "))) {
+          responseText +=
+            "שים לב שמתוכנן גשם - כדאי להכין מטריה או לשקול פעילות פנימית. ";
+        }
+        responseText +=
+          activities.afternoon.join(", ").substring(0, 100) + "\n";
       }
     }
   }
 
-  // Add attribution if available (keep this minimal)
-  if (data.attribution) {
-    const shortAttribution = data.attribution.split(".")[0]; // Just use the first sentence
-    response += `\n\n${shortAttribution}`;
+  // Add weather-specific recommendations
+  responseText += "\n**המלצות לפי מזג האוויר:**\n";
+
+  // Get conditions for recommendations
+  const conditions = data.forecast?.conditions?.toLowerCase() || "";
+  const temp = data.forecast?.temperature?.current || 20;
+
+  if (conditions.includes("rain") || conditions.includes("shower")) {
+    responseText += "🌂 כדאי לקחת מטריה או מעיל גשם\n";
   }
 
-  return response;
+  if (temp > 28) {
+    responseText += "🧴 מומלץ להשתמש בקרם הגנה ולשתות הרבה מים\n";
+  } else if (temp < 12) {
+    responseText += "🧣 מומלץ ללבוש שכבות חמות\n";
+  }
+
+  if (conditions.includes("cloud") && !conditions.includes("rain")) {
+    responseText += "☁️ יום מעונן אבל לא גשום - מתאים לטיולים בחוץ\n";
+  } else if (conditions.includes("clear") || conditions.includes("sun")) {
+    responseText += "😎 יום שמשי מצוין לפעילויות בחוץ\n";
+  }
+
+  return responseText;
+}
+
+// Helper function to determine if activities are likely outdoors
+function isOutdoorActivity(activityText) {
+  const outdoorKeywords = [
+    "פארק",
+    "גן",
+    "סיור",
+    "טיול",
+    "הליכה",
+    "חוץ",
+    "park",
+    "garden",
+    "tour",
+    "walk",
+    "outside",
+    "outdoor",
+  ];
+  return outdoorKeywords.some((keyword) =>
+    activityText.toLowerCase().includes(keyword)
+  );
 }
 
 /**
@@ -760,67 +899,111 @@ function formatFlightResponse(data) {
  * @returns {string} - Formatted attractions information
  */
 function formatAttractionsResponse(data) {
-  const { attractions, requestData, location } = data;
-
-  if (!attractions || attractions.length === 0) {
-    return `Sorry, I couldn't find attraction information for ${formatLocation(
-      requestData || { location: location }
-    )}.`;
+  if (!data || !data.success) {
+    return formatErrorResponse("Find-Attractions", data);
   }
 
-  // Use the location from data or fallback to location in requestData
-  const displayLocation = location || formatLocation(requestData);
-  let response = `**Top attractions in ${displayLocation}:**\n\n`;
+  // Start building the formatted response
+  const location = data.location || "the requested location";
 
-  // Show the top attractions with their details
-  attractions.slice(0, 5).forEach((attraction, index) => {
-    response += `**${index + 1}. ${attraction.name}** `;
+  // Extract applied filters for display
+  const appliedFilters = [];
 
-    // Add rating if available
-    if (attraction.rating) {
-      response += `(${attraction.rating}★)`;
+  // Check if category filter was applied
+  if (data.category) {
+    appliedFilters.push(data.category);
+  }
+
+  // Check if activity type filter was applied
+  if (data.activity_type) {
+    appliedFilters.push(data.activity_type);
+  }
+
+  // Check if duration filter was applied
+  if (data.duration) {
+    appliedFilters.push(`${data.duration}-hour`);
+  }
+
+  // Check if budget level filter was applied
+  if (data.budget_level) {
+    let budgetText = "";
+    switch (data.budget_level.toLowerCase()) {
+      case "cheap":
+      case "budget":
+        budgetText = "budget-friendly";
+        break;
+      case "moderate":
+        budgetText = "moderately priced";
+        break;
+      case "luxury":
+      case "expensive":
+        budgetText = "premium";
+        break;
+      default:
+        budgetText = data.budget_level;
     }
+    appliedFilters.push(budgetText);
+  }
 
-    response += `\n`;
+  // Check if rating filter was applied
+  if (data.rating) {
+    appliedFilters.push(`${data.rating}+ star rated`);
+  }
 
-    // Add category if available
-    if (attraction.category) {
-      response += `**Category:** ${attraction.category}`;
+  // Create title with filters
+  let titlePrefix =
+    appliedFilters.length > 0
+      ? `Here are some ${appliedFilters.join(", ")} attractions in `
+      : `Here are top attractions in `;
 
-      // Add price range if available
-      if (attraction.price_range) {
-        response += ` | **Price:** ${attraction.price_range}`;
+  // Format response header
+  let responseHeader = `${titlePrefix}${location}:`;
+
+  // Format attractions list with enhanced details
+  const attractionsList = data.attractions
+    .map((attraction, index) => {
+      // Format rating with stars
+      const formattedRating =
+        attraction.rating > 0
+          ? `${attraction.rating}/5 ${"★".repeat(
+              Math.floor(attraction.rating)
+            )}${attraction.rating % 1 >= 0.5 ? "½" : ""}`
+          : "Rating not available";
+
+      // Format category if available
+      const categoryStr = attraction.category
+        ? `Category: ${attraction.category}`
+        : "";
+
+      // Format price range info
+      const priceStr = attraction.price_range
+        ? `Price: ${attraction.price_range}`
+        : "";
+
+      // Format description with proper truncation
+      let descStr = "";
+      if (attraction.description) {
+        // Truncate long descriptions
+        descStr =
+          attraction.description.length > 150
+            ? `Description: ${attraction.description.substring(0, 147)}...`
+            : `Description: ${attraction.description}`;
       }
 
-      response += `\n`;
-    }
+      // Return formatted attraction entry
+      return `**${index + 1}. ${attraction.name}** (${formattedRating})
+   ${categoryStr}${categoryStr && priceStr ? "\n   " : ""}${priceStr}${
+        descStr ? "\n   " + descStr : ""
+      }`;
+    })
+    .join("\n\n");
 
-    // Add description if available
-    if (attraction.description) {
-      response += `${attraction.description.substring(0, 150)}${
-        attraction.description.length > 150 ? "..." : ""
-      }\n`;
-    }
+  // Add a helpful follow-up question
+  const followupQuestion =
+    "Would you like more details about any specific attraction or recommendations for planning your visit?";
 
-    // Add address if available
-    if (attraction.address) {
-      response += `**Location:** ${attraction.address}\n`;
-    }
-
-    response += `\n`;
-  });
-
-  // Add a note about more attractions if there are more than we displayed
-  if (attractions.length > 5) {
-    response += `*There are ${
-      attractions.length - 5
-    } more attractions available in this area.*\n\n`;
-  }
-
-  // Add a recommendation for planning
-  response += `Would you like more specific information about any of these attractions, or would you like recommendations for a different type of attraction in ${displayLocation}?`;
-
-  return response;
+  // Return the complete formatted response
+  return `${responseHeader}\n\n${attractionsList}\n\n${followupQuestion}`;
 }
 
 /**
@@ -1087,67 +1270,106 @@ function capitalizeFirstLetter(str) {
  * @returns {string} - Formatted hotel response
  */
 const formatHotelResponse = (data) => {
-  // Log received data for debugging
-  console.log("Formatting hotel response with data:", data);
-
-  // Handle simulated data notification
-  const simulatedNote = data.simulated
-    ? "\n\n*Note: This is demonstration data as the hotel service is currently in test mode.*"
-    : "";
-
-  // If no hotels found or hotels array doesn't exist
-  if (!data.hotels || data.hotels.length === 0) {
-    return `I couldn't find any hotels in ${
-      data.location || data.requestData?.city || "the requested location"
-    } matching your criteria. Would you like to try with different preferences?${simulatedNote}`;
+  if (!data || !data.success) {
+    return formatErrorResponse("Find-Hotel", data);
   }
 
-  // Start with a greeting and location
-  let response = `Here are some recommended hotels in ${
-    data.location || data.requestData?.city || "the requested location"
-  }:\n\n`;
+  // Get location from data or fallback
+  const location = data.location || "the requested location";
 
-  // Add each hotel with details
-  data.hotels.forEach((hotel, index) => {
-    response += `**${index + 1}. ${hotel.name}** `;
+  // Extract applied filters for display
+  const appliedFilters = [];
 
-    // Add rating
-    if (hotel.rating) {
+  // Check if budget level filter was applied
+  if (data.budget_level) {
+    let budgetText = "";
+    switch (data.budget_level.toLowerCase()) {
+      case "cheap":
+      case "budget":
+        budgetText = "budget-friendly";
+        break;
+      case "moderate":
+        budgetText = "moderately priced";
+        break;
+      case "luxury":
+      case "expensive":
+        budgetText = "luxury";
+        break;
+      default:
+        budgetText = data.budget_level;
+    }
+    appliedFilters.push(budgetText);
+  }
+
+  // Check if hotel type filter was applied
+  if (data.hotel_type) {
+    appliedFilters.push(data.hotel_type);
+  }
+
+  // Check if amenities filter was applied
+  if (data.amenities && data.amenities.length > 0) {
+    const amenitiesText =
+      data.amenities.length === 1
+        ? `with ${data.amenities[0]}`
+        : `with amenities like ${data.amenities.slice(0, -1).join(", ")} and ${
+            data.amenities[data.amenities.length - 1]
+          }`;
+    appliedFilters.push(amenitiesText);
+  }
+
+  // Check if rating filter was applied
+  if (data.rating) {
+    appliedFilters.push(`${data.rating}+ star rated`);
+  }
+
+  // Create title with filters
+  let titlePrefix =
+    appliedFilters.length > 0
+      ? `Here are some ${appliedFilters.join(", ")} hotels in `
+      : `Here are some recommended hotels in `;
+
+  const messageStart = `${titlePrefix}${location}:`;
+
+  // Format each hotel
+  const hotelList = data.hotels
+    .map((hotel, index) => {
+      // Format star rating with emojis
       const stars =
         "★".repeat(Math.floor(hotel.rating)) +
         (hotel.rating % 1 >= 0.5 ? "½" : "");
-      response += `(${hotel.rating}/5 ${stars}) `;
-    }
+      const formattedRating = `${hotel.rating}/5 ${stars}`;
 
-    // Add price range
-    if (hotel.price_range) {
-      response += `- ${hotel.price_range}\n`;
-    } else {
-      response += `\n`;
-    }
+      // Format price range using consistent symbols
+      let priceSymbol = hotel.price_range;
+      if (!priceSymbol.includes("$")) {
+        // Convert text description to $ symbols
+        if (hotel.price_range.toLowerCase().includes("budget")) {
+          priceSymbol = "$";
+        } else if (hotel.price_range.toLowerCase().includes("luxury")) {
+          priceSymbol = "$$$$";
+        } else if (hotel.price_range.toLowerCase().includes("moderate")) {
+          priceSymbol = "$$";
+        } else {
+          priceSymbol = "$$";
+        }
+      }
 
-    // Add location/address
-    if (hotel.location) {
-      response += `   Location: ${hotel.location}\n`;
-    } else if (hotel.address) {
-      response += `   Address: ${hotel.address}\n`;
-    }
+      // Format amenities if available
+      const amenitiesText =
+        hotel.amenities && hotel.amenities.length > 0
+          ? `Amenities: ${hotel.amenities.join(", ")}`
+          : "";
 
-    // Add amenities if available
-    if (hotel.amenities && hotel.amenities.length > 0) {
-      response += `   Amenities: ${hotel.amenities.join(", ")}\n`;
-    }
+      return `**${index + 1}. ${
+        hotel.name
+      }** (${formattedRating}) - ${priceSymbol}
+   Location: ${hotel.location}
+   ${amenitiesText}`;
+    })
+    .join("\n\n");
 
-    // Add a newline between hotels except the last one
-    if (index < data.hotels.length - 1) {
-      response += `\n`;
-    }
-  });
-
-  // Add a conclusion
-  response += `\nWould you like more details about any of these hotels or assistance with booking?${simulatedNote}`;
-
-  return response;
+  // Create a complete response with a follow-up question
+  return `${messageStart}\n\n${hotelList}\n\nWould you like more details about any of these hotels or assistance with booking?`;
 };
 
 /**
@@ -1157,88 +1379,217 @@ const formatHotelResponse = (data) => {
  * @returns {string} - Formatted restaurant information
  */
 function formatRestaurantsResponse(data) {
-  const { restaurants, requestData, location } = data;
-
-  if (!restaurants || restaurants.length === 0) {
-    return `Sorry, I couldn't find restaurant information for ${formatLocation(
-      requestData || { location: location }
-    )}.`;
+  if (!data || !data.success) {
+    return formatErrorResponse("Find-Restaurants", data);
   }
 
-  // Use the location from data or fallback to location in requestData
-  let displayLocation;
+  // Get location from data or fallback
+  const location = data.location || "your requested location";
 
-  if (location) {
-    // If we have a direct location string, use it
-    displayLocation = location;
-  } else if (requestData) {
-    // If we have request data, handle both location and city fields
-    if (requestData.location) {
-      displayLocation = formatLocation(requestData);
-    } else if (requestData.city) {
-      displayLocation = requestData.city;
-    } else {
-      displayLocation = "the requested location";
+  // Extract applied filters for display
+  const appliedFilters = [];
+
+  // Check if budget level filter was applied
+  if (data.budget_level) {
+    let budgetText = "";
+    switch (data.budget_level.toLowerCase()) {
+      case "cheap":
+      case "budget":
+        budgetText = "budget-friendly";
+        break;
+      case "moderate":
+        budgetText = "moderately priced";
+        break;
+      case "luxury":
+      case "expensive":
+        budgetText = "upscale";
+        break;
+      default:
+        budgetText = data.budget_level;
     }
-  } else {
-    displayLocation = "the requested location";
+    appliedFilters.push(budgetText);
   }
 
-  let response = `**Top restaurants in ${displayLocation}:**\n\n`;
+  // Check if cuisine filter was applied
+  if (data.cuisine) {
+    appliedFilters.push(data.cuisine);
+  }
 
-  // Show the top restaurants with their details
-  restaurants.slice(0, 5).forEach((restaurant, index) => {
-    response += `**${index + 1}. ${restaurant.name}** `;
+  // Check if dietary restriction filter was applied
+  if (data.dietary_restrictions) {
+    appliedFilters.push(data.dietary_restrictions);
+  }
 
-    // Add rating if available
-    if (restaurant.rating) {
-      response += `(${restaurant.rating}★)`;
+  // Check if meal type filter was applied
+  if (data.meal_type) {
+    appliedFilters.push(`${data.meal_type}`);
+  }
+
+  // Check if rating filter was applied
+  if (data.rating) {
+    appliedFilters.push(`${data.rating}+ star rated`);
+  }
+
+  // Create title with filters
+  let titlePrefix =
+    appliedFilters.length > 0
+      ? `Here are some ${appliedFilters.join(", ")} restaurants in `
+      : `Here are some top restaurants in `;
+
+  // Format restaurant list header
+  const header = `${titlePrefix}${location}:`;
+
+  // Format each restaurant entry
+  const restaurantsList = data.restaurants
+    .map((restaurant, index) => {
+      const formattedRating =
+        restaurant.rating > 0
+          ? `${restaurant.rating}/5 ${"★".repeat(
+              Math.floor(restaurant.rating)
+            )}${restaurant.rating % 1 >= 0.5 ? "½" : ""}`
+          : "Rating not available";
+
+      // Format cuisine information
+      const cuisineInfo = restaurant.cuisine
+        ? `Cuisine: ${restaurant.cuisine}`
+        : "";
+
+      // Format price indicators consistently
+      const priceInfo = restaurant.price_range
+        ? `Price: ${restaurant.price_range}`
+        : "";
+
+      // Format address if available
+      const addressInfo = restaurant.address
+        ? `Address: ${restaurant.address}`
+        : "";
+
+      // Format opening hours if available
+      const hoursInfo = restaurant.opening_hours
+        ? `${restaurant.opening_hours}`
+        : "";
+
+      return `**${index + 1}. ${restaurant.name}** (${formattedRating})
+   ${cuisineInfo}${cuisineInfo ? "\n   " : ""}${priceInfo}${
+        addressInfo ? "\n   " + addressInfo : ""
+      }${hoursInfo ? "\n   " + hoursInfo : ""}`;
+    })
+    .join("\n\n");
+
+  // Format the complete response with a follow-up question
+  return `${header}\n\n${restaurantsList}\n\nWould you like more details about any of these restaurants or help with reservations?`;
+}
+
+/**
+ * Format a response for a general itinerary question
+ * @param {Object} data - Response data
+ * @returns {string} - Formatted response
+ */
+function formatItineraryQuestionResponse(data) {
+  if (!data || !data.success) {
+    return formatErrorResponse("Itinerary-Question", data);
+  }
+
+  // אם יש מידע ספציפי על יום ביומן, נשתמש בו
+  if (data.dayInfo || data.dayContext) {
+    const dayInfo = data.dayInfo || {};
+    const dayContext = data.dayContext || "";
+
+    let response = "";
+
+    if (dayInfo.dayNumber) {
+      const dayNum =
+        typeof dayInfo.dayNumber === "number"
+          ? dayInfo.dayNumber
+          : dayInfo.dayNumber === "last"
+          ? "האחרון"
+          : dayInfo.dayNumber;
+
+      response += `${dayContext || `מידע על יום ${dayNum}`}:\n\n`;
     }
 
-    response += `\n`;
+    // אם יש מידע על פעילויות היום
+    if (dayInfo.activities) {
+      const activities = dayInfo.activities;
 
-    // Add price range if available
-    if (restaurant.price_range) {
-      response += `Price: ${restaurant.price_range}`;
-    }
-
-    // Add cuisine if available
-    if (restaurant.cuisine) {
-      if (restaurant.price_range) {
-        response += ` • `;
+      if (activities.morning && activities.morning.length > 0) {
+        response += `בבוקר: ${activities.morning.join(", ")}\n`;
       }
-      response += `Cuisine: ${restaurant.cuisine}`;
+
+      if (activities.lunch && activities.lunch.length > 0) {
+        response += `צהריים: ${activities.lunch.join(", ")}\n`;
+      }
+
+      if (activities.afternoon && activities.afternoon.length > 0) {
+        response += `אחה"צ: ${activities.afternoon.join(", ")}\n`;
+      }
+
+      if (activities.dinner && activities.dinner.length > 0) {
+        response += `ערב: ${activities.dinner.join(", ")}\n`;
+      }
     }
 
-    response += `\n`;
-
-    // Add location/address if available
-    if (restaurant.address) {
-      response += `Address: ${restaurant.address}\n`;
-    }
-
-    // Add description if available (mostly for simulated data)
-    if (restaurant.description) {
-      response += `${restaurant.description}\n`;
-    }
-
-    // Add opening hours if available
-    if (restaurant.opening_hours) {
-      response += `${restaurant.opening_hours}\n`;
-    }
-
-    // Add URL if available
-    if (restaurant.url) {
-      response += `[View on Google Maps](${restaurant.url})\n`;
-    }
-
-    response += `\n`;
-  });
-
-  // If there are more restaurants than we displayed
-  if (restaurants.length > 5) {
-    response += `... and ${restaurants.length - 5} more restaurants.`;
+    return (
+      response ||
+      data.message ||
+      "אין מידע ספציפי זמין על היום המבוקש ביומן המסע."
+    );
   }
 
-  return response;
+  // אם אין מידע ספציפי, החזר את ההודעה כפי שהיא
+  return data.message || "לא מצאתי מידע ספציפי על יומן המסע שלך.";
+}
+
+/**
+ * Format a response for day-specific advice
+ * @param {Object} data - Response data
+ * @returns {string} - Formatted response
+ */
+function formatDaySpecificAdviceResponse(data) {
+  if (!data || !data.success) {
+    return formatErrorResponse("Day-Specific-Advice", data);
+  }
+
+  // מזהה את סוג השאלה לפי המידע שהתקבל
+  const adviceType = data.adviceType || data.intent;
+
+  // בדיקה אם יש מידע על יום ספציפי
+  const dayInfo = data.dayInfo || data.daySpecificInfo;
+  const hasDayContext = dayInfo && (dayInfo.dayNumber || dayInfo.date);
+
+  let dayPrefix = "";
+  if (hasDayContext) {
+    if (dayInfo.dayNumber === "last") {
+      dayPrefix = `ליום האחרון של הטיול`;
+    } else if (typeof dayInfo.dayNumber === "number") {
+      dayPrefix = `ליום ${dayInfo.dayNumber} של הטיול`;
+    } else if (dayInfo.date) {
+      dayPrefix = `לתאריך ${dayInfo.date}`;
+    }
+
+    // הוספת מיקום אם קיים
+    if (dayInfo.location) {
+      dayPrefix += ` ב${dayInfo.location}`;
+    }
+
+    dayPrefix += " - ";
+  }
+
+  // על פי סוג השאלה, נפנה לפונקציית הפורמוט המתאימה ונוסיף את תחילית היום
+  switch (adviceType) {
+    case "Weather-Request":
+      return dayPrefix + formatWeatherResponse(data);
+    case "Find-Hotel":
+      return dayPrefix + formatHotelResponse(data);
+    case "Find-Attractions":
+      return dayPrefix + formatAttractionsResponse(data);
+    case "Find-Restaurants":
+      return dayPrefix + formatRestaurantsResponse(data);
+    default:
+      // אם אין פונקציית פורמוט ספציפית, החזר את ההודעה כפי שהיא
+      return (
+        dayPrefix +
+        (data.message || "המידע המבוקש אינו זמין עבור היום הספציפי.")
+      );
+  }
 }

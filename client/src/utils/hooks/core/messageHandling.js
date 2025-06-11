@@ -134,13 +134,23 @@ export const useMessageHandling = () => {
    * @param {string} message - The system message text
    */
   const addSystemMessage = useCallback((message) => {
+    if (!message) {
+      console.warn(
+        "[Messages] Attempted to add undefined or empty system message"
+      );
+      return;
+    }
+
+    // Ensure message is a string
+    const messageStr = String(message);
+
     console.log(
-      `[Messages] Adding system message: "${message.substring(0, 50)}..."`
+      `[Messages] Adding system message: "${messageStr.substring(0, 50)}..."`
     );
 
     const systemMessage = {
       role: "model",
-      message: message,
+      message: messageStr,
       id: `system-${Date.now()}`,
       isSystemMessage: true,
       isPermanent: true,

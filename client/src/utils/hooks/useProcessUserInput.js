@@ -67,6 +67,19 @@ const ERROR_FETCH_DELAY = 2000; // Delay for error cases
 const FOLLOW_UP_DELAY = 2000; // Delay for follow-up questions
 
 /**
+ * Check if an intent is a weather-related intent
+ * @param {string} intent - The intent to check
+ * @returns {boolean} - True if this is a weather intent
+ */
+const isWeatherIntent = (intent) => {
+  return (
+    intent === "Weather-Request" ||
+    intent === "Weather-Forecast" ||
+    intent?.toLowerCase().includes("weather")
+  );
+};
+
+/**
  * Get specific loading message for external data intents
  * @param {string} intent - The intent requiring external data
  * @returns {string} - Specific loading message
@@ -1362,7 +1375,93 @@ export function useProcessUserInput(chatData) {
           let finalAdviceResponse = responseText; // Default to original response
 
           // תיקון: בדיקה אם יש תשובה ישירות בנתונים המקוריים כשהכוונה לא דורשת נתונים חיצוניים
+          // Check if we have external data to display for any intent
           if (
+            (window.__weatherResponseData &&
+              window.__forceWeatherResponse &&
+              isWeatherIntent(intent)) ||
+            (window.__restaurantsResponseData &&
+              window.__forceRestaurantsResponse &&
+              intent === "Find-Restaurants") ||
+            (window.__externalDataResponse && window.__forceExternalDataDisplay)
+          ) {
+            // Determine which data to use
+            let responseData;
+            let responseType;
+
+            if (isWeatherIntent(intent) && window.__weatherResponseData) {
+              responseData = window.__weatherResponseData;
+              responseType = "weather";
+              console.log(
+                `[ModularProcessing] Using cached weather data response`
+              );
+              window.__forceWeatherResponse = false;
+              window.__weatherResponseDisplayed = true;
+            } else if (
+              intent === "Find-Restaurants" &&
+              window.__restaurantsResponseData
+            ) {
+              responseData = window.__restaurantsResponseData;
+              responseType = "restaurants";
+              console.log(
+                `[ModularProcessing] Using cached restaurants data response`
+              );
+              window.__forceRestaurantsResponse = false;
+              window.__restaurantsResponseDisplayed = true;
+            } else if (intent === "Find-Hotel" && window.__hotelsResponseData) {
+              responseData = window.__hotelsResponseData;
+              responseType = "hotels";
+              console.log(
+                `[ModularProcessing] Using cached hotels data response`
+              );
+              window.__forceHotelsResponse = false;
+              window.__hotelsResponseDisplayed = true;
+            } else if (
+              intent === "Find-Attractions" &&
+              window.__attractionsResponseData
+            ) {
+              responseData = window.__attractionsResponseData;
+              responseType = "attractions";
+              console.log(
+                `[ModularProcessing] Using cached attractions data response`
+              );
+              window.__forceAttractionsResponse = false;
+              window.__attractionsResponseDisplayed = true;
+            } else {
+              responseData = window.__externalDataResponse;
+              responseType = "external";
+              console.log(
+                `[ModularProcessing] Using cached external data response`
+              );
+              window.__forceExternalDataDisplay = false;
+              window.__externalDataDisplayed = true;
+            }
+
+            // Replace loading message with actual response
+            replaceLoadingMessage(loadingId, {
+              role: "model",
+              message: responseData,
+              id: loadingId,
+              isAdviceResponse: true,
+              isExternalDataResponse: true,
+              responseType: responseType,
+            });
+
+            finalAdviceResponse = responseData;
+
+            // Clear the cache after using it
+            setTimeout(() => {
+              if (responseType === "weather")
+                window.__weatherResponseData = null;
+              else if (responseType === "restaurants")
+                window.__restaurantsResponseData = null;
+              else if (responseType === "hotels")
+                window.__hotelsResponseData = null;
+              else if (responseType === "attractions")
+                window.__attractionsResponseData = null;
+              else window.__externalDataResponse = null;
+            }, 500);
+          } else if (
             extractedData?.data?.response &&
             (!intentRequiresExternalData(intent) ||
               extractedData?.data?.requires_external_data === false)

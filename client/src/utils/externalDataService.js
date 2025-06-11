@@ -25,8 +25,140 @@ import {
   isAdviceIntent,
 } from "./advice/AdviceFieldSchemas";
 
+// Import location utilities
+import {
+  inferCountryForCity,
+  parseLocationString,
+  formatLocation,
+} from "./cityCountryMapper";
+
+// The location handling utility functions are imported from cityCountryMapper.js above
+
 // API endpoint for server-side external data fetching
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+/**
+ * Extract and normalize filter parameters from user input
+ * Provides a unified approach to handle filters across all service types
+ *
+ * @param {string} intent - The service intent (Find-Hotel, Find-Attractions, Find-Restaurants)
+ * @param {object} requestDetails - Raw request details including user constraints
+ * @returns {object} - Normalized filter parameters for the specific service type
+ */
+export const extractFilterParameters = (intent, requestDetails) => {
+  // Create a base filter object
+  const filters = {};
+
+  // Extract common filters available across services
+  if (requestDetails.budget_level) {
+    filters.budget_level = requestDetails.budget_level;
+  }
+
+  if (requestDetails.price_level) {
+    filters.price_level =
+      requestDetails.price_level || requestDetails.budget_level;
+  }
+
+  if (requestDetails.rating) {
+    filters.rating = requestDetails.rating;
+  }
+
+  // Service-specific filter extraction
+  switch (intent) {
+    case "Find-Hotel":
+      // Hotel specific filters
+      if (requestDetails.amenities) {
+        filters.amenities = Array.isArray(requestDetails.amenities)
+          ? requestDetails.amenities
+          : [requestDetails.amenities];
+      }
+
+      if (requestDetails.hotel_type || requestDetails.type) {
+        filters.hotel_type = requestDetails.hotel_type || requestDetails.type;
+      }
+
+      // Map budget_level to price range if needed
+      if (filters.budget_level && !filters.price_level) {
+        // Map budget descriptions to price levels
+        const budgetToPrice = {
+          cheap: "budget",
+          budget: "budget",
+          affordable: "economy",
+          moderate: "midrange",
+          expensive: "luxury",
+          luxury: "luxury",
+          "high-end": "luxury",
+        };
+
+        filters.price_level =
+          budgetToPrice[filters.budget_level.toLowerCase()] ||
+          filters.budget_level;
+      }
+
+      break;
+
+    case "Find-Attractions":
+      // Attraction specific filters
+      if (requestDetails.category) {
+        filters.category = requestDetails.category;
+      }
+
+      if (requestDetails.activity_type || requestDetails.type) {
+        filters.activity_type =
+          requestDetails.activity_type || requestDetails.type;
+      }
+
+      if (requestDetails.duration) {
+        filters.duration = requestDetails.duration;
+      }
+
+      break;
+
+    case "Find-Restaurants":
+      // Restaurant specific filters
+      if (requestDetails.cuisine) {
+        filters.cuisine = requestDetails.cuisine;
+      }
+
+      if (requestDetails.dietary || requestDetails.dietary_restrictions) {
+        filters.dietary_restrictions =
+          requestDetails.dietary || requestDetails.dietary_restrictions;
+      }
+
+      if (requestDetails.meal_type) {
+        filters.meal_type = requestDetails.meal_type;
+      }
+
+      // Map budget_level to price range for restaurants
+      if (filters.budget_level && !filters.price_level) {
+        // Convert text budget levels to price indicators ($/$$/$$$)
+        const budgetToPrice = {
+          cheap: "$",
+          budget: "$",
+          affordable: "$$",
+          moderate: "$$",
+          expensive: "$$$",
+          luxury: "$$$$",
+          "high-end": "$$$$",
+        };
+
+        filters.price =
+          budgetToPrice[filters.budget_level.toLowerCase()] ||
+          filters.budget_level;
+      }
+
+      break;
+
+    default:
+      // No special handling for other intents
+      break;
+  }
+
+  // Log extracted filters for debugging
+  console.log(`Extracted ${intent} filters:`, filters);
+
+  return filters;
+};
 
 /**
  * Fetches weather data for a specific location and date
@@ -97,38 +229,65 @@ function inferCountryForWellKnownCity(city) {
   const wellKnownCities = {
     // Major European cities
     rome: "Italy",
-    paris: "France",
-    london: "United Kingdom",
-    madrid: "Spain",
-    berlin: "Germany",
-    athens: "Greece",
-    amsterdam: "Netherlands",
-    brussels: "Belgium",
-    vienna: "Austria",
-    geneva: "Switzerland",
-    zurich: "Switzerland",
-    dublin: "Ireland",
-    lisbon: "Portugal",
-    barcelona: "Spain",
-    florence: "Italy",
     milan: "Italy",
+    florence: "Italy",
     venice: "Italy",
     naples: "Italy",
+    paris: "France",
+    nice: "France",
+    lyon: "France",
+    marseille: "France",
+    london: "United Kingdom",
+    manchester: "United Kingdom",
+    liverpool: "United Kingdom",
+    edinburgh: "United Kingdom",
+    glasgow: "United Kingdom",
+    madrid: "Spain",
+    barcelona: "Spain",
+    seville: "Spain",
+    valencia: "Spain",
+    berlin: "Germany",
     munich: "Germany",
+    hamburg: "Germany",
     frankfurt: "Germany",
+    cologne: "Germany",
+    athens: "Greece",
+    thessaloniki: "Greece",
+    amsterdam: "Netherlands",
+    rotterdam: "Netherlands",
+    brussels: "Belgium",
+    antwerp: "Belgium",
+    vienna: "Austria",
+    salzburg: "Austria",
+    zurich: "Switzerland",
+    geneva: "Switzerland",
+    bern: "Switzerland",
     copenhagen: "Denmark",
-    oslo: "Norway",
     stockholm: "Sweden",
+    oslo: "Norway",
     helsinki: "Finland",
-    budapest: "Hungary",
+    lisbon: "Portugal",
+    porto: "Portugal",
+    dublin: "Ireland",
     prague: "Czech Republic",
+    budapest: "Hungary",
     warsaw: "Poland",
-    istanbul: "Turkey",
+    krakow: "Poland",
 
     // Major North American cities
-    "new york": "United States",
-    "los angeles": "United States",
-    chicago: "United States",
+    "new york": "USA",
+    "los angeles": "USA",
+    chicago: "USA",
+    houston: "USA",
+    phoenix: "USA",
+    philadelphia: "USA",
+    "san antonio": "USA",
+    "san diego": "USA",
+    dallas: "USA",
+    "san jose": "USA",
+    austin: "USA",
+    miami: "USA",
+    atlanta: "USA",
     toronto: "Canada",
     montreal: "Canada",
     vancouver: "Canada",
@@ -136,43 +295,55 @@ function inferCountryForWellKnownCity(city) {
 
     // Major Asian cities
     tokyo: "Japan",
-    kyoto: "Japan",
     osaka: "Japan",
+    kyoto: "Japan",
+    seoul: "South Korea",
     beijing: "China",
     shanghai: "China",
-    "hong kong": "China",
-    seoul: "South Korea",
-    bangkok: "Thailand",
+    "hong kong": "Hong Kong",
     singapore: "Singapore",
-    dubai: "United Arab Emirates",
+    bangkok: "Thailand",
     mumbai: "India",
     delhi: "India",
+
+    // Major Middle Eastern cities
+    dubai: "United Arab Emirates",
+    "abu dhabi": "United Arab Emirates",
+    doha: "Qatar",
+    istanbul: "Turkey",
     jerusalem: "Israel",
     "tel aviv": "Israel",
 
-    // Major Australian/Oceanian cities
+    // Major Australian cities
     sydney: "Australia",
     melbourne: "Australia",
+    brisbane: "Australia",
     perth: "Australia",
-    auckland: "New Zealand",
-    wellington: "New Zealand",
-
-    // Major South American cities
-    "rio de janeiro": "Brazil",
-    "buenos aires": "Argentina",
-    lima: "Peru",
-    bogota: "Colombia",
-    santiago: "Chile",
-
-    // Major African cities
-    cairo: "Egypt",
-    "cape town": "South Africa",
-    johannesburg: "South Africa",
-    casablanca: "Morocco",
-    nairobi: "Kenya",
   };
 
-  return wellKnownCities[normalizedCity] || null;
+  // Try direct match
+  if (wellKnownCities[normalizedCity]) {
+    console.log(
+      `Inferred country for ${city}: ${wellKnownCities[normalizedCity]}`
+    );
+    return wellKnownCities[normalizedCity];
+  }
+
+  // Try to find a match with part of the name (for cities with compound names)
+  for (const knownCity in wellKnownCities) {
+    if (
+      normalizedCity.includes(knownCity) ||
+      knownCity.includes(normalizedCity)
+    ) {
+      console.log(
+        `Fuzzy match: Inferred country for ${city}: ${wellKnownCities[knownCity]}`
+      );
+      return wellKnownCities[knownCity];
+    }
+  }
+
+  // No match found
+  return null;
 }
 
 /**
@@ -466,6 +637,15 @@ export const fetchHotelRecommendations = async (location, preferences = {}) => {
       ...(preferences.budget_level && {
         budget_level: preferences.budget_level,
       }),
+      ...(preferences.price_level && {
+        price_level: preferences.price_level,
+      }),
+      ...(preferences.rating && {
+        rating: preferences.rating,
+      }),
+      ...(preferences.hotel_type && {
+        hotel_type: preferences.hotel_type,
+      }),
     });
 
     // If there are complex preferences, stringify and add them
@@ -505,6 +685,11 @@ export const fetchAttractions = async (location, filters = {}) => {
     const params = new URLSearchParams({
       location,
       ...(filters.country && { country: filters.country }),
+      ...(filters.category && { category: filters.category }),
+      ...(filters.rating && { rating: filters.rating }),
+      ...(filters.price_level && { price_level: filters.price_level }),
+      ...(filters.activity_type && { activity_type: filters.activity_type }),
+      ...(filters.budget_level && { budget_level: filters.budget_level }),
     });
 
     // If there are complex filters, stringify and add them
@@ -547,6 +732,12 @@ export const fetchRestaurants = async (location, filters = {}) => {
       ...(filters.country && { country: filters.country }),
       ...(filters.cuisine && { cuisine: filters.cuisine }),
       ...(filters.price && { price: filters.price }),
+      ...(filters.rating && { rating: filters.rating }),
+      ...(filters.dietary_restrictions && {
+        dietary_restrictions: filters.dietary_restrictions,
+      }),
+      ...(filters.meal_type && { meal_type: filters.meal_type }),
+      ...(filters.budget_level && { budget_level: filters.budget_level }),
     });
 
     // If there are complex filters, stringify and add them
@@ -583,544 +774,696 @@ export const fetchRestaurants = async (location, filters = {}) => {
  * @param {string} intent - The intent that requires external data
  * @param {object} requestDetails - The details needed for this request, varies by intent
  * @param {object} userProfile - Optional user profile data to enhance the request
+ * @param {object} daySpecificInfo - Optional information about a specific day from the itinerary
  * @returns {Promise<object>} - Results of the external data fetch
  */
 export const fetchExternalData = async (
   intent,
   requestDetails = {},
-  userProfile = null
+  userProfile = null,
+  daySpecificInfo = null
 ) => {
   console.log(`Fetching external data for intent: ${intent}`, requestDetails);
 
-  // Process request details using the existing logic
-  const processedDetails = processRequestDetails(intent, {
-    ...requestDetails,
-    userProfile: userProfile,
-  });
+  // אם יש מידע על יום ספציפי, הוסף אותו לפרטי הבקשה
+  if (daySpecificInfo) {
+    console.log(
+      "Using day-specific information for external data request:",
+      daySpecificInfo
+    );
 
-  // Early exit for missing critical fields
-  if (!processedDetails || Object.keys(processedDetails).length === 0) {
-    console.error("Missing required details for external data request");
-    return {
-      success: false,
-      error: "Missing required details for this request",
-    };
+    // שילוב מידע היום בפרטי הבקשה אם חסר
+    if (daySpecificInfo.city && !requestDetails.city) {
+      requestDetails.city = daySpecificInfo.city;
+    }
+
+    if (daySpecificInfo.country && !requestDetails.country) {
+      requestDetails.country = daySpecificInfo.country;
+    }
+
+    if (daySpecificInfo.date) {
+      // תוספת תאריך ספציפי עבור בקשות מזג אוויר
+      if (intent === "Weather-Request" && !requestDetails.time) {
+        requestDetails.time = daySpecificInfo.date;
+      }
+
+      // תאריך כללי
+      if (!requestDetails.date) {
+        requestDetails.date = daySpecificInfo.date;
+      }
+
+      // הוספת היסטים זמנים
+      if (daySpecificInfo.timeContext && !requestDetails.timeContext) {
+        requestDetails.timeContext = daySpecificInfo.timeContext;
+      }
+    }
+  } else {
+    // בדיקה אם יש מידע בחלון הגלובלי
+    if (window.__daySpecificInfo) {
+      console.log(
+        "Found day-specific info in global state:",
+        window.__daySpecificInfo
+      );
+
+      const globalInfo = window.__daySpecificInfo;
+
+      // שילוב המידע הגלובלי אם חסר בבקשה הנוכחית
+      if (globalInfo.city && !requestDetails.city) {
+        requestDetails.city = globalInfo.city;
+        console.log(`Added city from global state: ${globalInfo.city}`);
+      }
+
+      if (globalInfo.country && !requestDetails.country) {
+        requestDetails.country = globalInfo.country;
+        console.log(`Added country from global state: ${globalInfo.country}`);
+      }
+
+      if (globalInfo.date) {
+        if (intent === "Weather-Request" && !requestDetails.time) {
+          requestDetails.time = globalInfo.date;
+          console.log(`Added time from global state: ${globalInfo.date}`);
+        }
+
+        if (!requestDetails.date) {
+          requestDetails.date = globalInfo.date;
+          console.log(`Added date from global state: ${globalInfo.date}`);
+        }
+      }
+    }
+  }
+
+  // לוג החלקים החשובים של הבקשה לפני עיבוד
+  if (intent === "Weather-Request") {
+    console.log(`Weather request details:
+    - City: ${requestDetails.city || "missing"}
+    - Country: ${requestDetails.country || "missing"}
+    - Time: ${requestDetails.time || "missing"}
+    - TimeContext: ${requestDetails.timeContext || "missing"}`);
+  } else if (intent === "Find-Hotel" || intent === "Find-Attractions") {
+    console.log(`${intent} request details:
+    - City: ${requestDetails.city || "missing"}
+    - Country: ${requestDetails.country || "missing"}`);
   }
 
   try {
-    // Special handling for Find-Attractions to ensure location is properly set
-    if (intent === "Find-Attractions") {
-      console.log(
-        "Processing Find-Attractions intent with details:",
-        processedDetails
-      );
+    // Process the request details to ensure we have correct data formats
+    // For certain intents, this will enrich the data with additional context
+    const enhancedDetails = processRequestDetails(requestDetails);
+    console.log("Enhanced request details:", enhancedDetails);
 
-      // Make sure we have a location parameter - check all possible location fields
-      const location =
-        processedDetails.location ||
-        processedDetails.city ||
-        processedDetails.vacation_location ||
-        processedDetails.destination;
+    // Extract filter parameters for service-specific filtering
+    const filters = extractFilterParameters(intent, enhancedDetails);
+    console.log(`Extracted filters for ${intent}:`, filters);
 
-      if (!location) {
-        console.error("Location is required for attractions search");
+    // Route to the appropriate handler based on intent
+    switch (intent) {
+      // Weather intents
+      case "Weather-Request": {
+        // Weather handling code remains the same
+        const { city, country, time = "now", timeContext } = enhancedDetails;
+
+        // If we have a specific location, fetch weather data
+        if (city && country) {
+          // For historical weather lookups, WMO API requires different logic
+          // Use appropriate service based on whether this is current or historical
+          return await fetchWeatherData(city, country, time, { timeContext });
+        } else if (city) {
+          // If we have city but not country, try to infer country from well-known cities
+          const inferredCountry = inferCountryForWellKnownCity(city);
+          if (inferredCountry) {
+            console.log(`Inferred country ${inferredCountry} for city ${city}`);
+            return await fetchWeatherData(city, inferredCountry, time, {
+              timeContext,
+            });
+          }
+
+          // If we couldn't infer the country, return an error
+          return {
+            success: false,
+            error: "Missing country for weather lookup",
+            requestData: enhancedDetails,
+          };
+        } else if (enhancedDetails.location) {
+          // If we have a combined location string, try to parse it
+          const parsedLocation = parseLocationString(enhancedDetails.location);
+          if (parsedLocation && parsedLocation.city && parsedLocation.country) {
+            return await fetchWeatherData(
+              parsedLocation.city,
+              parsedLocation.country,
+              time,
+              { timeContext }
+            );
+          }
+        }
+
+        // If we get here, we don't have enough data for a weather lookup
         return {
           success: false,
-          error: "Location is required for attractions search",
+          error: "Incomplete location data for weather lookup",
+          requestData: enhancedDetails,
         };
       }
 
-      // Create a clean params object with the location properly set
-      return await fetchAttractions(location, {
-        country: processedDetails.country,
-        category: processedDetails.category,
-        rating: processedDetails.rating,
-        ...processedDetails.filters,
-      });
-    }
+      // Hotel search intents
+      case "Find-Hotel": {
+        // Extract city, country, and preferences from request
+        let { city, country, budget_level, ...preferences } = enhancedDetails;
 
-    // For the other supported intents, use the server endpoint
-    if (
-      ["Weather-Request", "Find-Hotel", "Find-Restaurants"].includes(intent)
-    ) {
-      // Call the generic server endpoint with intent and all processed details
-      const params = new URLSearchParams({
-        intent,
-        ...processedDetails,
-      });
+        // Add direct data mapping from the original request fields
+        const directData =
+          requestDetails.data || requestDetails.collectedData || {};
+        if (!city && directData.city) {
+          city = directData.city;
+          console.log(`Using city directly from hotel request data: ${city}`);
+        }
 
-      // For complex objects, stringify them
-      if (processedDetails.preferences) {
-        params.delete("preferences");
-        params.append(
-          "preferences",
-          JSON.stringify(processedDetails.preferences)
-        );
-      }
+        if (!country && directData.country) {
+          country = directData.country;
+          console.log(
+            `Using country directly from hotel request data: ${country}`
+          );
+        }
 
-      if (processedDetails.filters) {
-        params.delete("filters");
-        params.append("filters", JSON.stringify(processedDetails.filters));
-      }
+        if (!budget_level && directData.budget_level) {
+          budget_level = directData.budget_level;
+          console.log(
+            `Using budget level directly from hotel request data: ${budget_level}`
+          );
+        }
 
-      console.log(
-        `Calling server endpoint for ${intent} with params:`,
-        params.toString()
-      );
+        // Try to get location from vacation_location if available
+        if (!city && requestDetails.vacation_location) {
+          const parsedVacationLocation = parseLocationString(
+            requestDetails.vacation_location
+          );
+          if (parsedVacationLocation.city) {
+            city = parsedVacationLocation.city;
+            console.log(
+              `Extracted city for hotel search from vacation_location: ${city}`
+            );
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/external/data?${params}`
-      );
+            if (!country && parsedVacationLocation.country) {
+              country = parsedVacationLocation.country;
+              console.log(
+                `Extracted country for hotel search from vacation_location: ${country}`
+              );
+            }
+          }
+        }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || `Server returned ${response.status}`
-        );
-      }
+        // If we have a specific location, search for hotels
+        if (city && country) {
+          // Format location as simple string with city and country
+          const location = `${city}, ${country}`;
 
-      const data = await response.json();
-      console.log(`Received ${intent} data from server:`, data);
-      return data;
-    }
+          // Merge extracted filters with existing preferences
+          const enhancedPreferences = {
+            ...preferences,
+            ...filters,
+            budget_level,
+            city,
+            country,
+          };
 
-    // For unsupported intents, fall back to the original implementation
-    switch (intent) {
-      case "Flight-Information":
-        return await fetchFlightInformation({
-          origin: processedDetails.origin,
-          destination: processedDetails.destination,
-          date: processedDetails.date,
-          returnDate: processedDetails.returnDate,
-          passengers: processedDetails.passengers,
+          console.log(
+            `Searching hotels with location: ${location}, filters:`,
+            enhancedPreferences
+          );
+
+          return await fetchHotelRecommendations(location, enhancedPreferences);
+        } else if (city) {
+          // Try to infer country if we only have city
+          const inferredCountry = inferCountryForCity(city);
+          if (inferredCountry) {
+            country = inferredCountry;
+            console.log(
+              `Inferred country for hotel search: ${inferredCountry}`
+            );
+            // Format location as simple string with city and country
+            const location = `${city}, ${inferredCountry}`;
+
+            // Merge extracted filters with existing preferences
+            const enhancedPreferences = {
+              ...preferences,
+              ...filters,
+              budget_level,
+              city,
+              country: inferredCountry,
+            };
+
+            console.log(
+              `Searching hotels with inferred location: ${location}, filters:`,
+              enhancedPreferences
+            );
+
+            return await fetchHotelRecommendations(
+              location,
+              enhancedPreferences
+            );
+          }
+        } else if (enhancedDetails.location) {
+          // If we have a combined location string, try to parse it
+          const parsedLocation = parseLocationString(enhancedDetails.location);
+          if (parsedLocation && parsedLocation.city) {
+            // Create location string directly from parsed parts
+            const locationStr = parsedLocation.country
+              ? `${parsedLocation.city}, ${parsedLocation.country}`
+              : parsedLocation.city;
+
+            // Merge extracted filters with existing preferences
+            const enhancedPreferences = {
+              ...preferences,
+              ...filters,
+              budget_level,
+              city: parsedLocation.city,
+              country: parsedLocation.country,
+            };
+
+            console.log(
+              `Parsed location for hotel search: ${locationStr}, filters:`,
+              enhancedPreferences
+            );
+
+            return await fetchHotelRecommendations(
+              locationStr,
+              enhancedPreferences
+            );
+          }
+        }
+
+        // Log what's missing to help debug
+        console.error("Hotel search failed - missing data:", {
+          city: city || "missing",
+          country: country || "missing",
+          originalRequest: requestDetails,
         });
 
-      case "Local-Events":
-        return await fetchLocalEvents({
-          location:
-            processedDetails.location || processedDetails.vacation_location,
-          startDate:
-            processedDetails.date ||
-            (processedDetails.dates ? processedDetails.dates.from : null),
-          endDate: processedDetails.dates ? processedDetails.dates.to : null,
-          category: processedDetails.category || processedDetails.eventType,
-          limit: 5,
-        });
-
-      case "Travel-Restrictions":
-        return await fetchTravelRestrictions({
-          country:
-            processedDetails.country ||
-            processedDetails.location ||
-            processedDetails.vacation_location,
-          citizenship: processedDetails.citizenship,
-        });
-
-      case "Currency-Conversion":
-        return await fetchCurrencyConversion({
-          from: processedDetails.from,
-          to: processedDetails.to,
-          amount: processedDetails.amount || 1,
-        });
-
-      case "Cost-Estimate":
-        return await fetchCostEstimates({
-          location:
-            processedDetails.location || processedDetails.vacation_location,
-          category: processedDetails.category,
-          budget:
-            processedDetails.budget_level ||
-            processedDetails.budget ||
-            (processedDetails.constraints
-              ? processedDetails.constraints.budget
-              : null) ||
-            "moderate",
-          currency: processedDetails.currency || "USD",
-        });
-
-      default:
-        console.warn(`Unhandled external data intent: ${intent}`);
+        // If we get here, we don't have enough data for a hotel search
         return {
           success: false,
-          error: `External data for ${intent} is not currently supported`,
+          error: "Incomplete location data for hotel search",
+          requestData: enhancedDetails,
+          debug: {
+            originalCity: directData.city,
+            originalCountry: directData.country,
+            enhancedCity: city,
+            enhancedCountry: country,
+          },
+        };
+      }
+
+      // Attraction search intents
+      case "Find-Attractions": {
+        // Extract city, country, and filters from request
+        let { city, country, category, ...otherDetails } = enhancedDetails;
+
+        // Add direct data mapping from the original request fields
+        const directData =
+          requestDetails.data || requestDetails.collectedData || {};
+        if (!city && directData.city) {
+          city = directData.city;
+          console.log(
+            `Using city directly from attractions request data: ${city}`
+          );
+        }
+
+        if (!country && directData.country) {
+          country = directData.country;
+          console.log(
+            `Using country directly from attractions request data: ${country}`
+          );
+        }
+
+        if (!category && directData.category) {
+          category = directData.category;
+          console.log(
+            `Using category directly from attractions request data: ${category}`
+          );
+        }
+
+        // Try to get location from vacation_location if available
+        if (!city && requestDetails.vacation_location) {
+          const parsedVacationLocation = parseLocationString(
+            requestDetails.vacation_location
+          );
+          if (parsedVacationLocation.city) {
+            city = parsedVacationLocation.city;
+            console.log(
+              `Extracted city for attractions from vacation_location: ${city}`
+            );
+
+            if (!country && parsedVacationLocation.country) {
+              country = parsedVacationLocation.country;
+              console.log(
+                `Extracted country for attractions from vacation_location: ${country}`
+              );
+            }
+          }
+        }
+
+        // If we have a specific location, search for attractions
+        if (city && country) {
+          // Format location as simple string with city and country
+          const location = `${city}, ${country}`;
+
+          // Merge extracted filters with existing parameters
+          const enhancedFilters = {
+            ...otherDetails,
+            ...filters,
+            category,
+            city,
+            country,
+          };
+
+          console.log(
+            `Searching attractions with location: ${location}, filters:`,
+            enhancedFilters
+          );
+
+          return await fetchAttractions(location, enhancedFilters);
+        } else if (city) {
+          // Try to infer country if we only have city
+          const inferredCountry = inferCountryForCity(city);
+          if (inferredCountry) {
+            country = inferredCountry;
+            console.log(
+              `Inferred country for attractions search: ${inferredCountry}`
+            );
+            // Format location as simple string with city and country
+            const location = `${city}, ${inferredCountry}`;
+
+            // Merge extracted filters with existing parameters
+            const enhancedFilters = {
+              ...otherDetails,
+              ...filters,
+              category,
+              city,
+              country: inferredCountry,
+            };
+
+            console.log(
+              `Searching attractions with inferred location: ${location}, filters:`,
+              enhancedFilters
+            );
+
+            return await fetchAttractions(location, enhancedFilters);
+          }
+        } else if (enhancedDetails.location) {
+          // If we have a combined location string, try to parse it
+          const parsedLocation = parseLocationString(enhancedDetails.location);
+          if (parsedLocation && parsedLocation.city) {
+            // Create location string directly from parsed parts
+            const locationStr = parsedLocation.country
+              ? `${parsedLocation.city}, ${parsedLocation.country}`
+              : parsedLocation.city;
+
+            // Merge extracted filters with existing parameters
+            const enhancedFilters = {
+              ...otherDetails,
+              ...filters,
+              category,
+              city: parsedLocation.city,
+              country: parsedLocation.country,
+            };
+
+            console.log(
+              `Parsed location for attractions search: ${locationStr}, filters:`,
+              enhancedFilters
+            );
+
+            return await fetchAttractions(locationStr, enhancedFilters);
+          }
+        }
+
+        // Log what's missing to help debug
+        console.error("Attractions search failed - missing data:", {
+          city: city || "missing",
+          country: country || "missing",
+          originalRequest: requestDetails,
+        });
+
+        // If we get here, we don't have enough data for an attraction search
+        return {
+          success: false,
+          error: "Incomplete location data for attraction search",
+          requestData: enhancedDetails,
+          debug: {
+            originalCity: directData.city,
+            originalCountry: directData.country,
+            enhancedCity: city,
+            enhancedCountry: country,
+          },
+        };
+      }
+
+      // Restaurant search intents
+      case "Find-Restaurants": {
+        // Extract city, country, and filters from request
+        let { city, country, cuisine, budget_level, ...otherDetails } =
+          enhancedDetails;
+
+        // Add direct data mapping from the original request fields
+        const directData =
+          requestDetails.data || requestDetails.collectedData || {};
+        if (!city && directData.city) {
+          city = directData.city;
+          console.log(`Using city directly from request data: ${city}`);
+        }
+
+        if (!country && directData.country) {
+          country = directData.country;
+          console.log(`Using country directly from request data: ${country}`);
+        }
+
+        if (!budget_level && directData.budget_level) {
+          budget_level = directData.budget_level;
+          console.log(
+            `Using budget level directly from request data: ${budget_level}`
+          );
+        }
+
+        // Try to get location from vacation_location if available
+        if (!city && requestDetails.vacation_location) {
+          const parsedVacationLocation = parseLocationString(
+            requestDetails.vacation_location
+          );
+          if (parsedVacationLocation.city) {
+            city = parsedVacationLocation.city;
+            console.log(`Extracted city from vacation_location: ${city}`);
+
+            if (!country && parsedVacationLocation.country) {
+              country = parsedVacationLocation.country;
+              console.log(
+                `Extracted country from vacation_location: ${country}`
+              );
+            }
+          }
+        }
+
+        // If we have a specific location, search for restaurants
+        if (city && country) {
+          // Format location properly as a string containing both city and country
+          const location = `${city}, ${country}`;
+
+          // Merge extracted filters with existing parameters
+          const enhancedFilters = {
+            ...otherDetails,
+            ...filters,
+            cuisine,
+            budget_level,
+            city,
+            country,
+          };
+
+          console.log(
+            `Searching restaurants with location: ${location}, filters:`,
+            enhancedFilters
+          );
+
+          return await fetchRestaurants(location, enhancedFilters);
+        } else if (city) {
+          // Try to infer country if we only have city
+          const inferredCountry = inferCountryForCity(city);
+          if (inferredCountry) {
+            country = inferredCountry;
+            console.log(
+              `Inferred country for restaurant search: ${inferredCountry}`
+            );
+            // Format location as simple string with city and country
+            const location = `${city}, ${inferredCountry}`;
+
+            // Merge extracted filters with existing parameters
+            const enhancedFilters = {
+              ...otherDetails,
+              ...filters,
+              cuisine,
+              budget_level,
+              city,
+              country: inferredCountry,
+            };
+
+            console.log(
+              `Searching restaurants with inferred location: ${location}, filters:`,
+              enhancedFilters
+            );
+
+            return await fetchRestaurants(location, enhancedFilters);
+          }
+        } else if (enhancedDetails.location) {
+          // If we have a combined location string, try to parse it
+          const parsedLocation = parseLocationString(enhancedDetails.location);
+          if (parsedLocation && parsedLocation.city) {
+            // Create location string directly from parsed parts
+            const locationStr = parsedLocation.country
+              ? `${parsedLocation.city}, ${parsedLocation.country}`
+              : parsedLocation.city;
+
+            // Merge extracted filters with existing parameters
+            const enhancedFilters = {
+              ...otherDetails,
+              ...filters,
+              cuisine,
+              budget_level,
+              city: parsedLocation.city,
+              country: parsedLocation.country,
+            };
+
+            console.log(
+              `Parsed location for restaurant search: ${locationStr}, filters:`,
+              enhancedFilters
+            );
+
+            return await fetchRestaurants(locationStr, enhancedFilters);
+          }
+        }
+
+        // Log what's missing to help debug
+        console.error("Restaurant search failed - missing data:", {
+          city: city || "missing",
+          country: country || "missing",
+          originalRequest: requestDetails,
+        });
+
+        // If we get here, we don't have enough data for a restaurant search
+        return {
+          success: false,
+          error: "Incomplete location data for restaurant search",
+          requestData: enhancedDetails,
+          debug: {
+            originalCity: directData.city,
+            originalCountry: directData.country,
+            enhancedCity: city,
+            enhancedCountry: country,
+          },
+        };
+      }
+
+      // Handle other intents with appropriate function calls
+      default:
+        // For intents we don't handle yet, return an error response
+        console.warn(`No handler implemented for intent: ${intent}`);
+        return {
+          success: false,
+          error: `Service for ${intent} not implemented yet`,
+          requestData: enhancedDetails,
+          fakeResponse: true, // Indicate this is a fake/placeholder response
+          details: {
+            message: `This would normally fetch ${intent
+              .toLowerCase()
+              .replace(/-/g, " ")} data from an external service`,
+          },
         };
     }
   } catch (error) {
-    console.error(`Error in fetchExternalData:`, error);
+    console.error(`Error in external data service for ${intent}:`, error);
     return {
       success: false,
-      error: `External data service error: ${error.message}`,
+      error: error.message || `Failed to fetch data for ${intent}`,
+      requestData: requestDetails,
     };
   }
 };
 
 /**
- * Process and validate request details before sending to API
- * @param {string} intent - The detected intent
- * @param {Object} details - Original request details
- * @returns {Object} - Processed request details
+ * Process the API request details and normalize them for the external services
+ * @param {Object} requestDetails - The original request details
+ * @returns {Object} - Normalized request details
  */
-const processRequestDetails = (intent, details) => {
-  if (!details) return {};
+export const processRequestDetails = (requestDetails) => {
+  try {
+    console.log("Processing request details:", requestDetails);
 
-  // Create a copy to avoid modifying the original
-  const processedDetails = { ...details };
+    // Deep clone to avoid modifying the original
+    const processedDetails = JSON.parse(JSON.stringify(requestDetails || {}));
 
-  // Check if collectedData exists and has fields - integrate them
-  if (details.collectedData && Object.keys(details.collectedData).length > 0) {
-    console.log(
-      "Found collectedData, integrating with details:",
-      details.collectedData
-    );
-
-    // Add any fields from collectedData that aren't in the main details
-    Object.entries(details.collectedData).forEach(([key, value]) => {
-      if (
-        processedDetails[key] === undefined &&
-        value !== undefined &&
-        key !== "lastUpdated" &&
-        value !== null
-      ) {
-        processedDetails[key] = value;
-        console.log(`Added ${key} from collectedData:`, value);
-      }
-    });
-
-    // Remove the collectedData field from processed details to avoid confusion
-    delete processedDetails.collectedData;
-  }
-
-  // Check if we have a user profile field and process it
-  if (details.userProfile && Object.keys(details.userProfile).length > 0) {
-    console.log(
-      "Found userProfile data, integrating with details:",
-      details.userProfile
-    );
-
-    // בדיקה האם יש שדה timeContext בפרופיל המשתמש לטיפול בזמנים
-    if (details.userProfile.timeContext && !processedDetails.timeContext) {
-      console.log(
-        `Using timeContext=${details.userProfile.timeContext} from userProfile`
-      );
-      processedDetails.timeContext = details.userProfile.timeContext;
-    }
-
-    // הסרת שדות boolean ישנים אם קיימים בפרופיל המשתמש
-    const oldTimeFlags = [
-      "isCurrentTime",
-      "isToday",
-      "isTomorrow",
-      "isWeekend",
-    ];
-    let hasOldTimeFlag = false;
-    let detectedTimeContext = null;
-
-    // בדיקה אם יש דגלי זמן ישנים בפרופיל המשתמש
-    oldTimeFlags.forEach((flag) => {
-      if (
-        details.userProfile[flag] === true ||
-        details.userProfile[flag] === "true"
-      ) {
-        hasOldTimeFlag = true;
-        console.log(`Found old time flag in userProfile: ${flag}=true`);
-
-        // המרה לפורמט החדש
-        if (flag === "isCurrentTime") detectedTimeContext = "now";
-        else if (flag === "isToday") detectedTimeContext = "today";
-        else if (flag === "isTomorrow") detectedTimeContext = "tomorrow";
-        else if (flag === "isWeekend") detectedTimeContext = "weekend";
-      }
-    });
-
-    // אם מצאנו דגל ישן ואין timeContext מוגדר, נשתמש בערך שזיהינו
+    // Extract location and country information
     if (
-      hasOldTimeFlag &&
-      detectedTimeContext &&
-      !processedDetails.timeContext
+      processedDetails.location ||
+      processedDetails.city ||
+      processedDetails.vacation_location
     ) {
-      console.log(
-        `Converting old time flags to timeContext=${detectedTimeContext}`
-      );
-      processedDetails.timeContext = detectedTimeContext;
-    }
+      // Use city field if available, otherwise use location
+      const locationStr =
+        processedDetails.city ||
+        processedDetails.location ||
+        processedDetails.vacation_location ||
+        "";
 
-    // Add any fields from userProfile that aren't in the main details
-    Object.entries(details.userProfile).forEach(([key, value]) => {
-      if (
-        // לא להעתיק את השדות הבוליאניים הישנים
-        !oldTimeFlags.includes(key) &&
-        processedDetails[key] === undefined &&
-        value !== undefined &&
-        key !== "lastUpdated" &&
-        value !== null
-      ) {
-        processedDetails[key] = value;
-        console.log(`Added ${key} from userProfile:`, value);
-      }
-    });
+      // Use our location parser to extract city and country
+      const parsedLocation = parseLocationString(locationStr);
 
-    // Remove the userProfile field from processed details to avoid confusion
-    delete processedDetails.userProfile;
-  }
-
-  // Standardize field names - ensure we use consistent names for the same concepts
-  // This is critical for Find-Hotel intent to properly recognize budget levels
-  if (intent === "Find-Hotel") {
-    // Check for alternative budget field names and standardize to budget_level
-    if (!processedDetails.budget_level) {
-      // Look for alternative field names that might contain budget information
-      const budgetLevel =
-        processedDetails.hotel_type ||
-        processedDetails.price_level ||
-        processedDetails.budget ||
-        processedDetails.price_range;
-
-      if (budgetLevel) {
-        console.log(
-          `Standardizing budget field: ${budgetLevel} → budget_level`
-        );
-        processedDetails.budget_level = budgetLevel;
-
-        // Clean up alternative fields to avoid confusion
-        delete processedDetails.hotel_type;
-        delete processedDetails.price_level;
-        delete processedDetails.price_range;
-      }
-    }
-
-    // If we still don't have a budget_level, check the original query for keywords
-    if (
-      !processedDetails.budget_level &&
-      (processedDetails.original_query ||
-        processedDetails.query ||
-        processedDetails.userMessage)
-    ) {
-      const queryText = (
-        processedDetails.original_query ||
-        processedDetails.query ||
-        processedDetails.userMessage ||
-        ""
-      ).toLowerCase();
-
-      if (
-        queryText.includes("luxury") ||
-        queryText.includes("expensive") ||
-        queryText.includes("high-end") ||
-        queryText.includes("fancy") ||
-        queryText.includes("5-star") ||
-        queryText.includes("premium")
-      ) {
-        processedDetails.budget_level = "luxury";
-        console.log(
-          `Detected luxury keyword in query, setting budget_level=luxury`
-        );
-      } else if (
-        queryText.includes("cheap") ||
-        queryText.includes("budget") ||
-        queryText.includes("inexpensive") ||
-        queryText.includes("affordable") ||
-        queryText.includes("low cost") ||
-        queryText.includes("cheapest") ||
-        queryText.includes("economical")
-      ) {
-        // Use "cheap" instead of "budget" for better consistency across system
-        processedDetails.budget_level = "cheap";
-        console.log(
-          `Detected budget keyword in query, setting budget_level=cheap`
-        );
-      } else if (
-        queryText.includes("moderate") ||
-        queryText.includes("mid-range") ||
-        queryText.includes("average") ||
-        queryText.includes("standard")
-      ) {
-        processedDetails.budget_level = "moderate";
-        console.log(
-          `Detected moderate keyword in query, setting budget_level=moderate`
-        );
-      }
-    }
-  }
-  // Special handling for restaurant searches
-  else if (intent === "Find-Restaurants") {
-    // Handle preferences array or string
-    if (processedDetails.preferences) {
-      let preferencesList = [];
-
-      // Convert to array if it's a string
-      if (typeof processedDetails.preferences === "string") {
-        preferencesList = [processedDetails.preferences];
-      }
-      // Keep as is if it's already an array
-      else if (Array.isArray(processedDetails.preferences)) {
-        preferencesList = processedDetails.preferences;
+      if (parsedLocation.city) {
+        processedDetails.city = parsedLocation.city;
+        console.log(`Set city to: ${processedDetails.city}`);
       }
 
-      // Extract rating information from preferences
-      for (const pref of preferencesList) {
-        const prefLower = pref.toLowerCase();
-        if (
-          prefLower.includes("high rating") ||
-          prefLower.includes("good rating") ||
-          prefLower.includes("top rated") ||
-          prefLower.includes("best") ||
-          prefLower.includes("highest rated")
-        ) {
-          processedDetails.rating = "high";
+      if (parsedLocation.country && !processedDetails.country) {
+        processedDetails.country = parsedLocation.country;
+        console.log(`Set country to: ${processedDetails.country}`);
+      } else if (!processedDetails.country) {
+        // Try to infer country from city if we still don't have it
+        const inferredCountry = inferCountryForCity(processedDetails.city);
+        if (inferredCountry) {
+          processedDetails.country = inferredCountry;
           console.log(
-            `Detected high rating preference from preferences array, setting rating=high`
+            `Inferred country for ${processedDetails.city}: ${inferredCountry}`
           );
-          break;
         }
       }
     }
 
-    // If rating not set from preferences, check the original query
-    if (
-      !processedDetails.rating &&
-      (processedDetails.original_query ||
-        processedDetails.query ||
-        processedDetails.userMessage)
-    ) {
-      const queryText = (
-        processedDetails.original_query ||
-        processedDetails.query ||
-        processedDetails.userMessage ||
-        ""
-      ).toLowerCase();
-
-      if (
-        queryText.includes("high rating") ||
-        queryText.includes("top rated") ||
-        queryText.includes("good rating") ||
-        queryText.includes("best restaurant") ||
-        queryText.includes("highly rated") ||
-        queryText.includes("great restaurant")
-      ) {
-        processedDetails.rating = "high";
-        console.log(`Detected rating keywords in query, setting rating=high`);
-      }
-    }
-
-    // Handle "city" vs "location" field for restaurants
-    if (processedDetails.city && !processedDetails.location) {
-      processedDetails.location = processedDetails.city;
-      console.log(
-        `Using city as location for restaurant search: ${processedDetails.city}`
+    // Extract dates from trip data if available
+    if (processedDetails.dates && typeof processedDetails.dates === "string") {
+      // Parse date range strings like "2025-06-15 to 2025-06-22"
+      const dateRangeMatch = processedDetails.dates.match(
+        /(\d{4}-\d{2}-\d{2})\s*(?:to|-)\s*(\d{4}-\d{2}-\d{2})/
       );
-    } else if (processedDetails.location && !processedDetails.city) {
-      processedDetails.city = processedDetails.location;
-      console.log(
-        `Using location as city for restaurant search: ${processedDetails.location}`
-      );
-    }
-  }
 
-  // Process common fields for any intent
-  const originalDetails = details;
-  if (
-    originalDetails.original_query ||
-    originalDetails.query ||
-    originalDetails.userMessage
-  ) {
-    const queryText = (
-      originalDetails.original_query ||
-      originalDetails.query ||
-      originalDetails.userMessage ||
-      ""
-    ).toLowerCase();
+      if (dateRangeMatch) {
+        console.log(`Found date range in trip data: ${processedDetails.dates}`);
 
-    // Check for budget terms for all intents that might need it
-    if (
-      intent === "Find-Hotel" ||
-      intent === "Find-Restaurants" ||
-      intent === "Find-Attractions"
-    ) {
-      // Check for budget terms
-      let budgetLevel = null;
-      if (
-        queryText.includes("luxury") ||
-        queryText.includes("expensive") ||
-        queryText.includes("high-end") ||
-        queryText.includes("5-star") ||
-        queryText.includes("premium")
-      ) {
-        budgetLevel = "luxury";
-      } else if (
-        queryText.includes("cheap") ||
-        queryText.includes("budget") ||
-        queryText.includes("inexpensive") ||
-        queryText.includes("affordable") ||
-        queryText.includes("low cost")
-      ) {
-        budgetLevel = "budget";
-      } else if (
-        queryText.includes("moderate") ||
-        queryText.includes("mid-range") ||
-        queryText.includes("average") ||
-        queryText.includes("standard")
-      ) {
-        budgetLevel = "moderate";
-      }
+        // Store the structured dates
+        processedDetails.structuredDates = {
+          from: dateRangeMatch[1],
+          to: dateRangeMatch[2],
+        };
 
-      // If budget term found, add to both formats for compatibility
-      if (budgetLevel) {
-        console.log(
-          `Detected budget level from query: ${budgetLevel} for ${intent}`
-        );
-
-        // Create preferences object if it doesn't exist
-        if (!processedDetails.preferences) {
-          processedDetails.preferences = {};
+        // If no specific date is requested, use start date as default
+        if (!processedDetails.date) {
+          processedDetails.date = dateRangeMatch[1];
+          console.log(
+            `Using first day of trip for date: ${processedDetails.date}`
+          );
         }
 
-        // Set budget in both formats for compatibility with different services
-        processedDetails.preferences.budget = budgetLevel;
-        processedDetails.preferences.budget_level = budgetLevel;
-        processedDetails.budget_level = budgetLevel;
-
-        console.log(`Set budget level to ${budgetLevel} for ${intent} search`);
-      }
-    }
-  }
-
-  // Handle Weather-Request specifics
-  if (intent === "Weather-Request") {
-    console.log("Raw weather request details:", processedDetails);
-
-    // Handle new field naming - city instead of location
-    if (processedDetails.city && !processedDetails.location) {
-      processedDetails.location = processedDetails.city;
-      console.log(`Using city field as location: ${processedDetails.city}`);
-    }
-
-    // Handle time field - התאמה לגישה החדשה עם timeContext
-    if (processedDetails.time) {
-      // Process time indicator words
-      if (
-        processedDetails.time === "now" ||
-        processedDetails.time === "current" ||
-        processedDetails.time === "currently"
-      ) {
-        processedDetails.timeContext = "now";
-        console.log(
-          `Set timeContext="now" based on time="${processedDetails.time}"`
-        );
-      } else if (processedDetails.time === "today") {
-        processedDetails.timeContext = "today";
-        console.log(
-          `Set timeContext="today" based on time="${processedDetails.time}"`
-        );
-      } else if (processedDetails.time === "tomorrow") {
-        processedDetails.timeContext = "tomorrow";
-        console.log(
-          `Set timeContext="tomorrow" based on time="${processedDetails.time}"`
-        );
-      } else if (processedDetails.time === "weekend") {
-        processedDetails.timeContext = "weekend";
-        console.log(
-          `Set timeContext="weekend" based on time="${processedDetails.time}"`
-        );
+        // Extract year for explicit use
+        const yearMatch = dateRangeMatch[1].match(/^(\d{4})/);
+        if (yearMatch) {
+          processedDetails.year = parseInt(yearMatch[1], 10);
+          console.log(
+            `Extracted year from trip dates: ${processedDetails.year}`
+          );
+        }
       }
     }
 
@@ -1145,80 +1488,160 @@ const processRequestDetails = (intent, details) => {
         );
       } else if (processedDetails.timeContext === "weekend") {
         const weekend = new Date(today);
-        const dayOfWeek = weekend.getDay();
-        const daysUntilWeekend =
-          dayOfWeek <= 5 ? 5 - dayOfWeek : 7 - dayOfWeek + 5;
-        weekend.setDate(weekend.getDate() + daysUntilWeekend);
+        // Find next Saturday (6 is Saturday in JavaScript)
+        const daysToAdd = (6 - today.getDay() + 7) % 7;
+        weekend.setDate(today.getDate() + daysToAdd);
         processedDetails.date = weekend.toISOString().split("T")[0];
         console.log(
-          `Set date=${processedDetails.date} based on timeContext="${processedDetails.timeContext}"`
+          `Set date=${processedDetails.date} based on timeContext="${processedDetails.timeContext}" (next Saturday)`
         );
+      } else if (
+        // If date is already set, don't override it
+        !processedDetails.date &&
+        (processedDetails.timeContext.includes("day") ||
+          processedDetails.timeContext.includes("date"))
+      ) {
+        // Try to parse date from the timeContext itself
+        try {
+          // Look for date format like "2023-01-15"
+          const dateMatch =
+            processedDetails.timeContext.match(/\d{4}-\d{2}-\d{2}/);
+          if (dateMatch) {
+            processedDetails.date = dateMatch[0];
+            console.log(
+              `Extracted date=${processedDetails.date} from timeContext="${processedDetails.timeContext}"`
+            );
+          } else {
+            // Try to parse a natural language date
+            const naturalDate = new Date(processedDetails.timeContext);
+            if (!isNaN(naturalDate.getTime())) {
+              processedDetails.date = naturalDate.toISOString().split("T")[0];
+              console.log(
+                `Parsed natural language date=${processedDetails.date} from timeContext="${processedDetails.timeContext}"`
+              );
+            }
+          }
+        } catch (e) {
+          console.warn(
+            "Failed to parse date from timeContext:",
+            processedDetails.timeContext,
+            e
+          );
+        }
+      }
+
+      // Check if the date is more than 5 days in the future (OpenWeather API limitation)
+      if (processedDetails.date) {
+        try {
+          const requestDate = new Date(processedDetails.date);
+          const today = new Date();
+
+          // Reset time part for accurate day comparison
+          today.setHours(0, 0, 0, 0);
+
+          // Calculate days difference
+          const diffTime = requestDate.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          // Flag if beyond forecast limit
+          if (diffDays > 5) {
+            processedDetails.beyondForecastLimit = true;
+            processedDetails.daysInFuture = diffDays;
+            console.log(
+              `Date ${processedDetails.date} is ${diffDays} days in future, beyond 5-day forecast limit`
+            );
+          }
+        } catch (error) {
+          console.error("Error calculating days difference:", error);
+        }
       }
     }
-    // מבטל את השימוש בשדות הבוליאניים הישנים
-    else if (!processedDetails.date) {
-      // גיבוי אחורה: אם אין timeContext ואין date, ננסה להתייחס לדגלים ישנים ולהמיר אותם
-      const today = new Date();
 
+    // If we have a daySpecificInfo object with date information, use it
+    if (processedDetails.daySpecificInfo) {
+      console.log(
+        "Processing day-specific information:",
+        processedDetails.daySpecificInfo
+      );
+
+      // If no date is set already, use the day-specific date
       if (
-        processedDetails.isCurrentTime === true ||
-        processedDetails.isCurrentTime === "true"
+        processedDetails.daySpecificInfo.date &&
+        (!processedDetails.date || processedDetails.date === "undefined")
       ) {
-        processedDetails.date = today.toISOString().split("T")[0];
-        processedDetails.timeContext = "now";
-        console.log(
-          `Using legacy isCurrentTime flag, setting timeContext="now" and date=${processedDetails.date}`
-        );
-        // מחיקת השדה הישן
-        delete processedDetails.isCurrentTime;
-      } else if (
-        processedDetails.isToday === true ||
-        processedDetails.isToday === "true"
+        processedDetails.date = processedDetails.daySpecificInfo.date;
+        console.log(`Using day-specific date: ${processedDetails.date}`);
+      }
+
+      // If we have a year from day-specific info, use it explicitly
+      if (processedDetails.daySpecificInfo.year && !processedDetails.year) {
+        processedDetails.year = processedDetails.daySpecificInfo.year;
+        console.log(`Using day-specific year: ${processedDetails.year}`);
+      }
+
+      // If location is missing, use the one from day-specific info
+      if (
+        !processedDetails.city &&
+        !processedDetails.location &&
+        processedDetails.daySpecificInfo.location
       ) {
-        processedDetails.date = today.toISOString().split("T")[0];
-        processedDetails.timeContext = "today";
-        console.log(
-          `Using legacy isToday flag, setting timeContext="today" and date=${processedDetails.date}`
+        // Use our location parser
+        const parsedLocation = parseLocationString(
+          processedDetails.daySpecificInfo.location
         );
-        // מחיקת השדה הישן
-        delete processedDetails.isToday;
-      } else if (
-        processedDetails.isTomorrow === true ||
-        processedDetails.isTomorrow === "true"
-      ) {
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        processedDetails.date = tomorrow.toISOString().split("T")[0];
-        processedDetails.timeContext = "tomorrow";
-        console.log(
-          `Using legacy isTomorrow flag, setting timeContext="tomorrow" and date=${processedDetails.date}`
-        );
-        // מחיקת השדה הישן
-        delete processedDetails.isTomorrow;
-      } else if (
-        processedDetails.isWeekend === true ||
-        processedDetails.isWeekend === "true"
-      ) {
-        const weekend = new Date(today);
-        const dayOfWeek = weekend.getDay();
-        const daysUntilWeekend =
-          dayOfWeek <= 5 ? 5 - dayOfWeek : 7 - dayOfWeek + 5;
-        weekend.setDate(weekend.getDate() + daysUntilWeekend);
-        processedDetails.date = weekend.toISOString().split("T")[0];
-        processedDetails.timeContext = "weekend";
-        console.log(
-          `Using legacy isWeekend flag, setting timeContext="weekend" and date=${processedDetails.date}`
-        );
-        // מחיקת השדה הישן
-        delete processedDetails.isWeekend;
+
+        if (parsedLocation.city) {
+          processedDetails.city = parsedLocation.city;
+          console.log(
+            `Set city to: ${processedDetails.city} from day-specific info`
+          );
+        }
+
+        if (parsedLocation.country) {
+          processedDetails.country = parsedLocation.country;
+          console.log(
+            `Set country to: ${processedDetails.country} from day-specific info`
+          );
+        }
       }
     }
 
-    // מחיקה מוחלטת של כל השדות הישנים שעלולים לגרום לקונפליקטים
-    delete processedDetails.isCurrentTime;
-    delete processedDetails.isToday;
-    delete processedDetails.isTomorrow;
-    delete processedDetails.isWeekend;
+    // Handle references to specific days in the itinerary when dates are available but no specific date is set
+    if (
+      (!processedDetails.date || processedDetails.date === "undefined") &&
+      processedDetails.dates
+    ) {
+      // First check if we have dates in object format
+      if (
+        typeof processedDetails.dates === "object" &&
+        processedDetails.dates.from
+      ) {
+        console.log(
+          `Using first day of trip from dates object: ${processedDetails.dates.from}`
+        );
+        processedDetails.date = processedDetails.dates.from;
+      }
+      // Then check if we have dates in string format
+      else if (typeof processedDetails.dates === "string") {
+        const dateRangeMatch = processedDetails.dates.match(
+          /(\d{4}-\d{2}-\d{2})\s*(?:to|-)\s*(\d{4}-\d{2}-\d{2})/
+        );
+
+        if (dateRangeMatch) {
+          console.log(`Using first day from date range: ${dateRangeMatch[1]}`);
+          processedDetails.date = dateRangeMatch[1];
+        }
+      }
+
+      // If we've set the date from the trip dates, extract the year too
+      if (processedDetails.date && !processedDetails.year) {
+        const yearMatch = processedDetails.date.match(/^(\d{4})/);
+        if (yearMatch) {
+          processedDetails.year = parseInt(yearMatch[1], 10);
+          console.log(`Extracted year from date: ${processedDetails.year}`);
+        }
+      }
+    }
 
     // Ensure we have a proper date
     if (!processedDetails.date || processedDetails.date === "undefined") {
@@ -1227,318 +1650,49 @@ const processRequestDetails = (intent, details) => {
       console.log(
         `No valid date found, defaulting to today: ${processedDetails.date}`
       );
-    }
+    } else {
+      // Check if the date is more than 5 days in the future (OpenWeather API limitation)
+      try {
+        const requestDate = new Date(processedDetails.date);
+        const today = new Date();
 
-    // Get date from dates object if exists
-    if (
-      !processedDetails.date &&
-      processedDetails.dates &&
-      processedDetails.dates.from
-    ) {
-      processedDetails.date = processedDetails.dates.from;
-      console.log(`Using date from dates.from: ${processedDetails.date}`);
-    }
+        // Reset time part for accurate day comparison
+        today.setHours(0, 0, 0, 0);
 
-    // Handle "today" as current date
-    if (processedDetails.date === "today") {
-      processedDetails.date = new Date().toISOString().split("T")[0];
-      processedDetails.timeContext = "today";
-      console.log(
-        `Converted date="today" to ${processedDetails.date} with timeContext="today"`
-      );
-    }
+        // Calculate days difference
+        const diffTime = requestDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    // בדיקה נוספת אם יש date אבל אין timeContext
-    if (processedDetails.date && !processedDetails.timeContext) {
-      // הוספת timeContext לפי התאריך
-      const today = new Date().toISOString().split("T")[0];
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split("T")[0];
-
-      if (processedDetails.date === today) {
-        processedDetails.timeContext = "today";
-      } else if (processedDetails.date === tomorrowStr) {
-        processedDetails.timeContext = "tomorrow";
-      }
-    }
-
-    // Try to extract country from the location field if it contains both city and country
-    if (!processedDetails.country && processedDetails.location) {
-      // Check if location contains a comma (likely city, country format)
-      const locationParts = processedDetails.location.split(",");
-      if (locationParts.length > 1) {
-        // Update location to be just the city
-        processedDetails.location = locationParts[0].trim();
-        processedDetails.city = locationParts[0].trim(); // Also update city field
-        // Set country to the part after the comma
-        processedDetails.country = locationParts[1].trim();
-        console.log(
-          `Extracted country from location: ${processedDetails.country}`
-        );
-      }
-
-      // Check for common patterns like "Tel Aviv Israel"
-      else {
-        const locationWords = processedDetails.location.split(" ");
-        // If we have multiple words, the last word might be a country
-        if (locationWords.length > 1) {
-          // Check if the last word is a known country
-          const possibleCountry = locationWords[locationWords.length - 1];
-          const countryCode = getCountryCode(possibleCountry);
-
-          if (countryCode) {
-            // If it's a recognized country, separate it
-            processedDetails.country = possibleCountry;
-            processedDetails.location = locationWords.slice(0, -1).join(" ");
-            processedDetails.city = processedDetails.location; // Also update city field
-            console.log(
-              `Detected country in location string: ${processedDetails.country}`
-            );
-          }
-        }
-      }
-    }
-
-    // Ensure country is present for weather requests
-    if (!processedDetails.country && processedDetails.vacation_location) {
-      // If we're requesting weather for the trip destination and we have country info in trip details
-      const locationParts = processedDetails.vacation_location.split(",");
-      if (locationParts.length > 1) {
-        processedDetails.location = locationParts[0].trim();
-        processedDetails.city = locationParts[0].trim(); // Also update city field
-        processedDetails.country = locationParts[1].trim();
-      }
-    }
-
-    // For locations like "Tel Aviv Israel" where there's no comma but both city and country
-    // are in the same string, try to separate them
-    if (!processedDetails.country && processedDetails.location) {
-      const words = processedDetails.location.split(/\s+/);
-      // Try to identify if the last word could be a country
-      if (words.length > 1) {
-        const lastWord = words[words.length - 1];
-        if (
-          inferCountryForWellKnownCity(lastWord) ||
-          getCountryCode(lastWord)
-        ) {
-          processedDetails.country = lastWord;
-          processedDetails.location = words.slice(0, -1).join(" ");
-          processedDetails.city = processedDetails.location; // Also update city field
+        // Flag if beyond forecast limit
+        if (diffDays > 5) {
+          processedDetails.beyondForecastLimit = true;
+          processedDetails.daysInFuture = diffDays;
           console.log(
-            `Separated city and country from: "${details.location}" to location: "${processedDetails.location}", country: "${processedDetails.country}"`
+            `Date ${processedDetails.date} is ${diffDays} days in future, beyond 5-day forecast limit`
           );
         }
+      } catch (error) {
+        console.error("Error calculating days difference:", error);
       }
     }
 
-    // Last resort: If we have a well-known city, infer the country
-    if (!processedDetails.country && processedDetails.location) {
-      const inferredCountry = inferCountryForWellKnownCity(
-        processedDetails.location
-      );
-      if (inferredCountry) {
-        processedDetails.country = inferredCountry;
-        console.log(
-          `Inferred country for well-known city: ${processedDetails.location} -> ${inferredCountry}`
-        );
-      }
-    }
-
-    console.log(`Processed weather request details:`, processedDetails);
-  } else if (intent === "Find-Hotel") {
-    // Handle hotel request specifics
-
-    // Handle city as location
-    if (processedDetails.city && !processedDetails.location) {
-      processedDetails.location = processedDetails.city;
+    // Add a formatted location string for display
+    if (processedDetails.city || processedDetails.country) {
+      processedDetails.formattedLocation = formatLocation({
+        city: processedDetails.city,
+        country: processedDetails.country,
+      });
       console.log(
-        `Using city field as location for hotel search: ${processedDetails.city}`
+        `Set formatted location: ${processedDetails.formattedLocation}`
       );
     }
 
-    // Try to extract country from location if it's in "City, Country" format
-    if (!processedDetails.country && processedDetails.location) {
-      // Check if location contains a comma (likely city, country format)
-      const locationParts = processedDetails.location.split(",");
-      if (locationParts.length > 1) {
-        // Update location to be just the city
-        processedDetails.location = locationParts[0].trim();
-        // Set country to the part after the comma
-        processedDetails.country = locationParts[1].trim();
-        console.log(
-          `Extracted country from location: ${processedDetails.country}`
-        );
-      }
-
-      // If location is "Tel Aviv Israel" format without comma
-      else if (processedDetails.location.includes(" ")) {
-        const locationWords = processedDetails.location.split(" ");
-        // Check if the last word could be a country
-        const lastWord = locationWords[locationWords.length - 1];
-
-        // Use a very simple check for common countries
-        const commonCountries = [
-          "israel",
-          "usa",
-          "uk",
-          "france",
-          "spain",
-          "italy",
-          "germany",
-        ];
-        if (commonCountries.includes(lastWord.toLowerCase())) {
-          processedDetails.country = lastWord;
-          processedDetails.location = locationWords.slice(0, -1).join(" ");
-          console.log(
-            `Detected country in location string: ${processedDetails.country}`
-          );
-        }
-      }
-    }
-
-    // Extract budget terms from the original request
-    const originalDetails = details;
-    if (originalDetails.original_query || originalDetails.query) {
-      const queryText = (
-        originalDetails.original_query || originalDetails.query
-      ).toLowerCase();
-
-      // Check for budget terms
-      let budgetLevel = null;
-      if (
-        queryText.includes("luxury") ||
-        queryText.includes("expensive") ||
-        queryText.includes("high-end") ||
-        queryText.includes("5-star") ||
-        queryText.includes("premium")
-      ) {
-        budgetLevel = "luxury";
-      } else if (
-        queryText.includes("cheap") ||
-        queryText.includes("budget") ||
-        queryText.includes("inexpensive") ||
-        queryText.includes("affordable") ||
-        queryText.includes("low cost")
-      ) {
-        budgetLevel = "budget";
-      } else if (
-        queryText.includes("moderate") ||
-        queryText.includes("mid-range") ||
-        queryText.includes("average") ||
-        queryText.includes("standard")
-      ) {
-        budgetLevel = "moderate";
-      }
-
-      // If budget term found, add to both formats for compatibility
-      if (budgetLevel) {
-        console.log(`Detected budget level from query: ${budgetLevel}`);
-
-        // Create preferences object if it doesn't exist
-        if (!processedDetails.preferences) {
-          processedDetails.preferences = {};
-        }
-
-        // Set budget in both formats for compatibility with different services
-        processedDetails.preferences.budget = budgetLevel;
-        processedDetails.preferences.budget_level = budgetLevel;
-        processedDetails.budget_level = budgetLevel;
-
-        console.log(`Set budget level to ${budgetLevel} for hotel search`);
-      }
-    }
-
-    // Process check-in date only if explicitly provided, but don't require it
-    if (processedDetails.time && !processedDetails.checkIn) {
-      // Process time indicators but make it optional
-      if (
-        processedDetails.time === "now" ||
-        processedDetails.time === "today"
-      ) {
-        processedDetails.checkIn = new Date().toISOString().split("T")[0];
-      } else if (processedDetails.time === "tomorrow") {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        processedDetails.checkIn = tomorrow.toISOString().split("T")[0];
-      } else if (
-        processedDetails.time &&
-        processedDetails.time.match(/\d{4}-\d{2}-\d{2}/)
-      ) {
-        // Only use as checkIn if it's a valid date format
-        processedDetails.checkIn = processedDetails.time;
-      }
-
-      if (processedDetails.checkIn) {
-        console.log(`Set check-in date to: ${processedDetails.checkIn}`);
-      } else {
-        console.log(
-          `No valid check-in date provided, proceeding without date filtering`
-        );
-      }
-    }
-  } else if (intent === "Find-Restaurants") {
-    // Handle restaurant request specifics
-
-    // Handle city as location
-    if (processedDetails.city && !processedDetails.location) {
-      processedDetails.location = processedDetails.city;
-      console.log(
-        `Using city field as location for restaurant search: ${processedDetails.city}`
-      );
-    }
-
-    // Try to extract country from location if it's in "City, Country" format
-    if (!processedDetails.country && processedDetails.location) {
-      // Check if location contains a comma (likely city, country format)
-      const locationParts = processedDetails.location.split(",");
-      if (locationParts.length > 1) {
-        // Update location to be just the city
-        processedDetails.location = locationParts[0].trim();
-        // Set country to the part after the comma
-        processedDetails.country = locationParts[1].trim();
-        console.log(
-          `Extracted country from location: ${processedDetails.country}`
-        );
-      }
-
-      // If location is "Tel Aviv Israel" format without comma
-      else if (processedDetails.location.includes(" ")) {
-        const locationWords = processedDetails.location.split(" ");
-        // Check if the last word could be a country
-        const lastWord = locationWords[locationWords.length - 1];
-
-        // Use a very simple check for common countries
-        const commonCountries = [
-          "israel",
-          "usa",
-          "uk",
-          "france",
-          "spain",
-          "italy",
-          "germany",
-        ];
-        if (commonCountries.includes(lastWord.toLowerCase())) {
-          processedDetails.country = lastWord;
-          processedDetails.location = locationWords.slice(0, -1).join(" ");
-          console.log(
-            `Detected country in location string: ${processedDetails.country}`
-          );
-        }
-      }
-    }
+    console.log("Processed request details:", processedDetails);
+    return processedDetails;
+  } catch (error) {
+    console.error("Error processing request details:", error);
+    return { ...requestDetails, error: "Failed to process request details" };
   }
-
-  // Remove internal meta fields to keep just data fields for API calls
-  delete processedDetails.meta;
-  delete processedDetails.rules;
-  delete processedDetails.missingFields;
-  delete processedDetails.status;
-  delete processedDetails.next_state;
-  delete processedDetails.next_action;
-
-  console.log("Processed request details:", processedDetails);
-  return processedDetails;
 };
 
 /**

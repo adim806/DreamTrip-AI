@@ -4,6 +4,7 @@ import ImageKit from "imagekit";
 import mongoose from "mongoose";
 import Chat from "./models/chat.js";
 import UserChats from "./models/userChats.js";
+import Itinerary from "./models/itinerary.js";
 import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
 import dotenv from "dotenv";
 
@@ -1565,25 +1566,42 @@ app.delete("/api/userchats/:id", authMiddleware, async (req, res) => {
 // Save an itinerary
 app.post("/api/itineraries", authMiddleware, async (req, res) => {
   const userId = req.auth.userId;
-  const { chatId, itinerary, metadata } = req.body;
+  const { chatId, itinerary, structuredItinerary, metadata } = req.body;
 
   try {
     console.log(`Saving itinerary for user: ${userId}, chat: ${chatId}`);
+    console.log(
+      `Received structured itinerary: ${structuredItinerary ? "Yes" : "No"}`
+    );
 
-    // Create a new itinerary record in the database
-    // This is a simplified implementation - in production, you'd want to
-    // store this in a dedicated collection
+    // יצירת רשומת יומן חדשה במודל הנפרד
+    const newItinerary = new Itinerary({
+      chatId: chatId,
+      userId: userId,
+      title: structuredItinerary?.title || "יומן טיול",
+      destination:
+        structuredItinerary?.destination || metadata?.destination || "",
+      duration: structuredItinerary?.duration || metadata?.duration || "",
+      dates: {
+        from: structuredItinerary?.dates?.from || metadata?.dates?.from || "",
+        to: structuredItinerary?.dates?.to || metadata?.dates?.to || "",
+      },
+      rawContent: itinerary,
+      structuredContent: structuredItinerary,
+      metadata: metadata || {},
+      version: 1,
+    });
 
-    // Update the chat with a reference to this itinerary
+    // שמירת היומן במסד הנתונים
+    const savedItinerary = await newItinerary.save();
+    console.log(`Saved new itinerary with ID: ${savedItinerary._id}`);
+
+    // הוספת קישור ליומן בצ'אט
     const updatedChat = await Chat.updateOne(
       { _id: chatId, userId },
       {
         $set: {
-          itinerary: {
-            content: itinerary,
-            metadata,
-            createdAt: new Date(),
-          },
+          itineraryId: savedItinerary._id,
         },
       }
     );
@@ -1595,10 +1613,111 @@ app.post("/api/itineraries", authMiddleware, async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Itinerary saved successfully",
+      itineraryId: savedItinerary._id,
     });
   } catch (error) {
     console.error("Error saving itinerary:", error);
     res.status(500).send("Error saving itinerary");
+  }
+});
+
+// Get all itineraries for a user
+app.get("/api/itineraries", authMiddleware, async (req, res) => {
+  const userId = req.auth.userId;
+
+  try {
+    const itineraries = await Itinerary.find({ userId })
+      .sort({ createdAt: -1 })
+      .select("-rawContent -structuredContent"); // לא מחזירים את כל התוכן כדי לצמצם את גודל התגובה
+
+    res.status(200).json(itineraries);
+  } catch (error) {
+    console.error("Error fetching itineraries:", error);
+    res.status(500).send("Error fetching itineraries");
+  }
+});
+
+// Get a specific itinerary by ID
+app.get("/api/itineraries/:id", authMiddleware, async (req, res) => {
+  const userId = req.auth.userId;
+  const itineraryId = req.params.id;
+
+  try {
+    const itinerary = await Itinerary.findOne({
+      _id: itineraryId,
+      $or: [{ userId: userId }, { isPublic: true }],
+    });
+
+    if (!itinerary) {
+      return res.status(404).send("Itinerary not found");
+    }
+
+    res.status(200).json(itinerary);
+  } catch (error) {
+    console.error("Error fetching itinerary:", error);
+    res.status(500).send("Error fetching itinerary");
+  }
+});
+
+// Update an itinerary
+app.put("/api/itineraries/:id", authMiddleware, async (req, res) => {
+  const userId = req.auth.userId;
+  const itineraryId = req.params.id;
+  const { title, isFavorite, isPublic, tags } = req.body;
+
+  try {
+    const updateFields = {};
+
+    if (title !== undefined) updateFields.title = title;
+    if (isFavorite !== undefined) updateFields.isFavorite = isFavorite;
+    if (isPublic !== undefined) updateFields.isPublic = isPublic;
+    if (tags !== undefined) updateFields.tags = tags;
+
+    const updatedItinerary = await Itinerary.findOneAndUpdate(
+      { _id: itineraryId, userId: userId },
+      { $set: updateFields },
+      { new: true }
+    );
+
+    if (!updatedItinerary) {
+      return res.status(404).send("Itinerary not found");
+    }
+
+    res.status(200).json(updatedItinerary);
+  } catch (error) {
+    console.error("Error updating itinerary:", error);
+    res.status(500).send("Error updating itinerary");
+  }
+});
+
+// Delete an itinerary
+app.delete("/api/itineraries/:id", authMiddleware, async (req, res) => {
+  const userId = req.auth.userId;
+  const itineraryId = req.params.id;
+
+  try {
+    const deletedItinerary = await Itinerary.findOneAndDelete({
+      _id: itineraryId,
+      userId: userId,
+    });
+
+    if (!deletedItinerary) {
+      return res.status(404).send("Itinerary not found");
+    }
+
+    // Remove reference from chat if it exists
+    await Chat.updateMany(
+      { itineraryId: itineraryId },
+      { $unset: { itineraryId: "" } }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Itinerary deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting itinerary:", error);
+    res.status(500).send("Error deleting itinerary");
   }
 });
 
