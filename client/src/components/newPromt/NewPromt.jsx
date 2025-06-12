@@ -17,7 +17,6 @@ import { IoSend, IoImageOutline } from "react-icons/io5";
 // Import UI components
 import TripSummary from "../ui/TripSummary";
 import ItineraryDisplay from "../ui/ItineraryDisplay";
-import TripSelector from "../ui/TripSelector";
 import ItineraryEditor from "../ui/ItineraryEditor";
 
 // Import utility functions
@@ -154,21 +153,21 @@ const forceUpdateReducer = (state) => state + 1;
 
 const NewPromt = ({ data }) => {
   // Get the trip context
-  const { 
-    conversationState, 
-    CONVERSATION_STATES, 
+  const {
+    conversationState,
+    CONVERSATION_STATES,
     transitionState,
     startNewTrip,
     tripDetails,
-    handleGenerateItinerary
+    handleGenerateItinerary,
   } = useContext(TripContext);
-  
+
   // State to control when to show trip summary
   const [showTripSummary, setShowTripSummary] = useState(false);
-  
+
   // Add a force update reducer for when we need to force DOM updates
   const [forceUpdateCounter, forceUpdate] = useReducer(forceUpdateReducer, 0);
-  
+
   // Image handling state
   const [img, setImg] = useState({
     isLoading: false,
@@ -181,15 +180,11 @@ const NewPromt = ({ data }) => {
   const endRef = useRef(null);
   const formRef = useRef(null);
   const inputRef = useRef(null);
-  
+
   // Use our custom hook for AI processing
   const processingHook = useProcessUserInput(data);
-  const {
-    processUserInput,
-    pendingMessages,
-    isTyping
-  } = processingHook;
-  
+  const { processUserInput, pendingMessages, isTyping } = processingHook;
+
   // Share the hook with the parent component by exposing it on window (temporary solution)
   useEffect(() => {
     // This is a workaround to share the hook state with ChatPage
@@ -205,16 +200,16 @@ const NewPromt = ({ data }) => {
         // Add the forceUpdate function
         forceUpdate: forceUpdate,
         // Add pendingMessages for access from other components
-        pendingMessages: processingHook.pendingMessages
+        pendingMessages: processingHook.pendingMessages,
       };
     };
-    
+
     // Update immediately
     updateHookState();
-    
+
     // Set a flag in the window object to indicate NewPromt is mounted and ready
     window.__newPromtReady = true;
-    
+
     // Clear any ongoing typing indicator when component unmounts
     return () => {
       window.__newPromtReady = false;
@@ -227,7 +222,7 @@ const NewPromt = ({ data }) => {
       }
     };
   }, [processingHook, forceUpdate]);
-  
+
   // Auto-scroll handling
   useEffect(() => {
     const scrollToBottom = () => {
@@ -264,8 +259,12 @@ const NewPromt = ({ data }) => {
       }
       return;
     }
-    
-    if (conversationState === CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION && tripDetails) {
+
+    if (
+      conversationState ===
+        CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION &&
+      tripDetails
+    ) {
       // Check if typing has finished before showing the summary
       if (!isTyping && pendingMessages && pendingMessages.length > 0) {
         // Delay showing the summary slightly to ensure the response is visible first
@@ -279,11 +278,20 @@ const NewPromt = ({ data }) => {
       // Hide summary when not in confirmation state
       // Especially hide it during GENERATING_ITINERARY state
       if (showTripSummary) {
-        console.log("Hiding trip summary due to state change to:", conversationState);
+        console.log(
+          "Hiding trip summary due to state change to:",
+          conversationState
+        );
         setShowTripSummary(false);
       }
     }
-  }, [conversationState, isTyping, pendingMessages, tripDetails, showTripSummary]);
+  }, [
+    conversationState,
+    isTyping,
+    pendingMessages,
+    tripDetails,
+    showTripSummary,
+  ]);
 
   // Monitor conversation state changes to debug TripSummary rendering
   useEffect(() => {
@@ -292,35 +300,48 @@ const NewPromt = ({ data }) => {
       // Use a counter to only log periodically, not on every render
       const now = Date.now();
       const lastLogTime = window.__lastPromtMonitorLog || 0;
-      
+
       // Only log if it's been more than 2 seconds since the last log
       if (now - lastLogTime > 2000) {
         window.__lastPromtMonitorLog = now;
-        
+
         console.log("NewPromt monitoring state:", {
           conversationState,
           hasTripDetails: !!tripDetails,
           tripDetailsKeys: tripDetails ? Object.keys(tripDetails) : [],
-          shouldDisplaySummary: showTripSummary && 
-            conversationState === CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION && 
-            !!tripDetails
+          shouldDisplaySummary:
+            showTripSummary &&
+            conversationState ===
+              CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION &&
+            !!tripDetails,
         });
-        
+
         // Check if all the required trip data is present
         if (tripDetails) {
-          const hasRequiredFields = 
-            tripDetails.vacation_location && 
+          const hasRequiredFields =
+            tripDetails.vacation_location &&
             tripDetails.duration &&
-            ((tripDetails.dates && tripDetails.dates.from && tripDetails.dates.to) || tripDetails.isTomorrow) &&
-            (tripDetails.budget || (tripDetails.constraints && tripDetails.constraints.budget));
-            
-          console.log("Trip completeness check in NewPromt:", { 
+            ((tripDetails.dates &&
+              tripDetails.dates.from &&
+              tripDetails.dates.to) ||
+              tripDetails.isTomorrow) &&
+            (tripDetails.budget ||
+              (tripDetails.constraints && tripDetails.constraints.budget));
+
+          console.log("Trip completeness check in NewPromt:", {
             hasRequiredFields,
             vacation_location: !!tripDetails.vacation_location,
             duration: !!tripDetails.duration,
-            dates: !!(tripDetails.dates && tripDetails.dates.from && tripDetails.dates.to),
+            dates: !!(
+              tripDetails.dates &&
+              tripDetails.dates.from &&
+              tripDetails.dates.to
+            ),
             isTomorrow: !!tripDetails.isTomorrow,
-            budget: !!(tripDetails.budget || (tripDetails.constraints && tripDetails.constraints.budget))
+            budget: !!(
+              tripDetails.budget ||
+              (tripDetails.constraints && tripDetails.constraints.budget)
+            ),
           });
         }
       }
@@ -346,21 +367,26 @@ const NewPromt = ({ data }) => {
   const handleConfirmTrip = () => {
     // Hide trip summary BEFORE anything else happens
     hideTripSummary();
-    
+
     // Force component to re-render to ensure trip summary is gone
     setShowTripSummary(false);
     forceUpdate();
-    
+
     // Set a flag to indicate generation has started
     window.__itineraryGenerationStarted = true;
-    
-    console.log("Trip summary hidden, beginning itinerary generationnnnnnnnnnnnnnnnnnyyyy");
-    
+
+    console.log(
+      "Trip summary hidden, beginning itinerary generationnnnnnnnnnnnnnnnnnyyyy"
+    );
+
     // Immediately transition to generating state to show proper UI
     transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
-    
+
     // Add a loading indicator to the chat
-    if (window.__processingHookState && window.__processingHookState.addLoadingMessage) {
+    if (
+      window.__processingHookState &&
+      window.__processingHookState.addLoadingMessage
+    ) {
       // First check if we should add a system message
       if (window.__processingHookState.addSystemMessage) {
         console.log("Adding initial system message before generation");
@@ -368,24 +394,25 @@ const NewPromt = ({ data }) => {
           "Great! I'll generate your personalized travel itinerary now. This might take a moment..."
         );
       }
-      
+
       // Create loading indicator and store its ID globally so it can be replaced later
       console.log("Creating loading indicator for itinerary generation");
       const loadingId = window.__processingHookState.addLoadingMessage({
         isGenerating: true,
         isItineraryGeneration: true,
-        message: "Generating your personalized travel itinerary... This might take a few moments."
+        message:
+          "Generating your personalized travel itinerary... This might take a few moments.",
       });
-      
+
       console.log("Created itinerary loading message with ID:", loadingId);
       window.__itineraryLoadingId = loadingId;
     }
-    
+
     // Add a slight delay before triggering generation to ensure UI updates
     setTimeout(() => {
       console.log("Starting itinerary generation");
       // Check if handleGenerateItinerary exists before calling it
-      if (typeof handleGenerateItinerary === 'function') {
+      if (typeof handleGenerateItinerary === "function") {
         try {
           // Generate the itinerary
           console.log("Calling itinerary generator function");
@@ -402,32 +429,38 @@ const NewPromt = ({ data }) => {
       }
     }, 100);
   };
-  
+
   const handleEditTrip = () => {
     // Hide trip summary first
     hideTripSummary();
-    
+
     // Transition back to trip building mode to edit details
     transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
-    
+
     // Display a system message for editing
-    if (window.__processingHookState && window.__processingHookState.addSystemMessage) {
+    if (
+      window.__processingHookState &&
+      window.__processingHookState.addSystemMessage
+    ) {
       window.__processingHookState.addSystemMessage(
         "Let's continue editing your trip details. What would you like to change?"
       );
     }
   };
-  
+
   const handleCancelTrip = () => {
     // Hide trip summary first
     hideTripSummary();
-    
+
     // Reset and transition back to idle
     startNewTrip();
     transitionState(CONVERSATION_STATES.IDLE);
-    
+
     // Display a system message for cancellation
-    if (window.__processingHookState && window.__processingHookState.addSystemMessage) {
+    if (
+      window.__processingHookState &&
+      window.__processingHookState.addSystemMessage
+    ) {
       window.__processingHookState.addSystemMessage(
         "I've cancelled the trip planning. How else can I assist you today?"
       );
@@ -452,7 +485,7 @@ const NewPromt = ({ data }) => {
 
     // Process the input with our custom hook
     await processUserInput(text, img);
-    
+
     // Reset image state after processing
     setImg({
       isLoading: false,
@@ -463,38 +496,38 @@ const NewPromt = ({ data }) => {
   };
 
   // Determine if we should disable input based on state
-  const isInputDisabled = conversationState === CONVERSATION_STATES.GENERATING_ITINERARY;
-  
+  const isInputDisabled =
+    conversationState === CONVERSATION_STATES.GENERATING_ITINERARY;
+
   // Custom message for input placeholder during generation
-  const inputPlaceholder = isInputDisabled 
-    ? "Creating your travel itinerary..." 
+  const inputPlaceholder = isInputDisabled
+    ? "Creating your travel itinerary..."
     : "Ask DreamTrip-AI about your next vacation...";
 
   return (
     <>
       <div className="w-full flex flex-col relative box-border bg-[#171923] max-h-full">
-        {/* Trip selector component */}
-        <TripSelector />
-        
         {/* Trip summary with confirm/edit/cancel buttons - only show when showTripSummary is true */}
         {showTripSummary && (
-          <TripSummary 
+          <TripSummary
             onConfirm={handleConfirmTrip}
             onEdit={handleEditTrip}
             onCancel={handleCancelTrip}
           />
         )}
-        
+
         {/* Itinerary display component */}
         <ItineraryDisplay inChatView={true} />
-        
+
         {/* Itinerary editor component */}
         <ItineraryEditor />
-        
+
         {/* Input form only - messages are displayed in the parent component */}
-        <form 
-          className={`w-full relative bg-[#1a1e2d] flex items-center gap-4 mb-3 px-5 py-4 z-20 shadow-[0_-4px_15px_rgba(0,0,0,0.35)] border-t-2 ${isInputDisabled ? 'border-blue-500/40' : 'border-blue-500/20'} min-h-[70px] rounded-t-lg`} 
-          onSubmit={handleSubmit} 
+        <form
+          className={`w-full relative bg-[#1a1e2d] flex items-center gap-4 mb-3 px-5 py-4 z-20 shadow-[0_-4px_15px_rgba(0,0,0,0.35)] border-t-2 ${
+            isInputDisabled ? "border-blue-500/40" : "border-blue-500/20"
+          } min-h-[70px] rounded-t-lg`}
+          onSubmit={handleSubmit}
           ref={formRef}
         >
           {!isInputDisabled && <Upload setImg={setImg} />}
@@ -504,7 +537,10 @@ const NewPromt = ({ data }) => {
             </div>
           )}
           {img.dbData?.filePath && !isInputDisabled && (
-            <div className="flex items-center justify-center bg-blue-500/20 rounded-lg px-2 h-6 ml-1" title="Image attached">
+            <div
+              className="flex items-center justify-center bg-blue-500/20 rounded-lg px-2 h-6 ml-1"
+              title="Image attached"
+            >
               <div className="text-sm text-gray-300">📎</div>
             </div>
           )}
@@ -515,15 +551,19 @@ const NewPromt = ({ data }) => {
             ref={inputRef}
             placeholder={inputPlaceholder}
             disabled={isInputDisabled}
-            className={`flex-1 px-4 py-3 border-none outline-none bg-[#2a2d3c] text-gray-100 text-base rounded-xl h-[45px] shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)] ${isInputDisabled ? 'bg-[#232532] text-gray-500 italic' : 'focus:ring-2 focus:ring-blue-500/40'}`}
+            className={`flex-1 px-4 py-3 border-none outline-none bg-[#2a2d3c] text-gray-100 text-base rounded-xl h-[45px] shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)] ${
+              isInputDisabled
+                ? "bg-[#232532] text-gray-500 italic"
+                : "focus:ring-2 focus:ring-blue-500/40"
+            }`}
           />
           {isInputDisabled ? (
             <div className="rounded-full bg-blue-500/40 border-none p-2.5 w-[45px] h-[45px] flex items-center justify-center flex-shrink-0">
               <LoadingDots />
             </div>
           ) : (
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isInputDisabled}
               className="rounded-full bg-blue-500 border-none p-2.5 w-[45px] h-[45px] flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0 shadow-[0_3px_8px_rgba(59,130,246,0.4)] hover:bg-blue-600 hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(59,130,246,0.5)] active:translate-y-[1px] active:shadow-[0_1px_3px_rgba(59,130,246,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
             >

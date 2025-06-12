@@ -573,7 +573,10 @@ export const saveItinerary = async (chatId, itineraryData) => {
           chatId,
           itinerary: itineraryData.itinerary, // Original string content
           structuredItinerary, // JSON structure
-          metadata: itineraryData.metadata || {},
+          metadata: {
+            ...(itineraryData.metadata || {}),
+            savedAt: new Date().toISOString(),
+          },
         }),
       }
     );
@@ -584,7 +587,11 @@ export const saveItinerary = async (chatId, itineraryData) => {
 
     const result = await response.json();
     console.log("Itinerary saved successfully with ID:", result.itineraryId);
-    return result;
+    return {
+      success: true,
+      itineraryId: result.itineraryId,
+      ...result,
+    };
   } catch (error) {
     console.error("Error saving itinerary:", error);
     return { success: false, error: error.message };

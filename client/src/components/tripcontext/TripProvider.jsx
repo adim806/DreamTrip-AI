@@ -837,9 +837,9 @@ export function TripProvider({ children }) {
 
               // המרת מחרוזת היומן לפורמט JSON מובנה
               import("../../utils/itineraryGenerator").then(
-                async ({ convertItineraryToJSON, saveItinerary }) => {
+                async ({ convertItineraryToJSON }) => {
                   try {
-                    // המרת היומן לפורמט JSON
+                    // המרת היומן לפורמט JSON רק עבור תצוגה וניתוח, לא לשמירה
                     const structuredItinerary = convertItineraryToJSON(
                       contextData.itinerary
                     );
@@ -848,31 +848,24 @@ export function TripProvider({ children }) {
                       structuredItinerary
                     );
 
-                    // שמירת היומן המומר במודל הנפרד
+                    // לא שומרים יותר את היומן אוטומטית - השמירה תתבצע רק בלחיצת המשתמש על כפתור השמירה
+
+                    // שומרים את היומן המומר בנתוני הטיול המקומיים
+                    setallTripData((prevData) => ({
+                      ...prevData,
+                      structuredItinerary,
+                      itinerary: contextData.itinerary,
+                      metadata: contextData.metadata || {
+                        destination: tripDetails?.vacation_location,
+                        duration: tripDetails?.duration,
+                        dates: tripDetails?.dates,
+                      },
+                    }));
+
+                    // שמירת מזהה הצ'אט לייזום השמירה בהמשך
                     const chatId = window.location.pathname.split("/").pop();
+
                     if (chatId) {
-                      const saveResult = await saveItinerary(chatId, {
-                        itinerary: contextData.itinerary,
-                        structuredItinerary,
-                        metadata: contextData.metadata || {
-                          destination: tripDetails?.vacation_location,
-                          duration: tripDetails?.duration,
-                          dates: tripDetails?.dates,
-                        },
-                      });
-                      console.log(
-                        "Saved itinerary in separate model:",
-                        saveResult
-                      );
-
-                      // אם קיים מזהה של היומן החדש, שומרים אותו בפרטי הטיול
-                      if (saveResult.itineraryId) {
-                        setallTripData((prevData) => ({
-                          ...prevData,
-                          itineraryId: saveResult.itineraryId,
-                        }));
-                      }
-
                       // שמירת היומן גם בהיסטוריית השיחה
                       try {
                         const headers = {};

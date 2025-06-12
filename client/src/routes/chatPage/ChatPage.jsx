@@ -21,6 +21,235 @@ import { fieldComponentMap } from "../../components/FieldCompletion/FieldCompone
 import MissingFieldsForm from "../../components/FieldCompletion/MissingFieldsForm";
 import "./chatPage.css";
 
+// הוצאת הפונקציה החוצה מהקומפוננטה הראשית והפיכתה לקומפוננטה נפרדת
+const ItineraryActions = React.memo(({ message }) => {
+  // Check if this message is an itinerary
+  if (
+    !(
+      message.isItinerary ||
+      (message.message &&
+        message.message.includes("Day 1:") &&
+        message.message.includes("Day 2:"))
+    )
+  ) {
+    return null;
+  }
+
+  const { tripDetails } = useContext(TripContext);
+
+  // State for save button
+  const [savedStatus, setSavedStatus] = useState({
+    isSaved: false,
+    isSaving: false,
+    error: null,
+  });
+
+  // State to track if we've navigated to edit
+  const [navigatedToEdit, setNavigatedToEdit] = useState(false);
+
+  // Save itinerary function
+  const handleSaveItinerary = async () => {
+    if (savedStatus.isSaved || savedStatus.isSaving) return;
+
+    setSavedStatus((prev) => ({ ...prev, isSaving: true }));
+    try {
+      // Get the chat ID from the URL
+      const chatId = window.location.pathname.split("/").pop();
+
+      // Import the saveItinerary function
+      const { saveItinerary } = await import("../../utils/itineraryGenerator");
+
+      // Save the itinerary with the message content
+      const result = await saveItinerary(chatId, {
+        itinerary: message.message || message.displayMessage,
+        metadata: {
+          destination: tripDetails?.vacation_location,
+          duration: tripDetails?.duration,
+          dates: tripDetails?.dates,
+          savedManually: true,
+          savedAt: new Date().toISOString(),
+        },
+      });
+
+      if (result.success) {
+        setSavedStatus({
+          isSaved: true,
+          isSaving: false,
+          error: null,
+        });
+      } else {
+        throw new Error(result.error || "Failed to save itinerary");
+      }
+    } catch (error) {
+      console.error("Error saving itinerary:", error);
+      setSavedStatus({
+        isSaved: false,
+        isSaving: false,
+        error: error.message,
+      });
+    }
+  };
+
+  // Navigate to edit itinerary
+  const handleEditItinerary = () => {
+    if (navigatedToEdit) return;
+
+    // Store the itinerary data in window/localStorage for access in the edit tab
+    const itineraryData = {
+      content: message.message || message.displayMessage,
+      tripDetails,
+      messageId: message.id,
+    };
+
+    window.__editItineraryData = itineraryData;
+    localStorage.setItem(
+      "editItineraryData",
+      JSON.stringify({
+        content: message.message || message.displayMessage,
+        tripDetails: tripDetails ? JSON.stringify(tripDetails) : null,
+        messageId: message.id,
+        timestamp: Date.now(),
+      })
+    );
+
+    // Find the tabs controller and switch to trip details tab
+    const tabsController = document.querySelector(".tubelight-navbar");
+    if (tabsController) {
+      // Find the trip details tab button (usually the third one)
+      const tripDetailsTab = tabsController.querySelectorAll("button")[2];
+      if (tripDetailsTab) {
+        tripDetailsTab.click();
+        setNavigatedToEdit(true);
+      }
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5, duration: 0.3 }}
+      className="itinerary-actions flex flex-wrap gap-2 mt-3 mb-2 justify-end"
+    >
+      <button
+        onClick={handleSaveItinerary}
+        disabled={savedStatus.isSaved || savedStatus.isSaving}
+        className={`px-4 py-2 rounded-md flex items-center gap-2 text-sm transition-all ${
+          savedStatus.isSaved
+            ? "bg-green-500/20 text-green-300 border border-green-500/30"
+            : savedStatus.isSaving
+            ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+            : "bg-blue-600 hover:bg-blue-700 text-white"
+        }`}
+      >
+        {savedStatus.isSaved ? (
+          <>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Saved
+          </>
+        ) : savedStatus.isSaving ? (
+          <>
+            <svg
+              className="animate-spin h-4 w-4 text-blue-300"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            Saving...
+          </>
+        ) : (
+          <>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h1a2 2 0 012 2v7a2 2 0 01-2 2H8a2 2 0 01-2-2v-7a2 2 0 012-2h1v5.586l-1.293-1.293zM13 6h-2v5a1 1 0 01-.293.707l-2 2a1 1 0 01-1.414 0l-2-2A1 1 0 015 11V6H3a3 3 0 00-3 3v8a3 3 0 003 3h10a3 3 0 003-3V9a3 3 0 00-3-3z" />
+            </svg>
+            Save Itinerary
+          </>
+        )}
+      </button>
+
+      <button
+        onClick={handleEditItinerary}
+        disabled={navigatedToEdit}
+        className={`px-4 py-2 rounded-md flex items-center gap-2 text-sm transition-all ${
+          navigatedToEdit
+            ? "bg-gray-500/20 text-gray-400 border border-gray-500/20"
+            : "bg-purple-600 hover:bg-purple-700 text-white"
+        }`}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-4 w-4"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+        </svg>
+        Edit Itinerary
+      </button>
+
+      {savedStatus.error && (
+        <div className="bg-red-500/10 text-red-300 text-xs p-2 rounded-md border border-red-500/20 w-full mt-1">
+          Error saving: {savedStatus.error}
+        </div>
+      )}
+    </motion.div>
+  );
+});
+
+// הוספת קומפוננטת UpdatedBadge שתוצג כאשר יומן עודכן
+const UpdatedBadge = React.memo(({ wasUpdated }) => {
+  if (!wasUpdated) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8, y: -5 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.3, type: "spring" }}
+      className="updated-badge bg-blue-500/20 text-blue-300 text-xs px-2 py-1 rounded-md flex items-center gap-1 absolute top-2 right-2 border border-blue-500/30"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-3 w-3"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+      </svg>
+      <span>Updated</span>
+    </motion.div>
+  );
+});
+
 const ChatPage = () => {
   const path = useLocation().pathname;
   const chatId = path.split("/").pop();
@@ -1048,6 +1277,156 @@ const ChatPage = () => {
     return <Markdown>{message}</Markdown>;
   };
 
+  // עדכון פונקציית renderItineraryActions להשתמש בקומפוננטה החדשה
+  const renderItineraryActions = (message) => {
+    return <ItineraryActions message={message} />;
+  };
+
+  // הוספת useEffect לבדיקת עדכוני יומן כשחוזרים לדף הצ'אט
+  useEffect(() => {
+    // בדיקה אם יש יומן מעודכן בזיכרון המקומי
+    const checkForUpdatedItinerary = () => {
+      try {
+        // בדיקה אם יש עדכון יומן בזיכרון הגלובלי
+        if (window.__updatedItinerary) {
+          const { content, messageId, timestamp } = window.__updatedItinerary;
+
+          // וידוא שהעדכון הוא מהדקות האחרונות (למניעת עדכונים ישנים)
+          const isRecent = Date.now() - timestamp < 5 * 60 * 1000; // 5 דקות
+
+          if (content && messageId && isRecent) {
+            console.log(
+              "Found updated itinerary in global memory, updating chat message"
+            );
+            updateItineraryInChat(messageId, content);
+
+            // ניקוי העדכון מהזיכרון אחרי שימוש
+            delete window.__updatedItinerary;
+            return true;
+          }
+        }
+
+        // בדיקה אם יש עדכון יומן ב-localStorage
+        const storedUpdate = localStorage.getItem("updatedItinerary");
+        if (storedUpdate) {
+          const { content, messageId, timestamp } = JSON.parse(storedUpdate);
+
+          // וידוא שהעדכון הוא מהדקות האחרונות
+          const isRecent = Date.now() - timestamp < 5 * 60 * 1000; // 5 דקות
+
+          if (content && messageId && isRecent) {
+            console.log(
+              "Found updated itinerary in localStorage, updating chat message"
+            );
+            updateItineraryInChat(messageId, content);
+
+            // ניקוי העדכון מה-localStorage אחרי שימוש
+            localStorage.removeItem("updatedItinerary");
+            return true;
+          } else {
+            // ניקוי עדכון ישן
+            localStorage.removeItem("updatedItinerary");
+          }
+        }
+
+        return false;
+      } catch (error) {
+        console.error("Error checking for updated itinerary:", error);
+        return false;
+      }
+    };
+
+    // פונקציה לעדכון היומן בצ'אט
+    const updateItineraryInChat = (messageId, newContent) => {
+      if (
+        !window.__processingHookState ||
+        !window.__processingHookState.setPendingMessages
+      ) {
+        return false;
+      }
+
+      // עדכון ההודעה בצ'אט
+      window.__processingHookState.setPendingMessages((prevMessages) => {
+        // חיפוש ההודעה לפי מזהה
+        const updatedMessages = prevMessages.map((msg) => {
+          // אם זו ההודעה שצריך לעדכן
+          if (
+            msg.id === messageId ||
+            (msg.isItinerary && msg.message && msg.message.includes("Day 1:"))
+          ) {
+            return {
+              ...msg,
+              message: newContent,
+              displayMessage: newContent,
+              wasUpdated: true,
+              updatedAt: new Date().toISOString(),
+              // הוספת מאפיינים לאנימציה
+              highlight: true,
+              animation: {
+                pulse: true,
+                fadeIn: true,
+              },
+            };
+          }
+          return msg;
+        });
+
+        return updatedMessages;
+      });
+
+      // עדכון גם בהיסטוריית השיחה אם קיימת
+      if (data?.history) {
+        const updatedHistory = data.history.map((msg) => {
+          if (
+            (msg.role === "model" || msg.role === "assistant") &&
+            msg.parts?.[0]?.text &&
+            msg.parts[0].text.includes("Day 1:")
+          ) {
+            return {
+              ...msg,
+              parts: [{ ...msg.parts[0], text: newContent }],
+              wasUpdated: true,
+            };
+          }
+          return msg;
+        });
+
+        // עדכון המידע המקומי
+        data.history = updatedHistory;
+      }
+
+      return true;
+    };
+
+    // בדיקת עדכונים כשהקומפוננטה נטענת
+    checkForUpdatedItinerary();
+
+    // בדיקת עדכונים כשהטאב מקבל פוקוס (חזרה מטאב אחר)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkForUpdatedItinerary();
+      }
+    };
+
+    // האזנה לאירוע עדכון יומן מותאם מ-TripDetailsEditor
+    const handleItineraryUpdated = (event) => {
+      console.log("Received itineraryUpdated event:", event.detail);
+      const { content, messageId } = event.detail;
+      if (content && messageId) {
+        updateItineraryInChat(messageId, content);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("itineraryUpdated", handleItineraryUpdated);
+
+    // ניקוי האזנה בעת פירוק הקומפוננטה
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("itineraryUpdated", handleItineraryUpdated);
+    };
+  }, [data]);
+
   return (
     <div className={`chat-with-map ${isMapVisible ? "with-map" : ""}`}>
       <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(25,28,40,0.97)] overflow-hidden compact-chat-container">
@@ -1228,6 +1607,20 @@ const ChatPage = () => {
                             ...(message.isTransitioning
                               ? { opacity: [1, 0.7] }
                               : {}),
+                            ...(message.highlight
+                              ? {
+                                  boxShadow: [
+                                    "0 0 0px rgba(59, 130, 246, 0)",
+                                    "0 0 15px rgba(59, 130, 246, 0.5)",
+                                    "0 0 0px rgba(59, 130, 246, 0)",
+                                  ],
+                                  borderColor: [
+                                    "rgba(59, 130, 246, 0.2)",
+                                    "rgba(59, 130, 246, 0.6)",
+                                    "rgba(59, 130, 246, 0.2)",
+                                  ],
+                                }
+                              : {}),
                           }}
                           transition={{
                             duration:
@@ -1238,8 +1631,10 @@ const ChatPage = () => {
                             ease: "easeOut",
                             opacity: { duration: 0.4 },
                             y: { type: "spring", stiffness: 120, damping: 14 },
+                            boxShadow: { duration: 2, repeat: 0 },
+                            borderColor: { duration: 2, repeat: 0 },
                           }}
-                          className={`px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 mb-2 ${
+                          className={`px-4 py-3 rounded-xl text-white text-base max-w-[75%] shadow-md leading-relaxed flex gap-3 mb-2 relative ${
                             message.role === "user"
                               ? "bg-gradient-to-r from-blue-600/30 to-blue-500/20 text-[#f9f9f9] self-end flex-row-reverse border-t border-r border-blue-500/20 mt-3"
                               : message.isSystemMessage
@@ -1248,9 +1643,13 @@ const ChatPage = () => {
                               ? "bg-gradient-to-r from-[#2a2d3c] to-[#2a3856] self-start border-t border-l border-blue-400/20 mt-2"
                               : message.isTransitioning
                               ? "bg-gradient-to-r from-[#2a2d3c] to-[#2a3046] self-start border-t border-l border-gray-700/30 mt-2"
+                              : message.wasUpdated
+                              ? "bg-gradient-to-r from-[#2a2d3c] to-[#30324a] self-start border-t border-l border-blue-500/30 hover:shadow-lg hover:border-blue-500/50 transition-all duration-200 mt-3"
                               : "bg-gradient-to-r from-[#2a2d3c] to-[#30324a] self-start border-t border-l border-gray-700/30 hover:shadow-lg hover:border-gray-700/50 transition-all duration-200 mt-3"
                           }`}
                         >
+                          <UpdatedBadge wasUpdated={message.wasUpdated} />
+
                           {message.role === "user" ? (
                             <div className="message-header">
                               <motion.div
@@ -1325,6 +1724,9 @@ const ChatPage = () => {
                                   ""}
                               </Markdown>
                             )}
+
+                            {/* Add itinerary action buttons */}
+                            {renderItineraryActions(message)}
                           </div>
                         </motion.div>
 

@@ -8,11 +8,11 @@ import DashboardPage from "./routes/dashboardPage/DashboardPage";
 import ChatPage from "./routes/chatPage/ChatPage";
 import SigninPage from "./routes/signinPage/SigninPage";
 import SignUpPage from "./routes/signUpPage/SignUpPage";
+import MyTripsPage from "./routes/myTrips/MyTripsPage";
 import RootLayout from "./layouts/rootLayout/RootLayout";
 import DashboardLayout from "./layouts/dashboardLayout/DashboardLayout";
 import "./index.css";
 import ViewTripData from "./routes/createTrip/ViewTripData";
-
 
 /**
  * Main entry point for the React application using Vite and React Router DOM.
@@ -24,7 +24,7 @@ import ViewTripData from "./routes/createTrip/ViewTripData";
  * - **SigninPage**: Displayed when navigating to the "/sign-in" route for user authentication.
  * - **SignUpPage**: Displayed when navigating to the "/sign-up" route for user registration.
  * - **DashboardLayout**: This layout is used for pages under the "/dashboard" path. Contains:
- *    - **DashboardPage**: Displayed when navigating to "/dashboard", acting as the main page of the user’s dashboard.
+ *    - **DashboardPage**: Displayed when navigating to "/dashboard", acting as the main page of the user's dashboard.
  *    - **ChatPage**: Displayed when navigating to a specific chat at "/dashboard/chats/:id", where `id` is a dynamic route parameter.
  *
  * The app uses `createBrowserRouter` to handle navigation between these pages and layouts.
@@ -56,7 +56,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/sign-in/*",
-        element: <SigninPage /> ,
+        element: <SigninPage />,
       },
       {
         path: "/sign-up/*",
@@ -72,14 +72,18 @@ const router = createBrowserRouter([
           {
             path: "/dashboard/chats/:id",
             element: (
-              <div>  
+              <div>
                 <ViewTripData /> {/* מציגים את המפה לצד הצ'אט */}
               </div>
             ),
           },
+          {
+            path: "/mytrips",
+            element: <MyTripsPage />,
+          },
         ],
       },
-    ], 
+    ],
   },
 ]);
 
