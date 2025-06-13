@@ -354,6 +354,24 @@ const extractDirectTripData = (userMessage) => {
 
   // Extract budget level - look for budget keywords
   if (
+    lowerMessage.includes("budget: luxury") ||
+    lowerMessage.includes("budget:luxury")
+  ) {
+    extractedData.budget_level = "luxury";
+    console.log("[DirectExtraction] Found explicit budget level: luxury");
+  } else if (
+    lowerMessage.includes("budget: moderate") ||
+    lowerMessage.includes("budget:moderate")
+  ) {
+    extractedData.budget_level = "moderate";
+    console.log("[DirectExtraction] Found explicit budget level: moderate");
+  } else if (
+    lowerMessage.includes("budget: cheap") ||
+    lowerMessage.includes("budget:cheap")
+  ) {
+    extractedData.budget_level = "cheap";
+    console.log("[DirectExtraction] Found explicit budget level: cheap");
+  } else if (
     lowerMessage.includes("cheap") ||
     lowerMessage.includes("budget") ||
     lowerMessage.includes("inexpensive") ||
@@ -376,6 +394,16 @@ const extractDirectTripData = (userMessage) => {
   ) {
     extractedData.budget_level = "moderate";
     console.log("[DirectExtraction] Found budget level: moderate");
+  }
+
+  // Also try to extract budget using regex pattern for form submissions
+  const budgetPattern = /budget:\s*(\w+)/i;
+  const budgetMatch = userMessage.match(budgetPattern);
+  if (budgetMatch && budgetMatch[1]) {
+    const budgetValue = budgetMatch[1].trim().toLowerCase();
+    extractedData.budget_level = budgetValue;
+    extractedData.budget = budgetValue;
+    console.log("[DirectExtraction] Extracted budget from form:", budgetValue);
   }
 
   // Extract dates - look for date patterns
@@ -1059,9 +1087,16 @@ export function useProcessUserInput(chatData) {
               const fromDate = new Date(dateStr);
               const toDate = new Date(fromDate);
 
-              // Use duration from tripDetails or default to 7 days
-              const duration = tripDetails.duration || data.duration || 7;
-              toDate.setDate(fromDate.getDate() + parseInt(duration, 10));
+              // Use duration from tripDetails or data, with a fallback to 3 days instead of 7
+              // This is a more reasonable default for most trips
+              const duration = tripDetails.duration || data.duration || 3;
+              console.log(
+                "[ModularProcessing] Using duration for date calculation:",
+                duration
+              );
+
+              // Subtract 1 from duration to include the start day in the count
+              toDate.setDate(fromDate.getDate() + parseInt(duration, 10) - 1);
 
               tripUpdates.dates = {
                 from: dateStr,
@@ -1088,16 +1123,29 @@ export function useProcessUserInput(chatData) {
 
         // Extract budget information
         if (data.budget_level) {
+          // Don't standardize the budget_level, use it exactly as provided
           tripUpdates.budget = data.budget_level;
+          // Also update constraints.budget to ensure it's used by the itinerary generator
+          if (!tripUpdates.constraints) tripUpdates.constraints = {};
+          tripUpdates.constraints.budget = data.budget_level;
           hasUpdates = true;
           console.log(
             "[ModularProcessing] Using budget_level:",
-            data.budget_level
+            data.budget_level,
+            "and updating constraints.budget"
           );
         } else if (data.budget) {
+          // Don't standardize the budget, use it exactly as provided
           tripUpdates.budget = data.budget;
+          // Also update constraints.budget to ensure it's used by the itinerary generator
+          if (!tripUpdates.constraints) tripUpdates.constraints = {};
+          tripUpdates.constraints.budget = data.budget;
           hasUpdates = true;
-          console.log("[ModularProcessing] Using budget:", data.budget);
+          console.log(
+            "[ModularProcessing] Using budget:",
+            data.budget,
+            "and updating constraints.budget"
+          );
         }
 
         // Update trip details if we found any updates
@@ -2664,6 +2712,17 @@ export function useProcessUserInput(chatData) {
               "[MissingFields] Updating trip details with form data:",
               processedFormValues
             );
+
+            // Make sure we preserve the budget value exactly as submitted
+            if (processedFormValues.budget) {
+              // Ensure we have constraints object
+              if (!tripDetails.constraints) {
+                tripDetails.constraints = {};
+              }
+              // Set both budget and constraints.budget to preserve the value
+              tripDetails.constraints.budget = processedFormValues.budget;
+            }
+
             const updatedTripDetails = updateTripDraft(
               tripDetails,
               processedFormValues
@@ -2673,6 +2732,36 @@ export function useProcessUserInput(chatData) {
 
           // Process the message to fetch external data
           processUserInput(userMessage);
+
+          // Ensure the budget value is preserved exactly as submitted
+          if (processedFormValues.budget) {
+            console.log(
+              "[MissingFields] Preserving exact budget value:",
+              processedFormValues.budget
+            );
+
+            // Update trip details directly to ensure the budget value is preserved
+            setTimeout(() => {
+              setTripDetails((currentDetails) => {
+                // Ensure we have the constraints object
+                const updatedDetails = { ...currentDetails };
+                if (!updatedDetails.constraints) {
+                  updatedDetails.constraints = {};
+                }
+
+                // Set both budget and constraints.budget to the exact value
+                updatedDetails.budget = processedFormValues.budget;
+                updatedDetails.constraints.budget = processedFormValues.budget;
+
+                console.log(
+                  "[MissingFields] Updated trip details with preserved budget:",
+                  updatedDetails.budget
+                );
+
+                return updatedDetails;
+              });
+            }, 300);
+          }
 
           // IMPORTANT: Reset missing fields state AFTER processing starts
           // This prevents infinite loops by ensuring the form isn't shown again

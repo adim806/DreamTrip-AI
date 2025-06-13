@@ -1138,6 +1138,9 @@ const ChatPage = () => {
 
       // Check if we already have a form with the same message ID to prevent duplicates
       if (missingFieldsState.messageId === message.id) {
+        // Get the trip duration from tripDetails if available
+        const tripDuration = tripDetails?.duration;
+        
         // Form is already being rendered with this message ID, just return it
         return (
           <div
@@ -1154,6 +1157,7 @@ const ChatPage = () => {
               onSubmit={handleMissingFieldsSubmit}
               submitLabel="שלח"
               intent={message.intent || missingFieldsState.intent}
+              duration={tripDuration}
             />
           </div>
         );
@@ -1200,11 +1204,12 @@ const ChatPage = () => {
             onSubmit={handleMissingFieldsSubmit}
             submitLabel="שלח"
             intent={message.intent || missingFieldsState.intent}
+            duration={tripDetails?.duration}
           />
         </div>
       );
     },
-    [missingFieldsState, setMissingFieldsState, handleMissingFieldsSubmit]
+    [missingFieldsState, setMissingFieldsState, handleMissingFieldsSubmit, tripDetails]
   );
 
   // Optimize the effect that initializes missingFieldsState to prevent infinite loops

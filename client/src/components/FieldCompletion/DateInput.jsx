@@ -3,7 +3,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { applyDatePickerFix } from "./DatePickerFix";
 
-export default function DateInput({ onComplete, value = "", label = "Date" }) {
+export default function DateInput({ onComplete, value = "", label = "Date", duration }) {
   const [selectedDate, setSelectedDate] = useState(value ? new Date(value) : null);
   
   // Apply the date picker fix when the component mounts
@@ -55,7 +55,10 @@ export default function DateInput({ onComplete, value = "", label = "Date" }) {
   // Helper function to calculate end date based on start date
   const calculateEndDate = (startDate) => {
     const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 7); // Default to 7 days
+    // Use the provided duration prop if available, otherwise default to 7 days
+    const daysToAdd = duration ? parseInt(duration, 10) : 7;
+    console.log(`[DateInput] Using ${daysToAdd} days for date range calculation`);
+    endDate.setDate(startDate.getDate() + daysToAdd - 1); // Subtract 1 to include the start day in the count
     return endDate.toISOString().split('T')[0];
   };
   

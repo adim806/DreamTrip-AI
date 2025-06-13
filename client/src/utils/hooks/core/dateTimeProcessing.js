@@ -29,6 +29,7 @@ export const processRelativeDates = (dates, tripDurationData) => {
   if (processedDates.from && !processedDates.to && tripDurationData?.duration) {
     const fromDate = new Date(processedDates.from);
     const toDate = new Date(fromDate);
+    // Subtract 1 from duration to include the start day in the count
     toDate.setDate(
       fromDate.getDate() + parseInt(tripDurationData.duration) - 1
     );

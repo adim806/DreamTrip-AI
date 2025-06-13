@@ -45,26 +45,93 @@ export const generateItineraryPrompt = (tripDetails) => {
   // Convert budget level to standardized format
   let standardizedBudget = "Not specified";
   if (constraints.budget) {
+    const budgetLower = constraints.budget.toLowerCase();
+    console.log(
+      `[ItineraryGenerator] Processing budget: "${constraints.budget}"`
+    );
+
     if (
-      constraints.budget.toLowerCase().includes("budget") ||
-      constraints.budget.toLowerCase().includes("low") ||
-      constraints.budget.toLowerCase().includes("cheap")
-    ) {
-      standardizedBudget = "Budget/Economy";
-    } else if (
-      constraints.budget.toLowerCase().includes("moderate") ||
-      constraints.budget.toLowerCase().includes("medium") ||
-      constraints.budget.toLowerCase().includes("standard")
-    ) {
-      standardizedBudget = "Moderate/Standard";
-    } else if (
-      constraints.budget.toLowerCase().includes("luxury") ||
-      constraints.budget.toLowerCase().includes("high") ||
-      constraints.budget.toLowerCase().includes("premium")
+      budgetLower === "luxury" ||
+      budgetLower.includes("luxury") ||
+      budgetLower.includes("high") ||
+      budgetLower.includes("premium") ||
+      budgetLower.includes("expensive")
     ) {
       standardizedBudget = "Luxury/Premium";
+      console.log(
+        `[ItineraryGenerator] Standardized budget to: "Luxury/Premium"`
+      );
+    } else if (
+      budgetLower === "moderate" ||
+      budgetLower.includes("moderate") ||
+      budgetLower.includes("medium") ||
+      budgetLower.includes("standard")
+    ) {
+      standardizedBudget = "Moderate/Standard";
+      console.log(
+        `[ItineraryGenerator] Standardized budget to: "Moderate/Standard"`
+      );
+    } else if (
+      budgetLower === "cheap" ||
+      budgetLower.includes("budget") ||
+      budgetLower.includes("low") ||
+      budgetLower.includes("cheap") ||
+      budgetLower.includes("economy")
+    ) {
+      standardizedBudget = "Budget/Economy";
+      console.log(
+        `[ItineraryGenerator] Standardized budget to: "Budget/Economy"`
+      );
     } else {
       standardizedBudget = constraints.budget;
+      console.log(
+        `[ItineraryGenerator] Using original budget: "${standardizedBudget}"`
+      );
+    }
+  } else if (tripDetails.budget) {
+    // If constraints.budget is not set but tripDetails.budget is, use that instead
+    const budgetLower = tripDetails.budget.toLowerCase();
+    console.log(
+      `[ItineraryGenerator] Using tripDetails.budget: "${tripDetails.budget}"`
+    );
+
+    if (
+      budgetLower === "luxury" ||
+      budgetLower.includes("luxury") ||
+      budgetLower.includes("high") ||
+      budgetLower.includes("premium") ||
+      budgetLower.includes("expensive")
+    ) {
+      standardizedBudget = "Luxury/Premium";
+      console.log(
+        `[ItineraryGenerator] Standardized tripDetails.budget to: "Luxury/Premium"`
+      );
+    } else if (
+      budgetLower === "moderate" ||
+      budgetLower.includes("moderate") ||
+      budgetLower.includes("medium") ||
+      budgetLower.includes("standard")
+    ) {
+      standardizedBudget = "Moderate/Standard";
+      console.log(
+        `[ItineraryGenerator] Standardized tripDetails.budget to: "Moderate/Standard"`
+      );
+    } else if (
+      budgetLower === "cheap" ||
+      budgetLower.includes("budget") ||
+      budgetLower.includes("low") ||
+      budgetLower.includes("cheap") ||
+      budgetLower.includes("economy")
+    ) {
+      standardizedBudget = "Budget/Economy";
+      console.log(
+        `[ItineraryGenerator] Standardized tripDetails.budget to: "Budget/Economy"`
+      );
+    } else {
+      standardizedBudget = tripDetails.budget;
+      console.log(
+        `[ItineraryGenerator] Using original tripDetails.budget: "${standardizedBudget}"`
+      );
     }
   }
 
@@ -850,7 +917,7 @@ export const extractDayInfoFromItinerary = (
         // If we didn't find a month name, try other formats
         if (!monthFound && !formattedDate) {
           // Try format like "15/06" or "15-06" (day/month)
-          const shortDateMatch = dateStr.match(/(\d{1,2})[\/\-\.](\d{1,2})/);
+          const shortDateMatch = dateStr.match(/(\d{1,2})[-./](\d{1,2})/);
           if (shortDateMatch) {
             // Assuming day/month format
             const day = parseInt(shortDateMatch[1], 10);

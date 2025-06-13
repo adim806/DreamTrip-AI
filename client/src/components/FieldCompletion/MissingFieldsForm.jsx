@@ -12,13 +12,15 @@ import "./MissingFieldsForm.css";
  * @param {Function} props.onSubmit - Function to call when the form is submitted
  * @param {String} props.submitLabel - Label for the submit button
  * @param {String} props.intent - The intent that requires these fields (optional)
+ * @param {Number} props.duration - The duration of the trip (optional)
  */
 const MissingFieldsForm = React.memo(function MissingFieldsForm({ 
   fields = [], 
   initialValues = {}, 
   onSubmit,
   submitLabel = "שלח",
-  intent = null
+  intent = null,
+  duration = null
 }) {
   const [formValues, setFormValues] = useState(initialValues || {});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -134,6 +136,11 @@ const MissingFieldsForm = React.memo(function MissingFieldsForm({
       // Mark form as submitted BEFORE calling onSubmit to prevent loops
       const submissionValues = {...formValues};
       
+      // Log the exact values being submitted, especially budget
+      if (submissionValues.budget) {
+        console.log(`[MissingFieldsForm] Submitting budget value: "${submissionValues.budget}"`);
+      }
+      
       // Clear the form after successful submission
       setFormValues({});
       
@@ -211,6 +218,9 @@ const MissingFieldsForm = React.memo(function MissingFieldsForm({
               );
             }
             
+            // Pass duration prop to DateInput component if the field is 'dates'
+            const extraProps = field === 'dates' ? { duration } : {};
+            
             return (
               <motion.div
                 key={field}
@@ -223,6 +233,7 @@ const MissingFieldsForm = React.memo(function MissingFieldsForm({
                   onComplete={value => handleFieldChange(field, value)}
                   label={field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
                   className="field-component"
+                  {...extraProps}
                 />
               </motion.div>
             );

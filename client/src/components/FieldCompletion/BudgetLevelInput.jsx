@@ -15,6 +15,7 @@ export default function BudgetLevelInput({ onComplete, value = "", label = "Budg
     setValue(newValue);
     // Call onComplete with each change to update parent form state
     onComplete(newValue);
+    console.log(`[BudgetLevelInput] Selected budget level: "${newValue}"`);
   };
   
   return (
@@ -27,9 +28,9 @@ export default function BudgetLevelInput({ onComplete, value = "", label = "Budg
           className="flex-1 px-3 py-2 bg-[#23263a] border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         >
           <option value="">Select {label}</option>
-          <option value="cheap">Budget/Cheap</option>
-          <option value="moderate">Moderate</option>
           <option value="luxury">Luxury</option>
+          <option value="moderate">Moderate</option>
+          <option value="cheap">Budget/Cheap</option>
         </select>
       </div>
     </div>

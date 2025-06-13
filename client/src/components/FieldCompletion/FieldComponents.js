@@ -2,10 +2,9 @@ import CityInput from "./CityInput";
 import CountryInput from "./CountryInput";
 import BudgetLevelInput from "./BudgetLevelInput";
 import DateInput from "./DateInput";
-import MissingFieldsForm from "./MissingFieldsForm";
 // ניתן להוסיף כאן רכיבים נוספים לכל שדה חסר
 
-export const fieldComponentMap = {
+const fieldComponentMap = {
   city: CityInput,
   country: CountryInput,
   budget_level: BudgetLevelInput,
@@ -18,5 +17,6 @@ export const fieldComponentMap = {
   // ...המשך שדות
 };
 
-export { MissingFieldsForm };
+// Export both as default and named export to support both import styles
 export default fieldComponentMap;
+export { fieldComponentMap };

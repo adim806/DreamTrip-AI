@@ -167,47 +167,48 @@ export const getInitialSystemInstruction = () => {
         "optional": ["date", "timeContext"]
       },
       "Find-Hotel": {
-        "required": ["city", "country", "budget_level"],
-        "optional": ["checkIn", "checkOut", "rating", "amenities", "preferences"]
+        "required": ["city"],
+        "optional": ["checkIn", "checkOut", "rating", "amenities", "preferences", "country", "budget_level"]
       },
       "Find-Attractions": {
-        "required": ["city", "country"],
-        "optional": ["category", "preferences", "budget_level"]
+        "required": ["city"],
+        "optional": ["category", "preferences", "budget_level", "country"]
       },
       "Find-Restaurants": {
-        "required": ["city", "country"],
-        "optional": ["cuisine", "budget_level", "rating", "preferences"]
+        "required": ["city"],
+        "optional": ["cuisine", "budget_level", "rating", "preferences", "country"]
       },
       "Flight-Information": {
         "required": ["origin", "destination", "date"],
         "optional": ["returnDate", "passengers", "class"]
       },
       "Local-Events": {
-        "required": ["location"],
-        "optional": ["startDate", "endDate", "category", "eventType"]
+        "required": ["city"],
+        "optional": ["startDate", "endDate", "category", "eventType", "country"]
       },
       "Travel-Restrictions": {
-        "required": ["country"],
-        "optional": ["citizenship"]
+        "required": ["city"],
+        "optional": ["citizenship", "country"]
       },
       "Currency-Conversion": {
         "required": ["from", "to"],
         "optional": ["amount"]
       },
       "Cost-Estimate": {
-        "required": ["location"],
-        "optional": ["category", "budget_level", "currency"]
+        "required": ["city"],
+        "optional": ["category", "budget_level", "currency", "country"]
       },
       "Public-Transport-Info": {
-        "required": ["location"],
-        "optional": ["transportType"]
+        "required": ["city"],
+        "optional": ["transportType", "country"]
       },
       "Safety-Information": {
-        "required": ["location"],
-        "optional": ["topic"]
+        "required": ["city"],
+        "optional": ["topic", "country"]
       },
       "Travel-Tips": {
-        "required": ["location"],
+        "required": ["city"],
+        "optional": ["country"]
       }
     }
     
@@ -253,7 +254,7 @@ export const getInitialSystemInstruction = () => {
     - DO NOT attempt to provide the external data yourself
     - For hotel searches (Find-Hotel intent): ensure next_state="FETCHING_EXTERNAL_DATA" and next_action="fetch_external_data"
     - When all required fields are present, ALWAYS set status="Complete", requires_external_data=true, and shouldDelayFetch=false
-    - For Find-Hotel intent, required fields are: city, country, budget_level
+    - For Find-Hotel intent, required fields are: city
     - For Weather-Request intent, required fields are: city, country, time
     - DO NOT set status="Incomplete" if all required fields are present
     - If fields are missing, set next_state="ASK_MISSING_FIELDS" to collect missing information
@@ -295,9 +296,19 @@ export const getInitialSystemInstruction = () => {
     
     #### Find-Hotel:
     - REQUIRED: "city" (string) - The city name only
-    - REQUIRED: "country" (string) - The country name only
-    - REQUIRED: "budget_level" (string) - "cheap", "moderate", or "luxury"
-    - NEVER combine city and country in a single field
+    - OPTIONAL: "country" (string) - The country name only
+    - OPTIONAL: "budget_level" (string) - "cheap", "moderate", or "luxury"
+    
+    For well-known cities, automatically infer the country:
+    - "Tel Aviv" → country="Israel"
+    - "New York" → country="USA"
+    - "Tokyo" → country="Japan"
+    - "Paris" → country="France"
+    - "London" → country="UK"
+    - "Rome" → country="Italy"
+    - "Bangkok" → country="Thailand"
+    - "Sydney" → country="Australia"
+    - "Dubai" → country="UAE"
     
     Budget level detection:
     - When detecting "cheap", "affordable", "inexpensive", or "low cost" in the query, set budget_level="cheap"
@@ -311,14 +322,19 @@ export const getInitialSystemInstruction = () => {
     - "Find me cheap hotels in Tel Aviv Israel"
       * Extract: city="Tel Aviv", country="Israel", budget_level="cheap"
       * Set: status="Complete", next_state="FETCHING_EXTERNAL_DATA", next_action="fetch_external_data"
+    - "Find luxury hotels in Tel Aviv"
+      * Extract: city="Tel Aviv", country="Israel" (inferred), budget_level="luxury"
+      * Set: status="Complete", next_state="FETCHING_EXTERNAL_DATA", next_action="fetch_external_data"
     - "Where can I stay in New York"
-      * Extract: city="New York", country missing, budget_level missing
-      * Set: status="Incomplete", next_state="ASK_MISSING_FIELDS", missingFields=["country", "budget_level"]
-      * Include a natural followUpQuestion like "I can help find hotels in New York. Could you tell me which country this is in and what your budget level is (cheap, moderate, or luxury)?"
+      * Extract: city="New York", country="USA" (inferred), budget_level missing
+      * Set: status="Incomplete", next_state="ASK_MISSING_FIELDS", missingFields=["budget_level"]
+      * Include a natural followUpQuestion like "I can help find hotels in New York. What's your budget level preference (cheap, moderate, or luxury)?"
     
     #### Find-Attractions:
     - REQUIRED: "city" (string) - The city name only
-    - REQUIRED: "country" (string) - The country name only (can be inferred from city if well-known)
+    - OPTIONAL: "country" (string) - The country name only (can be inferred from city if well-known)
+    
+    For well-known cities, automatically infer the country as with Find-Hotel intent.
     
     Optional fields:
     - category: Type of attraction (museums, parks, historical, etc.)
@@ -328,13 +344,14 @@ export const getInitialSystemInstruction = () => {
       * Extract: city="Rome", country="Italy"
       * Set: status="Complete", next_state="FETCHING_EXTERNAL_DATA", next_action="fetch_external_data"
     - "What museums can I visit in Paris"
-      * Extract: city="Paris", country missing, category="museums"
-      * Set: status="Incomplete", next_state="ASK_MISSING_FIELDS", missingFields=["country"]
-      * Include a natural followUpQuestion like "I'd be happy to find museums in Paris. Could you specify which country's Paris you're referring to?"
+      * Extract: city="Paris", country="France" (inferred), category="museums"
+      * Set: status="Complete", next_state="FETCHING_EXTERNAL_DATA", next_action="fetch_external_data"
     
     #### Find-Restaurants:
     - REQUIRED: "city" (string) - The city name only
-    - REQUIRED: "country" (string) - The country name only (can be inferred from city if well-known)
+    - OPTIONAL: "country" (string) - The country name only (can be inferred from city if well-known)
+    
+    For well-known cities, automatically infer the country as with Find-Hotel intent.
     
     Optional fields:
     - cuisine: Type of food (Italian, Japanese, etc.)
@@ -342,10 +359,10 @@ export const getInitialSystemInstruction = () => {
     
     Examples of restaurant queries and their correct classification:
     - "Find Italian restaurants in New York"
-      * Extract: city="New York", country="USA", cuisine="Italian"
+      * Extract: city="New York", country="USA" (inferred), cuisine="Italian"
       * Set: status="Complete", next_state="FETCHING_EXTERNAL_DATA", next_action="fetch_external_data"
     - "Where can I eat in Tokyo"
-      * Extract: city="Tokyo", country="Japan"
+      * Extract: city="Tokyo", country="Japan" (inferred)
       * Set: status="Complete", next_state="FETCHING_EXTERNAL_DATA", next_action="fetch_external_data"
     
     ### Enhanced Context Tracking:
@@ -370,8 +387,7 @@ export const getInitialSystemInstruction = () => {
         - next_state="ASK_MISSING_FIELDS"
         - shouldDelayFetch=true
         - Include a natural followUpQuestion for the missing field
-    - For hotel searches (Find-Hotel intent), the required fields are: city, country, budget_level
-    - For weather requests (Weather-Request intent), the required fields are: city, country, time
+ 
     
     ### Acknowledgment Message Handling:
     - For simple acknowledgments like "thanks", "thank you", "got it", etc., ALWAYS:

@@ -231,15 +231,15 @@ export const standardizeBudgetLevel = (data) => {
 
     // Map various terms to standard values
     if (
-      currentLevel === "budget" ||
-      currentLevel === "inexpensive" ||
-      currentLevel === "affordable" ||
-      currentLevel === "low" ||
-      currentLevel === "economical"
+      currentLevel === "luxury" ||
+      currentLevel.includes("luxury") ||
+      currentLevel.includes("high") ||
+      currentLevel.includes("premium") ||
+      currentLevel.includes("expensive")
     ) {
-      processedData.budget_level = "cheap";
+      processedData.budget_level = "luxury";
       console.log(
-        `[DataTransformation] Standardized budget_level from "${currentLevel}" to "cheap"`
+        `[DataTransformation] Standardized budget_level from "${currentLevel}" to "luxury"`
       );
     } else if (
       currentLevel === "mid range" ||
@@ -253,15 +253,15 @@ export const standardizeBudgetLevel = (data) => {
         `[DataTransformation] Standardized budget_level from "${currentLevel}" to "moderate"`
       );
     } else if (
-      currentLevel === "high end" ||
-      currentLevel === "high-end" ||
-      currentLevel === "expensive" ||
-      currentLevel === "premium" ||
-      currentLevel === "deluxe"
+      currentLevel === "budget" ||
+      currentLevel === "inexpensive" ||
+      currentLevel === "affordable" ||
+      currentLevel === "low" ||
+      currentLevel === "economical"
     ) {
-      processedData.budget_level = "luxury";
+      processedData.budget_level = "cheap";
       console.log(
-        `[DataTransformation] Standardized budget_level from "${currentLevel}" to "luxury"`
+        `[DataTransformation] Standardized budget_level from "${currentLevel}" to "cheap"`
       );
     }
   }

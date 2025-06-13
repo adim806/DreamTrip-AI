@@ -29,6 +29,7 @@ import {
 import { buildPromptWithExternalData } from "../externalDataService";
 import { extractStructuredDataFromResponse } from "../aiPromptUtils";
 import ragProcessor from "../GeminiRAGProcessor";
+import { processExternalData } from "./ExternalDataService";
 
 // ייבוא מפתח ה-API מתוך הגדרות הסביבה
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_PUBLIC_KEY;
@@ -385,13 +386,23 @@ export const processAdviceIntent = async ({
         if (externalData && externalData.success !== false) {
           console.log("External data fetch successful");
           result.processed = true;
-          result.status = "COMPLETE"; // Add explicit complete status
+          result.status = "COMPLETE"; // Add explicit status
           result.nextState = "ITINERARY_ADVICE_MODE";
           result.nextAction = "DISPLAY_EXTERNAL_DATA_RESPONSE";
 
           // Format the response based on the intent and data
           const formattedResponse = formatAdviceResponse(intent, externalData);
           result.response = formattedResponse;
+
+          // Process data for map visualization
+          try {
+            console.log(
+              `Processing external data for map visualization: intent=${intent}`
+            );
+            await processExternalData(intent, externalData);
+          } catch (error) {
+            console.error("Error processing external data for map:", error);
+          }
 
           // Store the formatted response in the global space for use by other components
           if (typeof window !== "undefined") {
