@@ -2526,10 +2526,84 @@ export function useProcessUserInput(chatData) {
       console.log("[ModularProcessing] Registered itinerary generator called");
       if (tripDetails) {
         try {
+          console.log(
+            "Starting itinerary generation with trip details:",
+            tripDetails
+          );
+
+          // בדיקה אם יש מידע חיצוני שנטען במקביל
+          let externalData = null;
+          if (window.__externalDataPromise) {
+            console.log(
+              "Found parallel external data promise, waiting for results..."
+            );
+            try {
+              // ניסיון לקבל את המידע החיצוני שנטען במקביל
+              externalData = await Promise.race([
+                window.__externalDataPromise,
+                // אם הטעינה המקבילה לוקחת יותר מדי זמן, נמשיך בלעדיה
+                new Promise((_, reject) =>
+                  setTimeout(
+                    () => reject(new Error("External data fetch timeout")),
+                    5000
+                  )
+                ),
+              ]);
+              console.log(
+                "Successfully retrieved parallel external data:",
+                externalData
+              );
+            } catch (error) {
+              console.warn(
+                "Could not wait for parallel external data:",
+                error.message
+              );
+              // נמשיך בלי המידע החיצוני
+            }
+          }
+
+          // קריאה לפונקציה שיוצרת את המסלול
           const result = await generateItinerary(tripDetails);
+
           if (result) {
+            // אם יש מידע חיצוני שהגיע בזמן, נשלב אותו במסלול
+            if (externalData && result.structuredItinerary) {
+              console.log("Integrating external data into itinerary");
+
+              // טעינת הפונקציה לשילוב מידע חיצוני
+              const { integrateExternalDataIntoItinerary } = await import(
+                "../../utils/itineraryGenerator"
+              );
+
+              // שילוב המידע החיצוני במסלול
+              result.structuredItinerary = integrateExternalDataIntoItinerary(
+                result.structuredItinerary,
+                externalData
+              );
+
+              // סימון שהמסלול הועשר במידע חיצוני
+              result.hasExternalData = true;
+              result.externalDataSources = Object.keys(externalData).filter(
+                (key) =>
+                  externalData[key] &&
+                  Array.isArray(externalData[key]) &&
+                  externalData[key].length > 0
+              );
+
+              console.log(
+                "Enhanced itinerary with external data:",
+                result.externalDataSources
+              );
+            }
+
+            // עדכון המסלול בממשק המשתמש
             setallTripData(result);
             transitionState(CONVERSATION_STATES.DISPLAYING_ITINERARY, result);
+
+            // ניקוי המשתנה הגלובלי
+            if (window.__externalDataPromise) {
+              delete window.__externalDataPromise;
+            }
           }
         } catch (error) {
           console.error(

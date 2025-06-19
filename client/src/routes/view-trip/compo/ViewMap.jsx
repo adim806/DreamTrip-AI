@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from "react";
+import React, { useContext, useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import axios from "axios";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -24,11 +24,20 @@ const ViewMap = ({ trip }) => {
     setSelectedRestaurant,
     setSelectedAttraction,
     setActiveLayer,
+    currentDestination,
+    setCurrentDestination,
+    displayMode,
+    setDisplayMode,
   } = useContext(TripContext);
 
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  
+  // Map configuration state
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [mapStyle, setMapStyle] = useState("mapbox://styles/mapbox/streets-v11");
+  const [showBuildingExtrusions, setShowBuildingExtrusions] = useState(false);
 
   // פונקציה לקבלת קואורדינטות לפי שם מקום
   const fetchCoordinates2 = async (locationName) => {
@@ -113,396 +122,223 @@ const ViewMap = ({ trip }) => {
 
   // פונקציה להצגת סימונים עבור מלונות
   const displayHotelsOnMap = (hotels) => {
-    if (!mapRef.current || !hotels) {
-      console.warn("❌ Cannot display hotels: map or hotel data is missing");
-      return;
-    }
-    
-    if (hotels.length === 0) {
-      console.warn("❌ No hotels to display on the map");
-      return;
-    }
-    
-    // First clear existing markers
-    clearMarkers();
-    console.log(`Attempting to display ${hotels.length} hotels on map`);
-    
-    // Track markers added for debugging
-    let markersAdded = 0;
-    
-    // Process each hotel and add a marker
-    hotels.forEach((hotel, index) => {
-      // Skip invalid coordinate data
-      if (!hotel.lat || !hotel.lng) {
-        console.warn(`❌ Hotel ${hotel.name} has invalid coordinates and will be skipped`);
-        return;
+    if (!mapRef.current || !hotels || hotels.length === 0) return;
+
+    // Clear existing hotel markers
+    markersRef.current = markersRef.current.filter((marker) => {
+      if (marker.type === "hotel") {
+        marker.remove();
+        return false;
       }
-      
-      console.log(`Adding marker for hotel: ${hotel.name} at [${hotel.lng}, ${hotel.lat}]`);
-      
-      try {
-        const markerEl = document.createElement("div");
-        markerEl.className = "w-7 h-8 flex items-center justify-center";
-        
-        // Add an extra class for approximate locations to style them differently if needed
-        const isApproximate = hotel.isApproximateLocation ? "approximate-marker" : "";
-        
-        const markerInner = document.createElement("div");
-        markerInner.className =
-          `w-full h-full bg-gradient-to-r from-blue-400 to-purple-500 rounded-full shadow-xl 
-           animate-drop transition-transform duration-300 ease-in-out flex items-center 
-           justify-center ${isApproximate}`;
-        
-        markerInner.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-white">
-            <path d="M4 3h16v18H4V3zm2 2v14h12V5H6zm3 2h2v2H9V7zm0 4h2v4H9v-4zm4-4h2v2h-2V7zm0 4h2v4h-2v-4z"/>
-          </svg>
-        `;
-        
-        markerEl.appendChild(markerInner);
-        
-        // Create and add the marker
-        const marker = new mapboxgl.Marker({ element: markerEl })
-          .setLngLat([hotel.lng, hotel.lat])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 }).setHTML(`
-              <div class="text-center">
-                <h3 class="text-lg font-semibold text-gray-800">${hotel.name}</h3>
-                <p class="text-sm text-gray-600">${hotel.address || "לא ידוע"}</p>
-                ${hotel.price_range ? `<p class="text-sm text-gray-600">Price: ${hotel.price_range}</p>` : ''}
-                ${hotel.rating ? `<p class="text-sm text-gray-600">Rating: ${hotel.rating} ⭐</p>` : ''}
-                ${hotel.isApproximateLocation ? '<p class="text-xs text-amber-600">*Approximate location</p>' : ''}
-                <img src="https://placehold.co/300x200" alt="hotel image" class="w-full rounded-md mt-2" />
-                <a href="${hotel.link}" target="_blank" class="text-blue-500 underline mt-2 block">לפרטים נוספים</a>
-              </div>
-            `)
-          )
-          .addTo(mapRef.current);
-        
-        // Store hotel ID for later reference
-        marker.hotelId = hotel.id;
-        
-        // Add click event for flying to the hotel
-        marker.getElement().addEventListener("click", () => {
-          mapRef.current.flyTo({
-            center: [hotel.lng, hotel.lat],
-            zoom: 15,
-            pitch: 60,
-            bearing: 30,
-            speed: 1.5,
-            duration: 1500,
-          });
-        });
-        
-        // Store the marker for later cleanup
-        markersRef.current.push(marker);
-        markersAdded++;
-        
-      } catch (error) {
-        console.error(`❌ Error adding marker for hotel ${hotel.name}:`, error);
-      }
+      return true;
     });
-    
-    if (markersAdded > 0) {
-      console.log(`✅ Successfully displayed ${markersAdded} of ${hotels.length} hotels on map`);
-      
-      // Calculate the bounds to fit all markers
-      if (markersAdded > 1) {
-        try {
-          const bounds = new mapboxgl.LngLatBounds();
-          hotels.forEach(hotel => {
-            if (hotel.lng && hotel.lat) {
-              bounds.extend([hotel.lng, hotel.lat]);
+
+    // Import the createMarkerElement function
+    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
+      // Add new hotel markers
+      hotels.forEach((hotel) => {
+        if (!hotel.lat || !hotel.lng) return;
+
+        // Create popup content
+        const popupContent = `
+          <div class="popup-content">
+            <h3 class="font-bold text-lg">${hotel.name}</h3>
+            ${hotel.description ? `<p class="text-sm mt-1">${hotel.description}</p>` : ""}
+            ${
+              hotel.amenities
+                ? `<p class="text-xs mt-1 text-gray-600">${hotel.amenities}</p>`
+                : ""
             }
-          });
-          
-          // Fit the map to show all hotels with padding
-          if (!bounds.isEmpty()) {
-            mapRef.current.fitBounds(bounds, {
-              padding: 100,
-              maxZoom: 14
-            });
-            console.log("✅ Adjusted map bounds to show all hotels");
-          }
-        } catch (e) {
-          console.error("❌ Error adjusting map bounds:", e);
-        }
-      }
-    } else {
-      console.warn("❌ No hotel markers were added to the map");
-    }
+          </div>
+        `;
+
+        // Create popup
+        const popup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: false,
+          maxWidth: "300px",
+        }).setHTML(popupContent);
+
+        // Create marker element using the utility function
+        const el = createMarkerElement("hotel", hotel);
+
+        // Create marker
+        const marker = new mapboxgl.Marker(el)
+        .setLngLat([hotel.lng, hotel.lat])
+          .setPopup(popup)
+        .addTo(mapRef.current);
+        
+        // Store hotel data with marker for later reference
+        marker.type = "hotel";
+        marker.itemData = hotel;
+
+        // Add to markers array
+        markersRef.current.push(marker);
+      });
+    }).catch(error => {
+      console.error("Error importing createMarkerElement:", error);
+    });
   };
 
   // פונקציה להצגת סימונים עבור מסעדות
   const displayRestaurantsOnMap = (restaurants) => {
-    if (!mapRef.current || !restaurants) {
-      console.warn("❌ Cannot display restaurants: map or restaurant data is missing");
-      return;
-    }
-    
-    if (restaurants.length === 0) {
-      console.warn("❌ No restaurants to display on the map");
-      return;
-    }
-    
-    // First clear existing markers
-    clearMarkers();
-    console.log(`Attempting to display ${restaurants.length} restaurants on map`);
-    
-    // Track markers added for debugging
-    let markersAdded = 0;
-    
-    // Process each restaurant and add a marker
-    restaurants.forEach((restaurant, index) => {
-      // Skip invalid coordinate data
-      if (!restaurant.lat || !restaurant.lng) {
-        console.warn(`❌ Restaurant ${restaurant.name} has invalid coordinates and will be skipped`);
-        return;
+    if (!mapRef.current || !restaurants || restaurants.length === 0) return;
+
+    // Clear existing restaurant markers
+    markersRef.current = markersRef.current.filter((marker) => {
+      if (marker.type === "restaurant") {
+        marker.remove();
+        return false;
       }
-      
-      console.log(`Adding marker for restaurant: ${restaurant.name} at [${restaurant.lng}, ${restaurant.lat}]`);
-      
-      try {
-        const markerEl = document.createElement("div");
-        markerEl.className = "w-10 h-10 flex items-center justify-center";
-        
-        // Add an extra class for dummy restaurants to style them differently if needed
-        const isDummy = restaurant.isDummy ? "dummy-marker" : "";
-        
-        const markerInner = document.createElement("div");
-        markerInner.className =
-          `w-full h-full bg-gradient-to-r from-green-400 to-teal-500 rounded-full shadow-xl 
-           animate-drop transition-transform duration-300 ease-in-out flex items-center 
-           justify-center ${isDummy}`;
-        
-        markerInner.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-white">
-            <path d="M17 2a1 1 0 00-1 1v12a1 1 0 102 0V3a1 1 0 00-1-1z"/>
-            <path d="M7 2a1 1 0 00-1 1v12a1 1 0 102 0V3a1 1 0 00-1-1z"/>
-            <path d="M7 15a1 1 0 011 1v5h2v-5a1 1 0 112 0v5h2v-5a1 1 0 011-1h2v-2H5v2h2z"/>
-          </svg>
-        `;
-        
-        markerEl.appendChild(markerInner);
-        
-        // Create and add the marker
-        const marker = new mapboxgl.Marker({ element: markerEl })
-          .setLngLat([restaurant.lng, restaurant.lat])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 }).setHTML(`
-              <div class="text-center">
-                <h3 class="text-lg font-semibold text-gray-800">${
-                  restaurant.name
-                }</h3>
-                <p class="text-sm text-gray-600">${
-                  restaurant.address || "לא ידוע"
-                }</p>
-                ${restaurant.cuisine ? `<p class="text-sm text-gray-600">Cuisine: ${restaurant.cuisine}</p>` : ''}
-                ${restaurant.price_range ? `<p class="text-sm text-gray-600">Price: ${restaurant.price_range}</p>` : ''}
-                <img src="https://placehold.co/300x200" alt="restaurant image" class="w-full rounded-md mt-2" />
-                <a href="${
-                  restaurant.link
-                }" target="_blank" class="text-blue-500 underline mt-2 block">🔗 לפרטים נוספים</a>
-              </div>
-            `)
-          )
-          .addTo(mapRef.current);
-        
-        // Store restaurant ID for later reference
-        marker.restaurantId = restaurant.id;
-        
-        // Add click event for flying to the restaurant
-        marker.getElement().addEventListener("click", () => {
-          mapRef.current.flyTo({
-            center: [restaurant.lng, restaurant.lat],
-            zoom: 15,
-            pitch: 60,
-            bearing: 30,
-            speed: 1.5,
-            duration: 1500,
-          });
-        });
-        
-        // Store the marker for later cleanup
-        markersRef.current.push(marker);
-        markersAdded++;
-        
-      } catch (error) {
-        console.error(`❌ Error adding marker for restaurant ${restaurant.name}:`, error);
-      }
+      return true;
     });
-    
-    if (markersAdded > 0) {
-      console.log(`✅ Successfully displayed ${markersAdded} of ${restaurants.length} restaurants on map`);
-      
-      // Calculate the bounds to fit all markers
-      if (markersAdded > 1) {
-        try {
-          const bounds = new mapboxgl.LngLatBounds();
-          restaurants.forEach(restaurant => {
-            if (restaurant.lng && restaurant.lat) {
-              bounds.extend([restaurant.lng, restaurant.lat]);
+
+    // Import the createMarkerElement function
+    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
+      // Add new restaurant markers
+      restaurants.forEach((restaurant) => {
+        if (!restaurant.lat || !restaurant.lng) return;
+
+        // Create popup content
+        const popupContent = `
+          <div class="popup-content">
+            <h3 class="font-bold text-lg">${restaurant.name}</h3>
+            ${
+              restaurant.cuisine
+                ? `<p class="text-sm font-medium text-orange-600">${restaurant.cuisine}</p>`
+                : ""
             }
-          });
-          
-          // Fit the map to show all restaurants with padding
-          if (!bounds.isEmpty()) {
-            mapRef.current.fitBounds(bounds, {
-              padding: 100,
-              maxZoom: 14
-            });
-            console.log("✅ Adjusted map bounds to show all restaurants");
-          }
-        } catch (e) {
-          console.error("❌ Error adjusting map bounds:", e);
-        }
-      }
-    } else {
-      console.warn("❌ No restaurant markers were added to the map");
-    }
+            ${
+              restaurant.notes
+                ? `<p class="text-sm mt-1">${restaurant.notes}</p>`
+                : ""
+            }
+            ${
+              restaurant.price_level
+                ? `<p class="text-xs mt-1">Price: ${
+                    "$".repeat(restaurant.price_level)
+                  }</p>`
+                : ""
+            }
+          </div>
+        `;
+
+        // Create popup
+        const popup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: false,
+          maxWidth: "300px",
+        }).setHTML(popupContent);
+
+        // Create marker element using the utility function
+        const el = createMarkerElement("restaurant", restaurant);
+
+        // Create marker
+        const marker = new mapboxgl.Marker(el)
+        .setLngLat([restaurant.lng, restaurant.lat])
+          .setPopup(popup)
+        .addTo(mapRef.current);
+        
+        // Store restaurant data with marker for later reference
+        marker.type = "restaurant";
+        marker.itemData = restaurant;
+
+        // Add to markers array
+        markersRef.current.push(marker);
+      });
+    }).catch(error => {
+      console.error("Error importing createMarkerElement:", error);
+    });
   };
 
   // פונקציה להצגת סימונים עבור אטרקציות
   const displayAttractionsOnMap = (attractions) => {
-    if (!mapRef.current || !attractions) {
-      console.warn("❌ Cannot display attractions: map or attraction data is missing");
-      return;
-    }
-    
-    if (attractions.length === 0) {
-      console.warn("❌ No attractions to display on the map");
-      return;
-    }
-    
-    // First clear existing markers
-    clearMarkers();
-    console.log(`Attempting to display ${attractions.length} attractions on map`);
-    
-    // Track markers added for debugging
-    let markersAdded = 0;
-    
-    // Process each attraction and add a marker
-    attractions.forEach((attraction, index) => {
-      // Skip invalid coordinate data
-      if (!attraction.lat || !attraction.lng) {
-        console.warn(`❌ Attraction ${attraction.name} has invalid coordinates and will be skipped`);
-        return;
+    if (!mapRef.current || !attractions || attractions.length === 0) return;
+
+    // Clear existing attraction markers
+    markersRef.current = markersRef.current.filter((marker) => {
+      if (marker.type === "attraction") {
+        marker.remove();
+        return false;
       }
-      
-      console.log(`Adding marker for attraction: ${attraction.name} at [${attraction.lng}, ${attraction.lat}]`);
-      
-      try {
-        const markerEl = document.createElement("div");
-        markerEl.className = "w-10 h-10 flex items-center justify-center";
-        
-        // Add an extra class for approximate locations to style them differently if needed
-        const isApproximate = attraction.isApproximateLocation ? "approximate-marker" : "";
-        
-        const markerInner = document.createElement("div");
-        markerInner.className =
-          `w-full h-full bg-gradient-to-r from-pink-400 to-red-500 rounded-full shadow-xl 
-           animate-drop transition-transform duration-300 ease-in-out flex items-center 
-           justify-center ${isApproximate}`;
-        
-        markerInner.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" fill="currentColor" class="w-6 h-6 text-white">
-            <path d="M316.7 17.8c-2.8-8.6-11-14.4-20-14.4s-17.2 5.8-20 14.4L226.4 150.2 89.6 171c-9 1.3-16.5 7.4-19.3 16.1s-.4 18.1 6.2 24.4l105.7 94.3-27.6 147.9c-1.6 9 2.1 18.1 9.3 23.5s16.3 6.3 24.2 2.5L288 403.8l128.9 71.9c7.9 4.4 17.5 3.8 24.2-2.5s10.9-14.5 9.3-23.5l-27.6-147.9 105.7-94.3c6.6-5.9 9.5-15 6.2-24.4s-10.3-14.8-19.3-16.1L349.6 150.2 316.7 17.8z"/>
-          </svg>
-        `;
-        
-        markerEl.appendChild(markerInner);
-        
-        // Create and add the marker
-        const marker = new mapboxgl.Marker({ element: markerEl })
-          .setLngLat([attraction.lng, attraction.lat])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 }).setHTML(`
-              <div class="text-center">
-                <h3 class="text-lg font-semibold text-gray-800">${attraction.name}</h3>
-                <p class="text-sm text-gray-600">${attraction.address || "לא ידוע"}</p>
-                ${attraction.category ? `<p class="text-sm text-gray-600">Category: ${attraction.category}</p>` : ''}
-                ${attraction.price_range ? `<p class="text-sm text-gray-600">Price: ${attraction.price_range}</p>` : ''}
-                ${attraction.rating ? `<p class="text-sm text-gray-600">Rating: ${attraction.rating} ⭐</p>` : ''}
-                ${attraction.isApproximateLocation ? '<p class="text-xs text-amber-600">*Approximate location</p>' : ''}
-                <img src="https://placehold.co/300x200" alt="attraction image" class="w-full rounded-md mt-2" />
-                <a href="${attraction.link}" target="_blank" class="text-blue-500 underline mt-2 block">🔗 לפרטים נוספים</a>
-              </div>
-            `)
-          )
-          .addTo(mapRef.current);
-        
-        // Store attraction ID for later reference
-        marker.attractionId = attraction.id;
-        
-        // Add click event for flying to the attraction
-        marker.getElement().addEventListener("click", () => {
-          mapRef.current.flyTo({
-            center: [attraction.lng, attraction.lat],
-            zoom: 15,
-            pitch: 60,
-            bearing: 30,
-            speed: 1.5,
-            duration: 1500,
-          });
-        });
-        
-        // Store the marker for later cleanup
-        markersRef.current.push(marker);
-        markersAdded++;
-        
-      } catch (error) {
-        console.error(`❌ Error adding marker for attraction ${attraction.name}:`, error);
-      }
+      return true;
     });
-    
-    if (markersAdded > 0) {
-      console.log(`✅ Successfully displayed ${markersAdded} of ${attractions.length} attractions on map`);
-      
-      // Calculate the bounds to fit all markers
-      if (markersAdded > 1) {
-        try {
-          const bounds = new mapboxgl.LngLatBounds();
-          attractions.forEach(attraction => {
-            if (attraction.lng && attraction.lat) {
-              bounds.extend([attraction.lng, attraction.lat]);
+
+    // Import the createMarkerElement function
+    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
+      // Add new attraction markers
+      attractions.forEach((attraction) => {
+        if (!attraction.lat || !attraction.lng) return;
+
+        // Create popup content
+        const popupContent = `
+          <div class="popup-content">
+            <h3 class="font-bold text-lg">${attraction.name}</h3>
+            ${
+              attraction.type
+                ? `<p class="text-sm font-medium text-blue-600">${attraction.type}</p>`
+                : ""
             }
-          });
-          
-          // Fit the map to show all attractions with padding
-          if (!bounds.isEmpty()) {
-            mapRef.current.fitBounds(bounds, {
-              padding: 100,
-              maxZoom: 14
-            });
-            console.log("✅ Adjusted map bounds to show all attractions");
-          }
-        } catch (e) {
-          console.error("❌ Error adjusting map bounds:", e);
-        }
-      }
-    } else {
-      console.warn("❌ No attraction markers were added to the map");
-    }
+            ${
+              attraction.description
+                ? `<p class="text-sm mt-1">${attraction.description}</p>`
+                : ""
+            }
+            ${
+              attraction.rating
+                ? `<p class="text-xs mt-1">Rating: ${attraction.rating} ⭐</p>`
+                : ""
+            }
+          </div>
+        `;
+
+        // Create popup
+        const popup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: false,
+          maxWidth: "300px",
+        }).setHTML(popupContent);
+
+        // Create marker element using the utility function
+        const el = createMarkerElement("attraction", attraction);
+
+        // Create marker
+        const marker = new mapboxgl.Marker(el)
+        .setLngLat([attraction.lng, attraction.lat])
+          .setPopup(popup)
+        .addTo(mapRef.current);
+        
+        // Store attraction data with marker for later reference
+        marker.type = "attraction";
+        marker.itemData = attraction;
+
+        // Add to markers array
+        markersRef.current.push(marker);
+      });
+    }).catch(error => {
+      console.error("Error importing createMarkerElement:", error);
+    });
   };
 
-  // Handle fly to location event
-  const handleFlyToLocation = (event) => {
+  // Handle flying to a specific location
+  const handleFlyToLocation = useCallback((event) => {
     if (!mapRef.current) return;
-    const { location, options } = event.detail;
     
-    if (location && location.lng && location.lat) {
+    const { location, options = {} } = event.detail;
+    if (!location) return;
+    
       const flyOptions = {
         center: [location.lng, location.lat],
-        zoom: options.zoom || 13,
+      zoom: options.zoom || 15,
         pitch: options.pitch || 0,
         bearing: options.bearing || 0,
-        speed: options.speed || 1.5,
-        duration: options.duration || 1500,
+      speed: options.speed || 1.2,
+      duration: options.duration || 2000,
         ...options
       };
       
+    console.log(`🌍 Flying to location: [${location.lng}, ${location.lat}]`);
       mapRef.current.flyTo(flyOptions);
-      console.log(`🌍 Flying to location: ${location.lng}, ${location.lat}`);
       
       // If notification of completion is requested, dispatch an event when the movement ends
       if (options.shouldNotifyOnComplete) {
@@ -511,8 +347,7 @@ const ViewMap = ({ trip }) => {
           window.dispatchEvent(new CustomEvent('mapbox:movement-complete'));
         });
       }
-    }
-  };
+  }, []);
 
   // אתחול המפה – מתבצע פעם אחת
   useEffect(() => {
@@ -533,60 +368,485 @@ const ViewMap = ({ trip }) => {
     };
   }, []);
 
-  // Event listeners for map events
-  useEffect(() => {
-    // Add event listeners for external data updates
-    const handleDisplayRestaurants = (event) => {
+  // Define event handler functions with useCallback to prevent unnecessary re-renders
+  const handleDisplayRestaurants = useCallback((event) => {
       const { data } = event.detail;
       console.log("📍 Received restaurants data for map:", data.length, "items");
       displayRestaurantsOnMap(data);
       setRestaurantsData(data);
       setActiveLayer("restaurants");
-    };
+  }, [setRestaurantsData, setActiveLayer]);
 
-    const handleDisplayHotels = (event) => {
+  const handleDisplayHotels = useCallback((event) => {
       const { data } = event.detail;
       console.log("📍 Received hotels data for map:", data.length, "items");
       displayHotelsOnMap(data);
       setHotelsData(data);
       setActiveLayer("hotels");
-    };
+  }, [setHotelsData, setActiveLayer]);
 
-    const handleDisplayAttractions = (event) => {
+  const handleDisplayAttractions = useCallback((event) => {
       const { data } = event.detail;
       console.log("📍 Received attractions data for map:", data.length, "items");
       displayAttractionsOnMap(data);
       setAttractionsData(data);
       setActiveLayer("attractions");
-    };
+  }, [setAttractionsData, setActiveLayer]);
 
-    const handleClearMap = () => {
+  const handleDisplayItineraryLocations = useCallback((event) => {
+    const { data, destination } = event.detail;
+    console.log("📍 Received itinerary locations for map:", 
+      Object.values(data).flat().length, "items");
+    
+    // Clear existing markers first
       clearMarkers();
-      console.log("🧹 Cleared all markers from map");
-    };
+    
+    // Try to fly to the destination first
+    if (destination && destination !== currentDestination) {
+      setCurrentDestination(destination);
+      
+      // Try to fly to the destination
+      if (mapRef.current) {
+        fetchCoordinates2(destination)
+          .then((coords) => {
+            if (coords) {
+              mapRef.current.flyTo({
+                center: [coords.lng, coords.lat],
+                zoom: 12,
+                essential: true,
+                duration: 2000,
+              });
+              
+              // After flying to the destination, display markers sequentially with animation
+              mapRef.current.once('moveend', () => {
+                displayMarkersSequentially(data);
+              });
+            } else {
+              // If we couldn't get coordinates, still display markers
+              displayMarkersSequentially(data);
+            }
+          })
+          .catch((error) => {
+            console.error("Error flying to destination:", error);
+            // If there was an error, still display markers
+            displayMarkersSequentially(data);
+          });
+      } else {
+        // If map isn't ready, display markers directly
+        displayMarkersSequentially(data);
+      }
+    } else {
+      // If no destination change, display markers directly
+      displayMarkersSequentially(data);
+    }
+    
+    // Show all layers
+    setActiveLayer("all");
+    
+    // Update UI to show we're displaying an itinerary
+    setDisplayMode("itinerary");
+  }, [
+    clearMarkers, 
+    currentDestination, 
+    fetchCoordinates2, 
+    setCurrentDestination, 
+    setActiveLayer, 
+    setDisplayMode
+  ]);
+
+  // Function to display markers sequentially with animation
+  const displayMarkersSequentially = (data) => {
+    // Store all locations to be displayed in order
+    const allLocations = [];
+    
+    // First add hotels (usually where you start/end the day)
+    if (data.hotels && data.hotels.length > 0) {
+      data.hotels.forEach(hotel => {
+        if (hotel.lat && hotel.lng && !isNaN(hotel.lat) && !isNaN(hotel.lng)) {
+          allLocations.push({ ...hotel, type: 'hotel', order: 0 });
+        }
+      });
+    }
+    
+    // Then add attractions (main activities)
+    if (data.attractions && data.attractions.length > 0) {
+      data.attractions.forEach((attraction, index) => {
+        if (attraction.lat && attraction.lng && !isNaN(attraction.lat) && !isNaN(attraction.lng)) {
+          allLocations.push({ ...attraction, type: 'attraction', order: index + 1 });
+        }
+      });
+    }
+    
+    // Finally add restaurants (usually visited between attractions)
+    if (data.restaurants && data.restaurants.length > 0) {
+      data.restaurants.forEach((restaurant, index) => {
+        if (restaurant.lat && restaurant.lng && !isNaN(restaurant.lat) && !isNaN(restaurant.lng)) {
+          allLocations.push({ ...restaurant, type: 'restaurant', order: index + 1 });
+        }
+      });
+    }
+    
+    // Sort all locations by order
+    allLocations.sort((a, b) => a.order - b.order);
+    
+    // Display markers with a delay between each one for animation effect
+    allLocations.forEach((location, index) => {
+      setTimeout(() => {
+        if (location.type === 'hotel') {
+          displayHotelMarker(location);
+        } else if (location.type === 'restaurant') {
+          displayRestaurantMarker(location);
+        } else if (location.type === 'attraction') {
+          displayAttractionMarker(location);
+        }
+      }, index * 100); // 100ms delay between each marker
+    });
+    
+    // Store the data in state for later reference
+    setHotelsData(data.hotels || []);
+    setRestaurantsData(data.restaurants || []);
+    setAttractionsData(data.attractions || []);
+  };
+  
+  // Individual marker display functions for sequential animation
+  const displayHotelMarker = (hotel) => {
+    if (!mapRef.current || !hotel || !hotel.lat || !hotel.lng) return;
+    
+    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
+      // Create popup content
+      const popupContent = `
+        <div class="popup-content">
+          <h3 class="font-bold text-lg">${hotel.name}</h3>
+          ${hotel.description ? `<p class="text-sm mt-1">${hotel.description}</p>` : ""}
+          ${hotel.price_range ? `<p class="text-xs mt-1">Price: ${hotel.price_range}</p>` : ""}
+          ${hotel.rating ? `<p class="text-xs mt-1">Rating: ${hotel.rating} ⭐</p>` : ""}
+        </div>
+      `;
+      
+      // Create popup
+      const popup = new mapboxgl.Popup({
+        offset: 25,
+        closeButton: false,
+        maxWidth: "300px",
+      }).setHTML(popupContent);
+      
+      // Create marker element with animation
+      const el = createMarkerElement("hotel", hotel);
+      el.className += " marker-animation";
+      
+      // Create marker
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([hotel.lng, hotel.lat])
+        .setPopup(popup)
+        .addTo(mapRef.current);
+      
+      // Store hotel data with marker for later reference
+      marker.type = "hotel";
+      marker.itemData = hotel;
+      
+      // Add to markers array
+      markersRef.current.push(marker);
+    }).catch(error => {
+      console.error("Error importing createMarkerElement:", error);
+    });
+  };
+  
+  const displayRestaurantMarker = (restaurant) => {
+    if (!mapRef.current || !restaurant || !restaurant.lat || !restaurant.lng) return;
+    
+    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
+      // Create popup content
+      const popupContent = `
+        <div class="popup-content">
+          <h3 class="font-bold text-lg">${restaurant.name}</h3>
+          ${restaurant.cuisine ? `<p class="text-sm font-medium text-orange-600">${restaurant.cuisine}</p>` : ""}
+          ${restaurant.notes ? `<p class="text-sm mt-1">${restaurant.notes}</p>` : ""}
+          ${restaurant.price_range ? `<p class="text-xs mt-1">Price: ${restaurant.price_range}</p>` : ""}
+        </div>
+      `;
+      
+      // Create popup
+      const popup = new mapboxgl.Popup({
+        offset: 25,
+        closeButton: false,
+        maxWidth: "300px",
+      }).setHTML(popupContent);
+      
+      // Create marker element with animation
+      const el = createMarkerElement("restaurant", restaurant);
+      el.className += " marker-animation";
+      
+      // Create marker
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([restaurant.lng, restaurant.lat])
+        .setPopup(popup)
+        .addTo(mapRef.current);
+      
+      // Store restaurant data with marker for later reference
+      marker.type = "restaurant";
+      marker.itemData = restaurant;
+      
+      // Add to markers array
+      markersRef.current.push(marker);
+    }).catch(error => {
+      console.error("Error importing createMarkerElement:", error);
+    });
+  };
+  
+  const displayAttractionMarker = (attraction) => {
+    if (!mapRef.current || !attraction || !attraction.lat || !attraction.lng) return;
+    
+    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
+      // Create popup content
+      const popupContent = `
+        <div class="popup-content">
+          <h3 class="font-bold text-lg">${attraction.name}</h3>
+          ${attraction.type ? `<p class="text-sm font-medium text-blue-600">${attraction.type}</p>` : ""}
+          ${attraction.description ? `<p class="text-sm mt-1">${attraction.description}</p>` : ""}
+          ${attraction.rating ? `<p class="text-xs mt-1">Rating: ${attraction.rating} ⭐</p>` : ""}
+        </div>
+      `;
+      
+      // Create popup
+      const popup = new mapboxgl.Popup({
+        offset: 25,
+        closeButton: false,
+        maxWidth: "300px",
+      }).setHTML(popupContent);
+      
+      // Create marker element with animation
+      const el = createMarkerElement("attraction", attraction);
+      el.className += " marker-animation";
+      
+      // Create marker
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([attraction.lng, attraction.lat])
+        .setPopup(popup)
+        .addTo(mapRef.current);
+      
+      // Store attraction data with marker for later reference
+      marker.type = "attraction";
+      marker.itemData = attraction;
+      
+      // Add to markers array
+      markersRef.current.push(marker);
+    }).catch(error => {
+      console.error("Error importing createMarkerElement:", error);
+    });
+  };
+
+  // Handle highlighting a specific marker
+  const handleHighlightMarker = useCallback((event) => {
+    const { name, type, coordinates, animation } = event.detail;
+    
+    if (!mapRef.current) return;
+    
+    console.log(`🔍 Highlighting marker: ${name} (${type})`);
+    
+    // Find the marker by name and type
+    let foundMarker = null;
+    
+    // First try to find by exact coordinates if provided
+    if (coordinates && coordinates.lat && coordinates.lng) {
+      foundMarker = markersRef.current.find(
+        marker => 
+          marker.type === type && 
+          marker.itemData && 
+          Math.abs(marker.itemData.lat - coordinates.lat) < 0.0001 &&
+          Math.abs(marker.itemData.lng - coordinates.lng) < 0.0001
+      );
+    }
+    
+    // If not found by coordinates, try by name
+    if (!foundMarker) {
+      // Case insensitive name search
+      const normalizedName = name.toLowerCase().trim();
+      foundMarker = markersRef.current.find(
+        marker => 
+          marker.type === type && 
+          marker.itemData && 
+          marker.itemData.name && 
+          marker.itemData.name.toLowerCase().trim().includes(normalizedName)
+      );
+      
+      // If still not found, try a more flexible search
+      if (!foundMarker) {
+        // Try to find by partial name match
+        foundMarker = markersRef.current.find(
+          marker => 
+            marker.type === type && 
+            marker.itemData && 
+            marker.itemData.name && 
+            (marker.itemData.name.toLowerCase().includes(normalizedName) || 
+             normalizedName.includes(marker.itemData.name.toLowerCase()))
+        );
+        
+        // If still not found, try across all marker types as a last resort
+        if (!foundMarker) {
+          foundMarker = markersRef.current.find(
+            marker => 
+              marker.itemData && 
+              marker.itemData.name && 
+              (marker.itemData.name.toLowerCase().includes(normalizedName) || 
+               normalizedName.includes(marker.itemData.name.toLowerCase()))
+          );
+        }
+      }
+    }
+    
+    if (foundMarker) {
+      console.log(`✅ Found marker for ${name} in ${type} collection`);
+      
+      // Reset any previously highlighted markers
+      markersRef.current.forEach(marker => {
+        if (marker.element) {
+          marker.element.classList.remove('highlighted', 'bounce');
+          
+          // Reset any custom styles
+          marker.element.style.zIndex = '';
+          marker.element.style.boxShadow = '';
+          marker.element.style.transform = '';
+          marker.element.style.border = '';
+        }
+      });
+      
+      // Highlight the found marker
+      if (foundMarker.element) {
+        // Add highlighted class
+        foundMarker.element.classList.add('highlighted');
+        
+        // Apply animation if specified
+        if (animation?.bounce) {
+          foundMarker.element.classList.add('bounce');
+        }
+        
+        // Make the marker stand out
+        foundMarker.element.style.zIndex = 999;
+        
+        // Add a glowing effect based on marker type
+        let glowColor = 'rgba(59, 130, 246, 0.5)'; // Default blue for attractions
+        
+        if (foundMarker.type === 'restaurants') {
+          glowColor = 'rgba(220, 38, 38, 0.5)'; // Red for restaurants
+        } else if (foundMarker.type === 'hotels') {
+          glowColor = 'rgba(168, 85, 247, 0.5)'; // Purple for hotels
+        }
+        
+        foundMarker.element.style.boxShadow = `0 0 0 4px ${glowColor}, 0 0 10px rgba(0, 0, 0, 0.5)`;
+        foundMarker.element.style.border = '2px solid white';
+        
+        // Fly to the marker with animation if requested
+        if (animation?.panToMarker && foundMarker.itemData.lat && foundMarker.itemData.lng) {
+          mapRef.current.flyTo({
+            center: [foundMarker.itemData.lng, foundMarker.itemData.lat],
+            zoom: animation?.zoom ? (animation.zoomLevel || 15) : mapRef.current.getZoom(),
+            essential: true,
+            duration: animation?.duration || 1500,
+          });
+        }
+        
+        // Open a popup with information about the location
+        if (foundMarker.popup) {
+          foundMarker.popup.addTo(mapRef.current);
+        }
+      }
+    } else {
+      console.warn(`❌ Could not find marker for ${name} in ${type} collection`);
+      
+      // If we have coordinates but no marker, we can still fly to the location
+      if (coordinates && coordinates.lat && coordinates.lng) {
+        console.log(`🌍 Flying to coordinates: [${coordinates.lng}, ${coordinates.lat}]`);
+        mapRef.current.flyTo({
+          center: [coordinates.lng, coordinates.lat],
+          zoom: animation?.zoom ? (animation.zoomLevel || 15) : mapRef.current.getZoom(),
+          essential: true,
+          duration: animation?.duration || 1500,
+        });
+      } else {
+        // If we have a name but no marker or coordinates, try to geocode the name
+        console.log(`🔍 Trying to geocode location name: ${name}`);
+        fetchCoordinates2(name)
+          .then(coords => {
+            if (coords && coords.lat && coords.lng) {
+              console.log(`🌍 Found coordinates for ${name}: [${coords.lng}, ${coords.lat}]`);
+              mapRef.current.flyTo({
+                center: [coords.lng, coords.lat],
+                zoom: animation?.zoom ? (animation.zoomLevel || 15) : mapRef.current.getZoom(),
+                essential: true,
+                duration: animation?.duration || 1500,
+              });
+            }
+          })
+          .catch(error => {
+            console.error(`Error geocoding ${name}:`, error);
+          });
+      }
+    }
+  }, [mapRef, markersRef, fetchCoordinates2]);
+
+  const handleClearMap = useCallback(() => {
+    clearMarkers();
+  }, [clearMarkers]);
+  
+  // Handle flying to location by name
+  const handleFlyToLocationName = useCallback(async (event) => {
+    const { locationName } = event.detail;
+    if (!locationName || !mapRef.current) return;
+    
+    console.log(`🔍 Flying to location by name: ${locationName}`);
+    
+    try {
+      const coords = await fetchCoordinates2(locationName);
+      if (coords) {
+        mapRef.current.flyTo({
+          center: [coords.lng, coords.lat],
+          zoom: 15,
+          essential: true,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error(`Error flying to location ${locationName}:`, error);
+    }
+  }, [fetchCoordinates2]);
 
     // Register event listeners
+  useEffect(() => {
+    // Register event listeners for map data updates
     window.addEventListener(MAP_EVENTS.DISPLAY_RESTAURANTS, handleDisplayRestaurants);
     window.addEventListener(MAP_EVENTS.DISPLAY_HOTELS, handleDisplayHotels);
     window.addEventListener(MAP_EVENTS.DISPLAY_ATTRACTIONS, handleDisplayAttractions);
+    window.addEventListener(MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS, handleDisplayItineraryLocations);
     window.addEventListener(MAP_EVENTS.CLEAR_MAP, handleClearMap);
     window.addEventListener(MAP_EVENTS.FLY_TO_LOCATION, handleFlyToLocation);
+    window.addEventListener(MAP_EVENTS.HIGHLIGHT_MARKER, handleHighlightMarker);
     
     // Add new event listener for location names
     window.addEventListener('mapbox:fly-to-location-name', handleFlyToLocationName);
 
-    // Clean up event listeners
+    // Cleanup event listeners on unmount
     return () => {
       window.removeEventListener(MAP_EVENTS.DISPLAY_RESTAURANTS, handleDisplayRestaurants);
       window.removeEventListener(MAP_EVENTS.DISPLAY_HOTELS, handleDisplayHotels);
       window.removeEventListener(MAP_EVENTS.DISPLAY_ATTRACTIONS, handleDisplayAttractions);
+      window.removeEventListener(MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS, handleDisplayItineraryLocations);
       window.removeEventListener(MAP_EVENTS.CLEAR_MAP, handleClearMap);
       window.removeEventListener(MAP_EVENTS.FLY_TO_LOCATION, handleFlyToLocation);
+      window.removeEventListener(MAP_EVENTS.HIGHLIGHT_MARKER, handleHighlightMarker);
       
       // Remove new event listener for location names
       window.removeEventListener('mapbox:fly-to-location-name', handleFlyToLocationName);
     };
-  }, [setHotelsData, setRestaurantsData, setAttractionsData, setActiveLayer]);
+  }, [
+    handleDisplayRestaurants, 
+    handleDisplayHotels, 
+    handleDisplayAttractions, 
+    handleDisplayItineraryLocations, 
+    handleClearMap, 
+    handleFlyToLocation,
+    handleHighlightMarker,
+    handleFlyToLocationName
+  ]);
 
   useEffect(() => {
     updateDestination();
@@ -764,45 +1024,103 @@ const ViewMap = ({ trip }) => {
     });
   }, [selectedAttraction]);
 
-  // Update the handleFlyToLocationName function
-  const handleFlyToLocationName = async (event) => {
-    if (!mapRef.current) return;
+  // Add CSS styles for marker highlight animation and interactive markers
+  useEffect(() => {
+    // Create a style element
+    const styleEl = document.createElement('style');
+    styleEl.id = 'map-marker-styles';
     
-    const { locationName, options = {} } = event.detail;
-    if (!locationName) return;
-    
-    try {
-      console.log(`🔍 Finding coordinates for location: ${locationName}`);
-      const coordinates = await fetchCoordinates2(locationName);
-      
-      if (coordinates && coordinates.lat && coordinates.lng) {
-        const flyOptions = {
-          center: [coordinates.lng, coordinates.lat],
-          zoom: options.zoom || 12,
-          pitch: options.pitch || 0,
-          bearing: options.bearing || 0,
-          speed: options.speed || 1.2,
-          duration: options.duration || 2000,
-          ...options
-        };
-        
-        console.log(`🌍 Flying to location by name: ${locationName} [${coordinates.lng}, ${coordinates.lat}]`);
-        mapRef.current.flyTo(flyOptions);
-        
-        // If notification of completion is requested, dispatch an event when the movement ends
-        if (options.shouldNotifyOnComplete) {
-          mapRef.current.once('moveend', () => {
-            console.log('Map movement complete (from fly-to-location-name), notifying listeners');
-            window.dispatchEvent(new CustomEvent('mapbox:movement-complete'));
-          });
-        }
-      } else {
-        console.error(`❌ Could not find coordinates for location: ${locationName}`);
+    // Add CSS for marker animations
+    styleEl.textContent = `
+      .custom-marker {
+        cursor: pointer;
       }
-    } catch (error) {
-      console.error(`❌ Error flying to location ${locationName}:`, error);
-    }
-  };
+      
+      .marker-container {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 4px white, 0 0 0 6px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        transform-origin: bottom center;
+      }
+      
+      .marker-icon {
+        font-size: 18px;
+        line-height: 1;
+      }
+      
+      .marker-hover {
+        z-index: 10;
+      }
+      
+      .marker-hover .marker-container {
+        transform: scale(1.2);
+      }
+      
+      .marker-animation {
+        animation: dropIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      
+      .marker-highlight {
+        animation: bounce 0.8s ease infinite alternate;
+      }
+      
+      @keyframes dropIn {
+        0% {
+          opacity: 0;
+          transform: translateY(-50px) scale(0.5);
+        }
+        60% {
+          opacity: 1;
+          transform: translateY(10px) scale(1.1);
+        }
+        100% {
+          transform: translateY(0) scale(1);
+        }
+      }
+      
+      @keyframes bounce {
+        0% {
+          transform: translateY(0);
+        }
+        100% {
+          transform: translateY(-10px);
+        }
+      }
+      
+      /* Popup styling */
+      .mapboxgl-popup-content {
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border: 1px solid rgba(0,0,0,0.05);
+      }
+      
+      .popup-content h3 {
+        margin-top: 0;
+        margin-bottom: 5px;
+      }
+      
+      .popup-content p {
+        margin: 5px 0;
+      }
+    `;
+    
+    // Add the style element to the document head
+    document.head.appendChild(styleEl);
+    
+    // Clean up on unmount
+    return () => {
+      const existingStyle = document.getElementById('map-marker-styles');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-full w-full box-border bg-black">

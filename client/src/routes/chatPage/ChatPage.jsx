@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState, useMemo } from "react";
+import React, { useContext, useEffect, useRef, useState, useMemo, useCallback } from "react";
 import NewPromt from "../../components/newPromt/NewPromt";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
@@ -21,20 +21,21 @@ import { fieldComponentMap } from "../../components/FieldCompletion/FieldCompone
 import MissingFieldsForm from "../../components/FieldCompletion/MissingFieldsForm";
 import "./chatPage.css";
 
+// Add imports for the new text animator
+import { createSegmentedTextAnimator } from "../../utils/advice/AdviceHandler";
+
+// Import for markdown parsing
+import { marked } from 'marked';
+
+// Configure marked with safe options
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+  silent: true
+});
+
 // הוצאת הפונקציה החוצה מהקומפוננטה הראשית והפיכתה לקומפוננטה נפרדת
 const ItineraryActions = React.memo(({ message }) => {
-  // Check if this message is an itinerary
-  if (
-    !(
-      message.isItinerary ||
-      (message.message &&
-        message.message.includes("Day 1:") &&
-        message.message.includes("Day 2:"))
-    )
-  ) {
-    return null;
-  }
-
   const { tripDetails } = useContext(TripContext);
 
   // State for save button
@@ -47,6 +48,261 @@ const ItineraryActions = React.memo(({ message }) => {
   // State to track if we've navigated to edit
   const [navigatedToEdit, setNavigatedToEdit] = useState(false);
 
+  // Check if this message is an itinerary
+  const isItinerary = 
+    message.isItinerary ||
+    (message.message &&
+      (message.message.includes("Day 1:") ||
+       message.message.includes("## Day 1") ||
+       message.message.includes("# Travel Itinerary") ||
+       message.message.includes("**Destination:**") ||
+       (message.message.includes("📍[") && message.message.includes("🍽️["))));
+
+  // Automatically display itinerary locations on the map when detected
+  useEffect(() => {
+    // Only proceed if this is an itinerary
+    if (!isItinerary) return;
+    
+    const displayLocationsOnMap = async () => {
+      try {
+        // Get the itinerary content
+        const itineraryContent = message.message || message.displayMessage;
+        
+        // Extract destination from the itinerary text
+        let destination = "";
+        const destinationMatch = itineraryContent.match(/\*\*Destination:\*\*\s+([^\n]+)/);
+        if (destinationMatch && destinationMatch[1]) {
+          destination = destinationMatch[1].trim();
+          console.log(`Extracted destination from itinerary: ${destination}`);
+        } else if (tripDetails?.vacation_location) {
+          destination = tripDetails.vacation_location;
+          console.log(`Using trip details destination: ${destination}`);
+        }
+        
+        // Import the function to display itinerary locations on the map
+        const { displayItineraryLocations } = await import("../../utils/map/MapEventService");
+        
+        // Extract and display locations on the map
+        const locations = await displayItineraryLocations(itineraryContent, destination);
+        console.log(`Automatically displayed ${Object.values(locations).flat().length} itinerary locations on the map`);
+        
+        // After locations are displayed, add click handlers to location markers in the chat
+        setTimeout(() => {
+          if (message.id) {
+            const addClickHandlersToLocationMarkers = window.__addClickHandlersToLocationMarkers;
+            if (typeof addClickHandlersToLocationMarkers === 'function') {
+              addClickHandlersToLocationMarkers(message.id);
+            }
+          }
+        }, 500);
+      } catch (error) {
+        console.error("Error displaying itinerary locations on map:", error);
+      }
+    };
+
+    // Display locations with a slight delay to ensure the map component is ready
+    const timer = setTimeout(() => {
+      displayLocationsOnMap();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [message.id, message.message, message.displayMessage, tripDetails, isItinerary]);
+  
+  // Function to add click handlers to location markers in the chat
+  const addClickHandlersToLocationMarkers = (messageId) => {
+    try {
+      // Find the message container for the specified message ID
+      if (!messageId) return;
+      
+      const messageContainer = document.getElementById(messageId);
+      if (!messageContainer) {
+        console.warn("Could not find message container for ID:", messageId);
+        return;
+      }
+      
+      // Store the function globally so we can use it from other places
+      window.__addClickHandlersToLocationMarkers = addClickHandlersToLocationMarkers;
+      
+      // Find all location markers in the message using separate regexes for each icon type
+      // This avoids issues with surrogate pairs in character classes
+      // Updated to support spacing between icon and bracket
+      const attractionRegex = /📍\s*\[(.*?)\](?:\((-?\d+\.?\d*),(-?\d+\.?\d*)\))?/g;
+      const restaurantRegex = /🍽️\s*\[(.*?)\](?:\((-?\d+\.?\d*),(-?\d+\.?\d*)\))?/g;
+      const hotelRegex = /🏨\s*\[(.*?)\](?:\((-?\d+\.?\d*),(-?\d+\.?\d*)\))?/g;
+      const eveningRegex = /🌆\s*\[(.*?)\](?:\((-?\d+\.?\d*),(-?\d+\.?\d*)\))?/g;
+      
+      // Get the current visible message content
+      const messageContent = messageContainer.textContent || "";
+      
+      // Find all matches using separate regexes
+      const locationMatches = [];
+      
+      // Process attractions
+      let match;
+      while ((match = attractionRegex.exec(messageContent)) !== null) {
+        locationMatches.push({
+          fullMatch: match[0],
+          icon: "📍",
+          name: match[1],
+          lat: match[2] ? parseFloat(match[2]) : null,
+          lng: match[3] ? parseFloat(match[3]) : null,
+          type: 'attractions'
+        });
+      }
+      
+      // Process restaurants
+      while ((match = restaurantRegex.exec(messageContent)) !== null) {
+        locationMatches.push({
+          fullMatch: match[0],
+          icon: "🍽️",
+          name: match[1],
+          lat: match[2] ? parseFloat(match[2]) : null,
+          lng: match[3] ? parseFloat(match[3]) : null,
+          type: 'restaurants'
+        });
+      }
+      
+      // Process hotels
+      while ((match = hotelRegex.exec(messageContent)) !== null) {
+        locationMatches.push({
+          fullMatch: match[0],
+          icon: "🏨",
+          name: match[1],
+          lat: match[2] ? parseFloat(match[2]) : null,
+          lng: match[3] ? parseFloat(match[3]) : null,
+          type: 'hotels'
+        });
+      }
+      
+      // Process evening venues
+      while ((match = eveningRegex.exec(messageContent)) !== null) {
+        locationMatches.push({
+          fullMatch: match[0],
+          icon: "🌆",
+          name: match[1],
+          lat: match[2] ? parseFloat(match[2]) : null,
+          lng: match[3] ? parseFloat(match[3]) : null,
+          type: 'attractions' // Evening venues are treated as attractions
+        });
+      }
+      
+      // Log the found locations for debugging
+      console.log(`Found ${locationMatches.length} locations in the chat message:`, 
+        locationMatches.map(loc => `${loc.icon} ${loc.name} (${loc.type})`));
+      
+      if (locationMatches.length === 0) {
+        console.warn("No location markers found in the message");
+        return;
+      }
+      
+      // Get all text nodes in the message container
+      const textNodes = [];
+      const walkNodes = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          textNodes.push(node);
+        } else {
+          for (let i = 0; i < node.childNodes.length; i++) {
+            walkNodes(node.childNodes[i]);
+          }
+        }
+      };
+      walkNodes(messageContainer);
+      
+      // Import MAP_EVENTS and utility functions
+      import("../../utils/map/MapEventService").then(({ MAP_EVENTS, flyToLocation, highlightMarkerOnMap }) => {
+        // For each location match, find it in the DOM and add a click handler
+        locationMatches.forEach((location) => {
+          // Find the text node containing this location
+          for (const textNode of textNodes) {
+            if (textNode.textContent.includes(location.fullMatch)) {
+              // Create a span element to replace the text
+              const span = document.createElement('span');
+              span.className = 'location-marker cursor-pointer hover:bg-blue-100 px-1 rounded';
+              span.dataset.locationType = location.type;
+              span.dataset.locationName = location.name;
+              
+              // Add visual styling based on location type
+              if (location.icon === '🍽️') {
+                span.classList.add('restaurant-marker');
+              } else if (location.icon === '🏨') {
+                span.classList.add('hotel-marker');
+              } else if (location.icon === '🌆') {
+                span.classList.add('evening-marker');
+              } else {
+                span.classList.add('attraction-marker');
+              }
+              
+              span.textContent = location.fullMatch;
+              span.title = `Click to highlight ${location.name} on the map`;
+              
+              // Add click handler
+              span.addEventListener('click', (event) => {
+                // Visual feedback in the chat
+                document.querySelectorAll('.location-marker.active').forEach(el => {
+                  el.classList.remove('active');
+                });
+                span.classList.add('active');
+                
+                // Prevent default behavior to avoid navigation issues
+                event.preventDefault();
+                event.stopPropagation();
+                
+                if (location.lat && location.lng) {
+                  // If we have coordinates, fly directly to them
+                  console.log(`Flying to coordinates for ${location.name}: [${location.lat}, ${location.lng}]`);
+                  flyToLocation({ lat: location.lat, lng: location.lng }, { zoom: 16 });
+                } else {
+                  // Otherwise, search for the location by name
+                  console.log(`Searching for location by name: ${location.name}`);
+                  const event = new CustomEvent('mapbox:fly-to-location-name', {
+                    detail: { locationName: location.name },
+                  });
+                  window.dispatchEvent(event);
+                }
+                
+                // Highlight the marker based on its type
+                let markerType = location.type;
+                
+                // Use the highlightMarkerOnMap function
+                highlightMarkerOnMap({ 
+                  name: location.name, 
+                  type: markerType,
+                  coordinates: location.lat && location.lng ? { lat: location.lat, lng: location.lng } : null
+                });
+              });
+              
+              // Replace the text node with our interactive span
+              const text = textNode.textContent;
+              const index = text.indexOf(location.fullMatch);
+              if (index >= 0) {
+                const beforeText = document.createTextNode(text.substring(0, index));
+                const afterText = document.createTextNode(text.substring(index + location.fullMatch.length));
+                
+                const parent = textNode.parentNode;
+                parent.insertBefore(beforeText, textNode);
+                parent.insertBefore(span, textNode);
+                parent.insertBefore(afterText, textNode);
+                parent.removeChild(textNode);
+                
+                // Exit the loop since we found and processed this location
+                break;
+              }
+            }
+          }
+        });
+      }).catch(error => {
+        console.error("Error setting up location click handlers:", error);
+      });
+    } catch (error) {
+      console.error("Error adding click handlers to location markers:", error);
+    }
+  };
+
+  // If this is not an itinerary, don't render anything
+  if (!isItinerary) {
+    return null;
+  }
+
   // Save itinerary function
   const handleSaveItinerary = async () => {
     if (savedStatus.isSaved || savedStatus.isSaving) return;
@@ -56,16 +312,141 @@ const ItineraryActions = React.memo(({ message }) => {
       // Get the chat ID from the URL
       const chatId = window.location.pathname.split("/").pop();
 
-      // Import the saveItinerary function
-      const { saveItinerary } = await import("../../utils/itineraryGenerator");
+      // Import the required functions
+      const { saveItinerary, convertItineraryToJSON, formatItineraryForDisplay } = await import("../../utils/itineraryGenerator");
 
-      // Save the itinerary with the message content
+      // Get the itinerary content
+      const itineraryContent = message.message || message.displayMessage;
+      
+      // Clean up any markdown code block indicators
+      const cleanContent = itineraryContent.replace(/```json|```/g, "").trim();
+      
+      // Try to parse as JSON first if it looks like JSON
+      let structuredItinerary = null;
+      let rawItinerary = null;
+      let formattedItinerary = itineraryContent;
+
+      if (cleanContent.trim().startsWith("{")) {
+        try {
+          // Parse the JSON and ensure it's properly structured
+          structuredItinerary = JSON.parse(cleanContent);
+          rawItinerary = cleanContent; // Store the raw JSON string
+          console.log("Successfully parsed itinerary as JSON");
+          
+          // Validate the structure has the expected fields
+          if (!structuredItinerary.days || !Array.isArray(structuredItinerary.days)) {
+            console.warn("JSON structure missing 'days' array, may not be a valid itinerary");
+          }
+          
+          // Generate a formatted text version for better display
+          formattedItinerary = formatItineraryForDisplay(structuredItinerary);
+        } catch (jsonError) {
+          console.warn("Failed to parse as JSON, falling back to converter:", jsonError);
+          try {
+            structuredItinerary = convertItineraryToJSON(cleanContent);
+            console.log("Successfully converted itinerary to JSON structure");
+            
+            // Generate a formatted text version for better display
+            formattedItinerary = formatItineraryForDisplay(structuredItinerary);
+          } catch (conversionError) {
+            console.error("Error converting itinerary to JSON:", conversionError);
+            // Continue with null structuredItinerary - the saveItinerary function will handle this
+            structuredItinerary = null;
+          }
+        }
+      } else {
+        // If not JSON, try the converter
+        try {
+          structuredItinerary = convertItineraryToJSON(cleanContent);
+          console.log("Successfully converted itinerary to JSON structure");
+          
+          // Generate a formatted text version for better display
+          formattedItinerary = formatItineraryForDisplay(structuredItinerary);
+        } catch (conversionError) {
+          console.error("Error converting itinerary to JSON:", conversionError);
+          // Continue with null structuredItinerary - the saveItinerary function will handle this
+          structuredItinerary = null;
+        }
+      }
+
+      // Ensure we have a valid structuredItinerary object
+      if (!structuredItinerary) {
+        structuredItinerary = {
+          title: "Travel Itinerary",
+          destination: tripDetails?.vacation_location || "Unknown Destination",
+          dates: tripDetails?.dates || { from: "", to: "" },
+          days: []
+        };
+        console.log("Created minimal structuredItinerary due to parsing failures");
+      }
+
+      // Fix destination if it's incorrect (like "advance" instead of actual destination)
+      if (structuredItinerary.destination === "advance" && tripDetails?.vacation_location) {
+        structuredItinerary.destination = tripDetails.vacation_location;
+        console.log(`Fixed incorrect destination from "advance" to "${structuredItinerary.destination}"`);
+      }
+
+      // Extract destination from text if not set or incorrect
+      if ((!structuredItinerary.destination || structuredItinerary.destination === "advance") && formattedItinerary) {
+        const destinationMatch = formattedItinerary.match(/\*\*Destination:\*\*\s+([^\n]+)/);
+        if (destinationMatch && destinationMatch[1]) {
+          structuredItinerary.destination = destinationMatch[1].trim();
+          console.log(`Extracted destination from formatted text: "${structuredItinerary.destination}"`);
+        }
+      }
+
+      // Make sure days have the correct structure for the new format
+      if (structuredItinerary.days && Array.isArray(structuredItinerary.days)) {
+        // Check if this is the new format with sections
+        const hasNewFormat = structuredItinerary.days.some(day => day.sections);
+        
+        if (hasNewFormat) {
+          // Ensure all days have sections property
+          structuredItinerary.days.forEach(day => {
+            if (!day.sections) {
+              day.sections = [];
+              console.log(`Added missing sections array to day ${day.dayNumber}`);
+            }
+          });
+        }
+      }
+
+      // Determine the format based on the structure
+      const format = structuredItinerary && 
+                    structuredItinerary.days && 
+                    structuredItinerary.days[0] &&
+                    structuredItinerary.days[0].sections 
+                    ? "structured-json-v2" 
+                    : "legacy";
+
+      // Ensure the structuredItinerary is serializable
+      let safeStructuredItinerary;
+      try {
+        // Convert to string and back to remove any circular references or non-serializable data
+        safeStructuredItinerary = JSON.parse(JSON.stringify(structuredItinerary));
+        console.log("Successfully sanitized structuredItinerary for saving");
+      } catch (error) {
+        console.error("Error sanitizing structuredItinerary:", error);
+        // Create a minimal version as fallback
+        safeStructuredItinerary = {
+          title: structuredItinerary.title || "Travel Itinerary",
+          destination: structuredItinerary.destination || tripDetails?.vacation_location || "Unknown Destination",
+          dates: structuredItinerary.dates || tripDetails?.dates || { from: "", to: "" },
+          days: []
+        };
+        console.log("Created simplified structuredItinerary due to serialization error");
+      }
+
+      // Save the itinerary with the message content and structured format
       const result = await saveItinerary(chatId, {
-        itinerary: message.message || message.displayMessage,
+        itinerary: formattedItinerary, // Use formatted text for display
+        rawItinerary: rawItinerary || cleanContent, // Use raw JSON if available, otherwise cleaned content
+        structuredItinerary: safeStructuredItinerary,
         metadata: {
-          destination: tripDetails?.vacation_location,
-          duration: tripDetails?.duration,
-          dates: tripDetails?.dates,
+          destination: safeStructuredItinerary.destination || tripDetails?.vacation_location,
+          duration: safeStructuredItinerary.duration || tripDetails?.duration,
+          dates: safeStructuredItinerary.dates || tripDetails?.dates,
+          format,
           savedManually: true,
           savedAt: new Date().toISOString(),
         },
@@ -77,6 +458,7 @@ const ItineraryActions = React.memo(({ message }) => {
           isSaving: false,
           error: null,
         });
+        console.log("Itinerary saved successfully with ID:", result.itineraryId);
       } else {
         throw new Error(result.error || "Failed to save itinerary");
       }
@@ -226,6 +608,9 @@ const ItineraryActions = React.memo(({ message }) => {
   );
 });
 
+// הוספת שם תצוגה לקומפוננטה
+ItineraryActions.displayName = "ItineraryActions";
+
 // הוספת קומפוננטת UpdatedBadge שתוצג כאשר יומן עודכן
 const UpdatedBadge = React.memo(({ wasUpdated }) => {
   if (!wasUpdated) return null;
@@ -250,6 +635,9 @@ const UpdatedBadge = React.memo(({ wasUpdated }) => {
   );
 });
 
+// הוספת שם תצוגה לקומפוננטה
+UpdatedBadge.displayName = "UpdatedBadge";
+
 const ChatPage = () => {
   const path = useLocation().pathname;
   const chatId = path.split("/").pop();
@@ -257,6 +645,12 @@ const ChatPage = () => {
   const chatContainerRef = useRef(null);
   const displayedMessagesRef = useRef(new Set());
   const { userId, isLoaded, isSignedIn, getToken } = useAuth();
+
+  // Add new state for tracking animated messages
+  const [animatingMessageId, setAnimatingMessageId] = useState(null);
+  const [animationProgress, setAnimationProgress] = useState(0);
+  const [currentAnimatingDay, setCurrentAnimatingDay] = useState(0);
+  const animatorRef = useRef(null);
 
   // Check if map is being displayed (based on trip details or URL params)
   const isMapVisible = useMemo(() => {
@@ -1357,7 +1751,13 @@ const ChatPage = () => {
           // אם זו ההודעה שצריך לעדכן
           if (
             msg.id === messageId ||
-            (msg.isItinerary && msg.message && msg.message.includes("Day 1:"))
+            (msg.isItinerary || 
+             (msg.message && 
+              (msg.message.includes("Day 1:") || 
+               msg.message.includes("## Day 1") || 
+               msg.message.includes("# Travel Itinerary") || 
+               msg.message.includes("**Destination:**") || 
+               (msg.message.includes("📍[") && msg.message.includes("🍽️[")))))
           ) {
             return {
               ...msg,
@@ -1431,6 +1831,602 @@ const ChatPage = () => {
       document.removeEventListener("itineraryUpdated", handleItineraryUpdated);
     };
   }, [data]);
+
+  // Prepare messages to display by combining data history and pending messages
+  const messagesForDisplay = useMemo(() => {
+    const history = data?.history || [];
+    return [...history, ...pendingMessages];
+  }, [data, pendingMessages]);
+
+  // Function to extract day information from itinerary text
+  const extractDaysFromItinerary = (text) => {
+    // Match day headers (### Day X:)
+    const dayPattern = /### Day \d+:/g;
+    const dayMatches = [...text.matchAll(dayPattern)];
+    
+    if (dayMatches.length > 0) {
+      // Extract each day's content
+      const days = [];
+      const dayIndices = dayMatches.map(match => match.index);
+      dayIndices.push(text.length); // Add the end of string
+      
+      for (let i = 0; i < dayMatches.length; i++) {
+        days.push({
+          title: dayMatches[i][0].trim(),
+          content: text.substring(dayIndices[i], dayIndices[i + 1]),
+          startIndex: dayIndices[i],
+          endIndex: dayIndices[i + 1]
+        });
+      }
+      
+      return { days, hasDayMarkers: true };
+    } else {
+      // Try to split by section markers or paragraphs if no day markers
+      const sectionPattern = /####|###|##/g;
+      const sectionMatches = [...text.matchAll(sectionPattern)];
+      
+      if (sectionMatches.length > 0) {
+        // Extract each section as a "day"
+        const sections = [];
+        const sectionIndices = sectionMatches.map(match => match.index);
+        sectionIndices.push(text.length);
+        
+        for (let i = 0; i < sectionMatches.length; i++) {
+          sections.push({
+            title: text.substring(sectionIndices[i], sectionIndices[i] + text.substring(sectionIndices[i]).indexOf('\n')),
+            content: text.substring(sectionIndices[i], sectionIndices[i + 1]),
+            startIndex: sectionIndices[i],
+            endIndex: sectionIndices[i + 1]
+          });
+        }
+        
+        return { days: sections, hasDayMarkers: false };
+      } else {
+        // Split by paragraphs as a last resort
+        const paragraphs = text.split('\n\n').filter(p => p.trim().length > 0);
+        
+        if (paragraphs.length > 1) {
+          // Group paragraphs into logical sections
+          const sections = [];
+          let currentIndex = 0;
+          
+          paragraphs.forEach(paragraph => {
+            const paragraphStart = text.indexOf(paragraph, currentIndex);
+            const paragraphEnd = paragraphStart + paragraph.length;
+            
+            sections.push({
+              title: paragraph.substring(0, Math.min(30, paragraph.length)) + '...',
+              content: paragraph,
+              startIndex: paragraphStart,
+              endIndex: paragraphEnd
+            });
+            
+            currentIndex = paragraphEnd;
+          });
+          
+          return { days: sections, hasDayMarkers: false };
+        } else {
+          // Just return the whole text as one "day"
+          return { 
+            days: [{
+              title: 'Itinerary',
+              content: text,
+              startIndex: 0,
+              endIndex: text.length
+            }],
+            hasDayMarkers: false
+          };
+        }
+      }
+    }
+  };
+  
+  // This function displays locations on the map for a specific day
+  const displayDayLocationsOnMap = async (dayContent, destination, messageId, keepExisting = true) => {
+    try {
+      // Import needed functions
+      const { displayItineraryLocations } = await import("../../utils/map/MapEventService");
+      
+      // Display only the locations mentioned in this day's content
+      // The true parameter ensures we don't clear previous markers
+      const locations = await displayItineraryLocations(dayContent, destination, keepExisting);
+      
+      console.log(`Displayed ${Object.values(locations).flat().length} locations for current day`);
+      
+      // After locations are displayed, add click handlers
+      setTimeout(() => {
+        if (messageId) {
+          addClickHandlersToLocationMarkers(messageId);
+        }
+      }, 300);
+      
+      return locations;
+    } catch (error) {
+      console.error("Error displaying day locations on map:", error);
+      return null;
+    }
+  };
+  
+  // Function to properly format days with wrapper divs for animation
+  const formatDayContent = (text) => {
+    // Check if the text contains day headers
+    const dayHeaderPattern = /### Day \d+:/g;
+    if (!dayHeaderPattern.test(text)) {
+      return text; // Return unchanged if no day headers
+    }
+    
+    // Split text by day headers
+    const parts = text.split(/(### Day \d+:)/);
+    
+    if (parts.length <= 1) {
+      return text; // Return unchanged if splitting didn't work
+    }
+    
+    let result = '';
+    let currentDay = 0;
+    
+    for (let i = 0; i < parts.length; i++) {
+      if (i === 0 && !parts[i].match(dayHeaderPattern)) {
+        // This is intro content before the first day
+        result += parts[i];
+      } else if (parts[i].match(dayHeaderPattern)) {
+        // This is a day header
+        currentDay++;
+        
+        // Start a new day section
+        if (i + 1 < parts.length) {
+          result += `<div class="day-content" data-day="${currentDay}">`;
+          result += parts[i]; // Add the header
+          result += parts[i + 1]; // Add the content
+          result += '</div>';
+          i++; // Skip the next part as we've already added it
+        } else {
+          // Header with no content
+          result += `<div class="day-content" data-day="${currentDay}">`;
+          result += parts[i];
+          result += '</div>';
+        }
+      }
+    }
+    
+    return result;
+  };
+  
+  // Add this at the appropriate spot when starting the segmented animation
+  const animateDaysWithSegments = (introText, dayText) => {
+    // Start the day-by-day animation with segmented animator
+    animatorRef.current = createSegmentedTextAnimator(dayText, {
+      segmentPatterns: [/### Day \d+:/], // Day headers as segment boundaries
+      charSpeed: 15, // Characters per animation frame
+      segmentDelay: 1000, // Pause between days
+      onUpdate: (text, dayProgress) => {
+        // Format the day content with wrapper divs
+        const formattedDayText = formatDayContent(text);
+        
+        // Combine intro with current day text
+        const combinedText = introText + formattedDayText;
+        
+        // Update with combined text (intro is 20%, days are 80% of total)
+        const totalProgress = 20 + (dayProgress * 0.8);
+        onUpdate(combinedText, totalProgress);
+      },
+      onSegmentComplete: async (segmentIndex, currentText) => {
+        // A day has been fully revealed
+        setCurrentAnimatingDay(segmentIndex + 1);
+        
+        // Display this day's locations on the map
+        if (segmentIndex < days.length) {
+          const dayContent = days[segmentIndex].content;
+          await displayDayLocationsOnMap(dayContent, destination, message.id, true); // true = keep previous markers
+          
+          // Highlight the current day section
+          setTimeout(() => {
+            const currentDayElement = document.querySelector(`.day-content[data-day="${segmentIndex + 1}"]`);
+            if (currentDayElement) {
+              currentDayElement.classList.add('current-day');
+            }
+          }, 100);
+          
+          // Add a pause between days to make the transition more noticeable
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+      },
+      onComplete: () => {
+        // Animation complete, show full text
+        const formattedFullText = formatDayContent(message.message);
+        onUpdate(formattedFullText, 100);
+        setAnimationProgress(100);
+        console.log("Itinerary animation complete");
+        
+        // Add click handlers to all location markers
+        setTimeout(() => {
+          if (typeof addClickHandlersToLocationMarkers === 'function') {
+            addClickHandlersToLocationMarkers(message.id);
+          }
+        }, 500);
+      }
+    });
+    
+    return animatorRef.current;
+  };
+  
+  // Enhanced function to start animating an itinerary message
+  const startItineraryAnimation = (message) => {
+    if (!message || !message.message) return;
+    
+    // Set the current message as animating - these are state variables in the ChatPage component
+    setAnimatingMessageId(message.id);
+    setAnimationProgress(0);
+    setCurrentAnimatingDay(-1); // Start at -1 to indicate we're in the "intro" phase
+    
+    // Extract the destination for map display
+    let destination = "";
+    const destinationMatch = message.message.match(/\*\*Destination:\*\*\s+([^\n]+)/);
+    if (destinationMatch && destinationMatch[1]) {
+      destination = destinationMatch[1].trim();
+    } else if (tripDetails?.vacation_location) {
+      destination = tripDetails.vacation_location;
+    }
+    
+    // Clear the map initially for a fresh start
+    // Import and use the clearMap function
+    import("../../utils/map/MapEventService").then(({ clearMap }) => {
+      clearMap();
+    });
+    
+    // Parse the itinerary into days/sections
+    const { days, hasDayMarkers } = extractDaysFromItinerary(message.message);
+    
+    if (days.length === 0) {
+      // Nothing to animate, show the full message
+      setAnimationProgress(100);
+      return;
+    }
+    
+    // For proper itineraries, we want to extract the intro part before the first day
+    let introText = "";
+    if (hasDayMarkers && days.length > 0 && days[0].startIndex > 0) {
+      introText = message.message.substring(0, days[0].startIndex);
+    } else {
+      // For itineraries without clear day markers, use the first paragraph as intro
+      const firstNewlineIndex = message.message.indexOf("\n\n");
+      if (firstNewlineIndex > 0) {
+        introText = message.message.substring(0, firstNewlineIndex + 2);
+      } else {
+        // If no clear paragraphs, use the first 150 characters as intro
+        introText = message.message.substring(0, Math.min(150, message.message.length));
+      }
+    }
+    
+    // Create the text animator
+    if (animatorRef.current) {
+      animatorRef.current.stop();
+    }
+    
+    // Animation phases:
+    // 1. Start with empty message
+    // 2. Fade in the title and intro text
+    // 3. Proceed with day-by-day animation
+    
+    // Initialize with empty text
+    const messageElement = document.getElementById(message.id);
+    if (messageElement) {
+      const messageContentElement = messageElement.querySelector('.message-content');
+      if (messageContentElement) {
+        // Start with an empty message
+        onUpdate("", 0);
+      }
+    }
+    
+    // Function to update the displayed text
+    const onUpdate = (text, progress) => {
+      // Update the React state for tracking progress
+      setAnimationProgress(progress);
+      
+      // Also directly update the DOM for smoother updates
+      const messageElement = document.getElementById(message.id);
+      if (messageElement) {
+        const messageContentElement = messageElement.querySelector('.message-content');
+        if (messageContentElement) {
+          const markdownElement = messageContentElement.querySelector('div');
+          if (markdownElement) {
+            // Create temporary element to render Markdown
+            try {
+              // First create a new temporary div for the new content
+              const tempDiv = document.createElement('div');
+              
+              // Use a safe approach with error handling
+              let parsedContent = '';
+              try {
+                parsedContent = marked.parse(text);
+              } catch (error) {
+                console.warn('Error parsing markdown:', error);
+                // Fallback to displaying raw text if parsing fails
+                parsedContent = text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+              }
+              
+              tempDiv.innerHTML = `<div>${parsedContent}</div>`;
+              
+              // Replace the content with proper DOM diffing to avoid flickering
+              if (tempDiv.firstChild) {
+                // Use a requestAnimationFrame for smoother updates
+                requestAnimationFrame(() => {
+                  // Process day headers to add special styling
+                  const dayHeaders = tempDiv.querySelectorAll('h3');
+                  dayHeaders.forEach(header => {
+                    if (header.textContent.includes('Day')) {
+                      header.classList.add('day-header');
+                    }
+                  });
+                  
+                  // Update the DOM
+                  markdownElement.innerHTML = tempDiv.firstChild.innerHTML;
+                  
+                  // Add smooth appearance animation to day headers
+                  const newDayHeaders = markdownElement.querySelectorAll('h3.day-header');
+                  newDayHeaders.forEach(header => {
+                    if (!header.classList.contains('animated')) {
+                      header.classList.add('animated');
+                      header.style.opacity = '0';
+                      setTimeout(() => {
+                        header.style.opacity = '1';
+                        header.style.transition = 'opacity 0.5s ease-in-out';
+                      }, 10);
+                    }
+                  });
+                  
+                  // Add click handlers to location markers after a brief delay
+                  setTimeout(() => {
+                    if (typeof addClickHandlersToLocationMarkers === 'function') {
+                      addClickHandlersToLocationMarkers(message.id);
+                    }
+                  }, 100);
+                });
+              }
+            } catch (error) {
+              console.error('Error updating markdown content:', error);
+              // Last resort fallback
+              markdownElement.textContent = text;
+            }
+          }
+        }
+      }
+    };
+    
+    // Start the animation process
+    try {
+      // Start with intro animation
+      const animateIntro = async () => {
+        console.log("Starting intro animation");
+        
+        // Animate the intro text
+        let currentText = "";
+        const charInterval = 20; // ms between characters
+        
+        for (let i = 0; i <= introText.length; i++) {
+          currentText = introText.substring(0, i);
+          onUpdate(currentText, (i / introText.length) * 20); // Intro is 20% of total progress
+          await new Promise(resolve => setTimeout(resolve, charInterval));
+        }
+        
+        console.log("Intro animation complete, starting days");
+        
+        // After intro is complete, start animating days one by one
+        await animateDaysSequentially(introText, days, destination, message.id);
+      };
+      
+      // Function to animate days one by one, ensuring synchronization with map
+      const animateDaysSequentially = async (introSoFar, days, destination, messageId) => {
+        let fullText = introSoFar;
+        
+        // For each day
+        for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
+          // Update current animating day
+          setCurrentAnimatingDay(dayIndex);
+          
+          const day = days[dayIndex];
+          const dayContent = day.content;
+          
+          // Extract just this day's content for the map
+          console.log(`Animating Day ${dayIndex + 1}`);
+          
+          // First, show the day header instantly
+          const dayHeaderMatch = dayContent.match(/### Day \d+:/);
+          if (dayHeaderMatch) {
+            const headerText = dayHeaderMatch[0];
+            fullText += `<div class="day-content" data-day="${dayIndex + 1}">${headerText}`;
+            onUpdate(fullText, 20 + ((dayIndex / days.length) * 80));
+            
+            // Short pause after showing the header
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
+          // Create a promise for map markers to track when they're displayed
+          const markersPromise = displayDayLocationsOnMap(
+            dayContent, 
+            destination, 
+            messageId, 
+            true // Keep previous markers
+          );
+          
+          // Now animate the day content character by character
+          let dayTextWithoutHeader = dayContent.replace(/### Day \d+:/, '');
+          let currentDayText = "";
+          const charInterval = 15; // ms between characters
+          
+          for (let i = 0; i <= dayTextWithoutHeader.length; i += 3) { // Increment by 3 for faster animation
+            currentDayText = dayTextWithoutHeader.substring(0, i);
+            
+            // Calculate progress: intro (20%) + (current day / total days) * 80%
+            const dayProgress = dayIndex / days.length;
+            const charProgress = i / dayTextWithoutHeader.length;
+            const overallProgress = 20 + (dayProgress * 80) + (charProgress * (80 / days.length));
+            
+            const updatedText = fullText + currentDayText;
+            onUpdate(updatedText, Math.min(overallProgress, 99)); // Cap at 99% until complete
+            
+            await new Promise(resolve => setTimeout(resolve, charInterval));
+          }
+          
+          // Complete this day
+          fullText += dayTextWithoutHeader + '</div>';
+          
+          // Ensure map markers are fully displayed before proceeding
+          await markersPromise;
+          
+          // Highlight the completed day
+          setTimeout(() => {
+            const currentDayElement = document.querySelector(`.day-content[data-day="${dayIndex + 1}"]`);
+            if (currentDayElement) {
+              currentDayElement.classList.add('current-day');
+            }
+          }, 100);
+          
+          // Add a pause between days
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Animation complete - set to 100%
+        onUpdate(formatDayContent(message.message), 100);
+        setAnimationProgress(100);
+        console.log("Itinerary animation complete");
+      };
+      
+      // Start the animation process
+      animateIntro();
+    } catch (error) {
+      console.error("Error in itinerary animation:", error);
+      // Fallback to showing the full message
+      onUpdate(message.message, 100);
+      setAnimationProgress(100);
+    }
+  };
+  
+  // Cleanup animation on unmount or when changing messages
+  useEffect(() => {
+    return () => {
+      if (animatorRef.current) {
+        animatorRef.current.stop();
+      }
+    };
+  }, []);
+  
+  // Add this effect to detect and start animation for new itinerary messages
+  useEffect(() => {
+    if (!messagesForDisplay.length) return;
+    
+    // Check if there's a new itinerary message
+    const latestMessage = messagesForDisplay[messagesForDisplay.length - 1];
+    if (latestMessage && !animatingMessageId && 
+        (latestMessage.isItinerary || 
+          (latestMessage.message && 
+            (latestMessage.message.includes("Day 1:") || 
+            latestMessage.message.includes("## Day 1") ||
+            latestMessage.message.includes("# Travel Itinerary") ||
+            latestMessage.message.includes("**Destination:**") ||
+            (latestMessage.message.includes("📍[") && latestMessage.message.includes("🍽️[")))))) {
+      
+      // Start animating this message
+      startItineraryAnimation(latestMessage);
+    }
+  }, [messagesForDisplay, animatingMessageId]);
+  
+  // Improved renderMessage function that handles the animated itinerary display
+  const renderMessage = (message) => {
+    // Check if this is an itinerary message that should be animated
+    const isItinerary = 
+      message.isItinerary ||
+      (message.message &&
+        (message.message.includes("Day 1:") ||
+          message.message.includes("## Day 1") ||
+          message.message.includes("# Travel Itinerary") ||
+          message.message.includes("**Destination:**") ||
+          (message.message.includes("📍[") && message.message.includes("🍽️["))));
+  
+  // If this is an itinerary and it's currently being animated
+  if (isItinerary && animatingMessageId === message.id && message.message) {
+    // Parse the itinerary structure
+    const { days, hasDayMarkers } = extractDaysFromItinerary(message.message);
+    
+    // Extract intro part
+    let introText = "";
+    if (hasDayMarkers && days.length > 0 && days[0].startIndex > 0) {
+      introText = message.message.substring(0, days[0].startIndex);
+    } else {
+      // For itineraries without clear day markers, use the first paragraph as intro
+      const firstNewlineIndex = message.message.indexOf("\n\n");
+      if (firstNewlineIndex > 0) {
+        introText = message.message.substring(0, firstNewlineIndex + 2);
+      } else {
+        // If no clear paragraphs, use the first 150 characters as intro
+        introText = message.message.substring(0, Math.min(150, message.message.length));
+      }
+    }
+    
+    if (days.length > 0 || introText) {
+      // Calculate how much of the message to show based on animation progress
+      let visibleText = "";
+      
+      if (animationProgress < 20) {
+        // During intro phase (0-20%), show partial intro
+        const introProgress = animationProgress / 20; // Convert to 0-100% for intro
+        const charsToShow = Math.floor(introProgress * introText.length);
+        visibleText = introText.substring(0, charsToShow);
+      } else if (animationProgress < 100) {
+        // During days phase (20-100%), show full intro + partial days
+        visibleText = introText; // Always show full intro
+        
+        // Add days content based on current day
+        if (currentAnimatingDay >= 0 && days.length > 0) {
+          // Add all complete days
+          for (let i = 0; i < currentAnimatingDay && i < days.length; i++) {
+            visibleText += days[i].content;
+          }
+          
+          // Add partial current day if we're in the middle of one
+          if (currentAnimatingDay < days.length) {
+            const currentDay = days[currentAnimatingDay];
+            // Calculate day progress based on overall animation progress
+            const overallDayProgress = (animationProgress - 20) / 80; // Convert to 0-1 for days portion
+            const daysPassed = overallDayProgress * days.length;
+            const currentDayProgress = daysPassed - Math.floor(daysPassed);
+            
+            // Calculate how much of the current day to show
+            const dayLength = currentDay.endIndex - currentDay.startIndex;
+            const charsToShow = Math.floor(currentDayProgress * dayLength);
+            
+            visibleText += message.message.substring(
+              currentDay.startIndex, 
+              currentDay.startIndex + charsToShow
+            );
+          }
+        }
+      } else {
+        // Animation complete, show the full message
+        visibleText = message.message;
+      }
+      
+      return (
+        <div className={`message-content markdown-content itinerary-animation-active ${animationProgress < 100 ? 'animating' : 'complete'}`}>
+          <Markdown>{visibleText}</Markdown>
+          {animationProgress < 100 && (
+            <div className="itinerary-loading flex items-center text-blue-400 text-sm">
+              <div className="loading-spinner mr-2 h-4 w-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></div>
+              {animationProgress < 20 ? 'Loading your itinerary...' : `Building ${currentAnimatingDay >= 0 ? `Day ${currentAnimatingDay + 1}` : 'your itinerary'}...`}
+            </div>
+          )}
+        </div>
+      );
+    }
+  }
+  
+  // For non-itinerary messages or fully displayed itineraries, render normally
+  return (
+    <div className="message-content markdown-content">
+      <Markdown>{message.message || message.displayMessage}</Markdown>
+    </div>
+  );
+};
 
   return (
     <div className={`chat-with-map ${isMapVisible ? "with-map" : ""}`}>
@@ -1722,12 +2718,8 @@ const ChatPage = () => {
                                 }
                               />
                             ) : (
-                              <Markdown>
-                                {message.displayMessage ||
-                                  message.message ||
-                                  (message.parts && message.parts[0]?.text) ||
-                                  ""}
-                              </Markdown>
+                              // Replace direct Markdown with the renderMessage function
+                              renderMessage(message)
                             )}
 
                             {/* Add itinerary action buttons */}

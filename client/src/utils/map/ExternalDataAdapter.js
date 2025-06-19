@@ -19,21 +19,96 @@ export const getCoordinates = async (address) => {
     // Log the address we're trying to geocode
     console.log(`Geocoding address: "${address}"`);
 
+    // Clean up the address to improve geocoding success
+    const cleanAddress = address
+      .replace(/\([^)]*\)/g, "") // Remove content in parentheses
+      .replace(/[^\w\s,.-]/g, " ") // Replace special chars with spaces
+      .replace(/\s+/g, " ") // Replace multiple spaces with single space
+      .trim();
+
+    console.log(`Cleaned address for geocoding: "${cleanAddress}"`);
+
     // Check if address contains specific city names and use fallback coordinates
     // This helps when API geocoding fails for certain locations
-    if (
-      address.toLowerCase().includes("tokyo") ||
-      address.toLowerCase().includes("טוקיו")
-    ) {
-      console.log("Using fallback coordinates for Tokyo");
-      return { lng: 139.6503, lat: 35.6762 }; // Tokyo coordinates
+    const cityCoordinates = {
+      tokyo: { lng: 139.6503, lat: 35.6762 },
+      "new york": { lng: -74.006, lat: 40.7128 },
+      paris: { lng: 2.3522, lat: 48.8566 },
+      london: { lng: -0.1278, lat: 51.5074 },
+      barcelona: { lng: 2.1734, lat: 41.3851 },
+      rome: { lng: 12.4964, lat: 41.9028 },
+      "tel aviv": { lng: 34.7818, lat: 32.0853 },
+      berlin: { lng: 13.405, lat: 52.52 },
+      amsterdam: { lng: 4.9041, lat: 52.3676 },
+      bangkok: { lng: 100.5018, lat: 13.7563 },
+      "hong kong": { lng: 114.1694, lat: 22.3193 },
+      istanbul: { lng: 28.9784, lat: 41.0082 },
+      dubai: { lng: 55.2708, lat: 25.2048 },
+      sydney: { lng: 151.2093, lat: -33.8688 },
+      "rio de janeiro": { lng: -43.1729, lat: -22.9068 },
+      "buenos aires": { lng: -58.3816, lat: -34.6037 },
+      "cape town": { lng: 18.4241, lat: -33.9249 },
+      jerusalem: { lng: 35.2137, lat: 31.7683 },
+      "san francisco": { lng: -122.4194, lat: 37.7749 },
+      chicago: { lng: -87.6298, lat: 41.8781 },
+      miami: { lng: -80.1918, lat: 25.7617 },
+      toronto: { lng: -79.3832, lat: 43.6532 },
+      vancouver: { lng: -123.1207, lat: 49.2827 },
+      mexico: { lng: -99.1332, lat: 19.4326 },
+      "los angeles": { lng: -118.2437, lat: 34.0522 },
+      vegas: { lng: -115.1398, lat: 36.1699 },
+      "las vegas": { lng: -115.1398, lat: 36.1699 },
+      vienna: { lng: 16.3738, lat: 48.2082 },
+      prague: { lng: 14.4378, lat: 50.0755 },
+      madrid: { lng: -3.7038, lat: 40.4168 },
+      lisbon: { lng: -9.1393, lat: 38.7223 },
+      athens: { lng: 23.7275, lat: 37.9838 },
+      cairo: { lng: 31.2357, lat: 30.0444 },
+      moscow: { lng: 37.6173, lat: 55.7558 },
+      beijing: { lng: 116.4074, lat: 39.9042 },
+      seoul: { lng: 126.978, lat: 37.5665 },
+      singapore: { lng: 103.8198, lat: 1.3521 },
+      kyoto: { lng: 135.7681, lat: 35.0116 },
+      osaka: { lng: 135.5023, lat: 34.6937 },
+      florence: { lng: 11.2558, lat: 43.7696 },
+      venice: { lng: 12.3155, lat: 45.4408 },
+      milan: { lng: 9.19, lat: 45.4642 },
+      munich: { lng: 11.582, lat: 48.1351 },
+      zurich: { lng: 8.5417, lat: 47.3769 },
+      geneva: { lng: 6.1432, lat: 46.2044 },
+      brussels: { lng: 4.3517, lat: 50.8503 },
+      copenhagen: { lng: 12.5683, lat: 55.6761 },
+      stockholm: { lng: 18.0686, lat: 59.3293 },
+      oslo: { lng: 10.7522, lat: 59.9139 },
+      helsinki: { lng: 24.9384, lat: 60.1699 },
+      dublin: { lng: -6.2603, lat: 53.3498 },
+      edinburgh: { lng: -3.1883, lat: 55.9533 },
+      krakow: { lng: 19.945, lat: 50.0647 },
+      budapest: { lng: 19.0402, lat: 47.4979 },
+    };
+
+    // Check for known cities in the address
+    const addressLower = cleanAddress.toLowerCase();
+    for (const [city, coords] of Object.entries(cityCoordinates)) {
+      if (addressLower.includes(city)) {
+        console.log(
+          `Found known city "${city}" in address, using reliable coordinates`
+        );
+
+        // Add small random offset to avoid markers stacking exactly on top of each other
+        const randomOffset = () => (Math.random() - 0.5) * 0.01; // Small random offset
+        return {
+          lng: coords.lng + randomOffset(),
+          lat: coords.lat + randomOffset(),
+        };
+      }
     }
 
     // Try the Mapbox geocoding API
     try {
       const response = await axios.get(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-          address
+          cleanAddress
         )}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN}`
       );
 
@@ -42,45 +117,45 @@ export const getCoordinates = async (address) => {
           lng: response.data.features[0].center[0],
           lat: response.data.features[0].center[1],
         };
-        console.log(`Successfully geocoded "${address}" to:`, coordinates);
+        console.log(`Successfully geocoded "${cleanAddress}" to:`, coordinates);
         return coordinates;
       } else {
-        console.warn(`No geocoding results found for address: "${address}"`);
+        console.warn(
+          `No geocoding results found for address: "${cleanAddress}"`
+        );
       }
     } catch (error) {
-      console.error(`Mapbox geocoding error for "${address}":`, error);
+      console.error(`Mapbox geocoding error for "${cleanAddress}":`, error);
     }
 
-    // Fallback to extracting location from address
-    const extractLocation = (addr) => {
-      // Try to extract known city names
-      const cities = {
-        tokyo: { lng: 139.6503, lat: 35.6762 },
-        "new york": { lng: -74.006, lat: 40.7128 },
-        paris: { lng: 2.3522, lat: 48.8566 },
-        london: { lng: -0.1278, lat: 51.5074 },
-        barcelona: { lng: 2.1734, lat: 41.3851 },
-        rome: { lng: 12.4964, lat: 41.9028 },
-        "tel aviv": { lng: 34.7818, lat: 32.0853 },
-      };
+    // If we still don't have coordinates, try with just the location name without details
+    const simplifiedAddress = cleanAddress.split(",")[0].trim();
+    if (simplifiedAddress !== cleanAddress) {
+      try {
+        console.log(`Trying simplified address: "${simplifiedAddress}"`);
+        const response = await axios.get(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+            simplifiedAddress
+          )}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN}`
+        );
 
-      const lowerAddr = addr.toLowerCase();
-      for (const [city, coords] of Object.entries(cities)) {
-        if (lowerAddr.includes(city)) {
+        if (response.data.features && response.data.features.length > 0) {
+          const coordinates = {
+            lng: response.data.features[0].center[0],
+            lat: response.data.features[0].center[1],
+          };
           console.log(
-            `Found city name "${city}" in address, using fallback coordinates`
+            `Successfully geocoded simplified address "${simplifiedAddress}" to:`,
+            coordinates
           );
-          return coords;
+          return coordinates;
         }
+      } catch (error) {
+        console.error(
+          `Mapbox geocoding error for simplified address "${simplifiedAddress}":`,
+          error
+        );
       }
-
-      return null;
-    };
-
-    // Try the fallback extraction
-    const fallbackCoords = extractLocation(address);
-    if (fallbackCoords) {
-      return fallbackCoords;
     }
 
     // If all else fails, use random coordinates near the main location
@@ -697,4 +772,230 @@ export const convertAttractionsForMap = async (attractionsData) => {
     `Final verification: ${attractions.length} attractions ready for display`
   );
   return attractions;
+};
+
+/**
+ * Process the extracted locations to ensure they all have coordinates
+ * @param {Object} extractedLocations - The extracted locations from the itinerary
+ * @param {string} destination - The destination city/location
+ * @returns {Promise<Object>} - The processed locations with coordinates
+ */
+export const processItineraryLocations = async (
+  extractedLocations,
+  destination
+) => {
+  console.log(
+    `Processing ${
+      Object.values(extractedLocations).flat().length
+    } locations for ${destination}`
+  );
+
+  // Create deep copies to avoid mutating the original
+  const hotels = [...(extractedLocations.hotels || [])];
+  const restaurants = [...(extractedLocations.restaurants || [])];
+  const attractions = [...(extractedLocations.attractions || [])];
+
+  // Track progress for debugging
+  let locationsWithCoordinates = 0;
+  let locationsNeedingSearch = 0;
+
+  // Attempt to resolve coordinates in parallel for faster processing
+  const processLocationBatch = async (locations, locationType) => {
+    // Create an array of promises, each resolving a location's coordinates
+    const coordinatePromises = locations.map(async (location) => {
+      // Skip if already has coordinates
+      if (location.lat && location.lng) {
+        locationsWithCoordinates++;
+        return location;
+      }
+
+      locationsNeedingSearch++;
+
+      try {
+        // Try to search for coordinates based on name + destination
+        const searchTerm = `${location.name}, ${destination}`;
+        const coordinates = await getCoordinates(searchTerm);
+
+        if (coordinates) {
+          return {
+            ...location,
+            lat: coordinates.lat,
+            lng: coordinates.lng,
+            resolved: true, // Mark as successfully resolved
+          };
+        }
+
+        // If first search fails, try just the location name
+        const fallbackCoordinates = await getCoordinates(location.name);
+        if (fallbackCoordinates) {
+          return {
+            ...location,
+            lat: fallbackCoordinates.lat,
+            lng: fallbackCoordinates.lng,
+            resolved: true,
+          };
+        }
+
+        // If all searches fail, use destination coordinates as fallback
+        const destinationCoordinates = await getCoordinates(destination);
+        if (destinationCoordinates) {
+          // Use a slight offset to avoid stacking
+          const offset = (Math.random() - 0.5) * 0.01;
+          return {
+            ...location,
+            lat: destinationCoordinates.lat + offset,
+            lng: destinationCoordinates.lng + offset,
+            fallback: true, // Mark as using fallback coordinates
+          };
+        }
+
+        // If everything fails, return the original location
+        console.warn(`Failed to resolve coordinates for ${location.name}`);
+        return location;
+      } catch (error) {
+        console.error(
+          `Error resolving coordinates for ${location.name}:`,
+          error
+        );
+        return location;
+      }
+    });
+
+    // Wait for all coordinate lookups to complete
+    return Promise.all(coordinatePromises);
+  };
+
+  // Process all location types in parallel for efficiency
+  const [processedHotels, processedRestaurants, processedAttractions] =
+    await Promise.all([
+      processLocationBatch(hotels, "hotel"),
+      processLocationBatch(restaurants, "restaurant"),
+      processLocationBatch(attractions, "attraction"),
+    ]);
+
+  // Log success rate for debugging
+  console.log(
+    `Coordinates resolved: ${locationsWithCoordinates} had coordinates, ${locationsNeedingSearch} needed search`
+  );
+
+  return {
+    hotels: processedHotels,
+    restaurants: processedRestaurants,
+    attractions: processedAttractions,
+  };
+};
+
+/**
+ * Create a custom marker element for the map
+ * @param {string} type - Type of marker (hotel, restaurant, attraction)
+ * @param {Object} item - Item data for the marker
+ * @returns {HTMLElement} - The marker element
+ */
+export const createMarkerElement = (type, item) => {
+  // Create marker element
+  const el = document.createElement("div");
+  el.className = "custom-marker interactive-marker";
+
+  // Add appropriate icon based on type
+  let icon = "📍"; // Default for attractions
+  let colorClass = "bg-blue-500";
+  let shadowColor = "rgba(59, 130, 246, 0.5)"; // Blue shadow
+
+  if (type === "hotel") {
+    icon = "🏨";
+    colorClass = "bg-purple-500";
+    shadowColor = "rgba(168, 85, 247, 0.5)"; // Purple shadow
+    el.classList.add("hotel-marker");
+  } else if (type === "restaurant") {
+    icon = "🍽️";
+    colorClass = "bg-orange-500";
+    shadowColor = "rgba(249, 115, 22, 0.5)"; // Orange shadow
+    el.classList.add("restaurant-marker");
+  } else {
+    // Check if it's an evening venue
+    if (item.isEveningVenue || item.category === "Evening Entertainment") {
+      icon = "🌆";
+      colorClass = "bg-indigo-500";
+      shadowColor = "rgba(99, 102, 241, 0.5)"; // Indigo shadow
+      el.classList.add("evening-marker");
+    } else {
+      el.classList.add("attraction-marker");
+    }
+  }
+
+  // Create the marker content with enhanced styling
+  el.innerHTML = `
+    <style>
+      .marker-container {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 4px white, 0 0 0 6px ${shadowColor}, 0 0 15px ${shadowColor};
+        transition: all 0.3s ease;
+        transform-origin: bottom center;
+      }
+      
+      .marker-icon {
+        font-size: 18px;
+        line-height: 1;
+      }
+      
+      .marker-hover {
+        z-index: 10;
+      }
+      
+      .marker-hover .marker-container {
+        transform: scale(1.2);
+        box-shadow: 0 0 0 4px white, 0 0 0 6px ${shadowColor}, 0 0 20px ${shadowColor};
+      }
+      
+      .marker-animation {
+        animation: dropIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      
+      .marker-highlight {
+        animation: bounce 0.8s ease infinite alternate;
+      }
+      
+      @keyframes dropIn {
+        0% {
+          opacity: 0;
+          transform: translateY(-50px) scale(0.5);
+        }
+        60% {
+          opacity: 1;
+          transform: translateY(10px) scale(1.1);
+        }
+        100% {
+          transform: translateY(0) scale(1);
+        }
+      }
+      
+      @keyframes bounce {
+        0% {
+          transform: translateY(0);
+        }
+        100% {
+          transform: translateY(-10px);
+        }
+      }
+    </style>
+    <div class="marker-container ${colorClass} hover:scale-110 transition-transform">
+      <span class="marker-icon">${icon}</span>
+    </div>
+  `;
+
+  // Add hover effect
+  el.addEventListener("mouseenter", () => {
+    el.classList.add("marker-hover");
+  });
+
+  el.addEventListener("mouseleave", () => {
+    el.classList.remove("marker-hover");
+  });
+
+  return el;
 };

@@ -952,3 +952,300 @@ function extractFilterCriteriaFromMessage(message, intent) {
 
   return criteria;
 }
+
+/**
+ * Provides a gradual animation of text content for displaying in the UI
+ * This can be used to create a "typing" effect for itineraries or other long texts
+ * @param {string} fullText - The complete text to be animated
+ * @param {number} speed - Characters per frame (higher = faster)
+ * @param {function} onUpdate - Callback function that receives the current text state
+ * @param {function} onComplete - Callback function called when animation completes
+ * @returns {Object} - Control object with start, pause, resume and stop methods
+ */
+export const createTextAnimator = (
+  fullText,
+  speed = 10,
+  onUpdate = () => {},
+  onComplete = () => {}
+) => {
+  let currentIndex = 0;
+  let isRunning = false;
+  let animationFrameId = null;
+
+  // Function to process the next chunk of text
+  const processNextChunk = () => {
+    if (!isRunning) return;
+
+    // If we haven't reached the end, continue animating
+    if (currentIndex < fullText.length) {
+      // Calculate how many characters to add in this frame
+      const charsToAdd = Math.min(speed, fullText.length - currentIndex);
+      currentIndex += charsToAdd;
+
+      // Get the current portion of text
+      const currentText = fullText.substring(0, currentIndex);
+
+      // Call the update callback with the current text
+      onUpdate(currentText, (currentIndex / fullText.length) * 100);
+
+      // Schedule the next frame
+      animationFrameId = requestAnimationFrame(processNextChunk);
+    } else {
+      // We've reached the end, call the complete callback
+      isRunning = false;
+      onComplete();
+    }
+  };
+
+  // Control methods
+  return {
+    start() {
+      if (!isRunning) {
+        isRunning = true;
+        currentIndex = 0;
+        processNextChunk();
+      }
+      return this;
+    },
+
+    pause() {
+      isRunning = false;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      return this;
+    },
+
+    resume() {
+      if (!isRunning && currentIndex < fullText.length) {
+        isRunning = true;
+        processNextChunk();
+      }
+      return this;
+    },
+
+    stop() {
+      isRunning = false;
+      currentIndex = 0;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      return this;
+    },
+
+    // Set the current position (0-100%)
+    setProgress(percent) {
+      const newIndex = Math.floor((percent / 100) * fullText.length);
+      currentIndex = Math.max(0, Math.min(newIndex, fullText.length));
+      onUpdate(fullText.substring(0, currentIndex), percent);
+      return this;
+    },
+
+    // Get the current progress percentage
+    getProgress() {
+      return (currentIndex / fullText.length) * 100;
+    },
+
+    // Jump to a specific section marker (like a day or heading)
+    jumpToSection(sectionPattern) {
+      const regex = new RegExp(sectionPattern, "g");
+      const matches = [...fullText.matchAll(regex)];
+
+      if (matches.length > 0) {
+        // Find the next section after the current position
+        const nextSection = matches.find((match) => match.index > currentIndex);
+
+        if (nextSection) {
+          // Jump to the beginning of this section
+          currentIndex = nextSection.index;
+          onUpdate(
+            fullText.substring(0, currentIndex),
+            (currentIndex / fullText.length) * 100
+          );
+        } else {
+          // If no next section, jump to the end
+          currentIndex = fullText.length;
+          onUpdate(fullText, 100);
+          onComplete();
+        }
+      }
+
+      return this;
+    },
+
+    // Get the current state
+    getState() {
+      return {
+        isRunning,
+        progress: (currentIndex / fullText.length) * 100,
+        currentText: fullText.substring(0, currentIndex),
+        isComplete: currentIndex >= fullText.length,
+      };
+    },
+  };
+};
+
+/**
+ * Creates a segmented text animator that breaks text into logical segments (like days or sections)
+ * and animates segment by segment with pauses between them
+ * @param {string} fullText - The complete text to be animated
+ * @param {Object} options - Configuration options
+ * @returns {Object} - Control object with various methods
+ */
+export const createSegmentedTextAnimator = (fullText, options = {}) => {
+  const {
+    segmentPatterns = [/### Day \d+:/, /## /, /# /], // Default patterns to identify segments
+    charSpeed = 10, // Characters per frame
+    segmentDelay = 500, // Pause between segments (ms)
+    onUpdate = () => {}, // Called on each update
+    onSegmentComplete = () => {}, // Called when a segment completes
+    onComplete = () => {}, // Called when all animation completes
+  } = options;
+
+  // Find all segment boundaries
+  const findSegmentBoundaries = () => {
+    const boundaries = [];
+
+    segmentPatterns.forEach((pattern) => {
+      const regex = new RegExp(pattern, "g");
+      const matches = [...fullText.matchAll(regex)];
+
+      matches.forEach((match) => {
+        boundaries.push(match.index);
+      });
+    });
+
+    // Sort boundaries by position
+    boundaries.sort((a, b) => a - b);
+
+    // Add start and end positions
+    if (boundaries[0] !== 0) {
+      boundaries.unshift(0);
+    }
+    boundaries.push(fullText.length);
+
+    return boundaries;
+  };
+
+  const boundaries = findSegmentBoundaries();
+  let currentSegment = 0;
+  let currentIndex = 0;
+  let isRunning = false;
+  let animationFrameId = null;
+  let segmentTimerId = null;
+
+  // Animation step function
+  const animate = () => {
+    if (!isRunning) return;
+
+    const segmentStart = boundaries[currentSegment];
+    const segmentEnd = boundaries[currentSegment + 1];
+
+    if (currentIndex < segmentEnd) {
+      // Calculate how many characters to add in this frame
+      const charsToAdd = Math.min(charSpeed, segmentEnd - currentIndex);
+      currentIndex += charsToAdd;
+
+      // Get the current portion of text
+      const currentText = fullText.substring(0, currentIndex);
+
+      // Call the update callback with the current text and progress
+      onUpdate(currentText, (currentIndex / fullText.length) * 100);
+
+      // Schedule the next frame
+      animationFrameId = requestAnimationFrame(animate);
+    } else {
+      // This segment is complete
+      const currentText = fullText.substring(0, currentIndex);
+      onSegmentComplete(currentSegment, currentText);
+
+      // Move to the next segment
+      currentSegment++;
+
+      if (currentSegment < boundaries.length - 1) {
+        // Pause briefly before starting the next segment
+        segmentTimerId = setTimeout(() => {
+          animationFrameId = requestAnimationFrame(animate);
+        }, segmentDelay);
+      } else {
+        // All segments complete
+        isRunning = false;
+        onComplete();
+      }
+    }
+  };
+
+  // Control methods
+  return {
+    start() {
+      if (!isRunning) {
+        isRunning = true;
+        currentSegment = 0;
+        currentIndex = 0;
+        animate();
+      }
+      return this;
+    },
+
+    pause() {
+      isRunning = false;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      if (segmentTimerId) {
+        clearTimeout(segmentTimerId);
+        segmentTimerId = null;
+      }
+      return this;
+    },
+
+    resume() {
+      if (!isRunning && currentIndex < fullText.length) {
+        isRunning = true;
+        animate();
+      }
+      return this;
+    },
+
+    stop() {
+      isRunning = false;
+      currentSegment = 0;
+      currentIndex = 0;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      if (segmentTimerId) {
+        clearTimeout(segmentTimerId);
+        segmentTimerId = null;
+      }
+      return this;
+    },
+
+    jumpToSegment(segmentIndex) {
+      if (segmentIndex >= 0 && segmentIndex < boundaries.length - 1) {
+        currentSegment = segmentIndex;
+        currentIndex = boundaries[segmentIndex];
+        onUpdate(
+          fullText.substring(0, currentIndex),
+          (currentIndex / fullText.length) * 100
+        );
+      }
+      return this;
+    },
+
+    getState() {
+      return {
+        isRunning,
+        currentSegment,
+        totalSegments: boundaries.length - 1,
+        progress: (currentIndex / fullText.length) * 100,
+        currentText: fullText.substring(0, currentIndex),
+        isComplete: currentIndex >= fullText.length,
+      };
+    },
+  };
+};

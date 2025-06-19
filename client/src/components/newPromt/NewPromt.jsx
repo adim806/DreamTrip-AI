@@ -365,19 +365,35 @@ const NewPromt = ({ data }) => {
 
   // Trip summary action handlers
   const handleConfirmTrip = () => {
-    // Hide trip summary BEFORE anything else happens
+    // Hide trip summary first
     hideTripSummary();
 
-    // Force component to re-render to ensure trip summary is gone
-    setShowTripSummary(false);
-    forceUpdate();
+    // Log the trip details for debugging
+    console.log("Trip confirmation with details:", tripDetails);
 
-    // Set a flag to indicate generation has started
-    window.__itineraryGenerationStarted = true;
-
-    console.log(
-      "Trip summary hidden, beginning itinerary generationnnnnnnnnnnnnnnnnnyyyy"
-    );
+    // התחלת טעינת מידע חיצוני במקביל ליצירת המסלול
+    if (tripDetails && tripDetails.vacation_location) {
+      console.log("Starting parallel external data fetch for:", tripDetails.vacation_location);
+      
+      // טעינת מידע על מלונות, מסעדות ואטרקציות במקביל
+      import("../../utils/itineraryGenerator").then(async ({ fetchExternalDataInParallel }) => {
+        try {
+          // התחלת הבקשות במקביל
+          const externalDataPromise = fetchExternalDataInParallel(tripDetails);
+          
+          // שמירת ההבטחה במשתנה גלובלי כדי שנוכל להשתמש בה מאוחר יותר
+          window.__externalDataPromise = externalDataPromise;
+          
+          console.log("External data fetch started in parallel");
+          
+          // לא מחכים כאן לתוצאות - המשך התהליך יקרה בפונקציית generateItinerary
+        } catch (error) {
+          console.error("Error starting parallel data fetch:", error);
+        }
+      });
+    } else {
+      console.warn("Cannot start parallel data fetch - missing location in trip details");
+    }
 
     // Immediately transition to generating state to show proper UI
     transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);

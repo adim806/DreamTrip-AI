@@ -1569,34 +1569,653 @@ app.post("/api/itineraries", authMiddleware, async (req, res) => {
   const { chatId, itinerary, structuredItinerary, metadata } = req.body;
 
   try {
-    console.log(`Saving itinerary for user: ${userId}, chat: ${chatId}`);
+    console.log("=== ITINERARY SAVE PROCESS STARTED ===");
     console.log(
-      `Received structured itinerary: ${structuredItinerary ? "Yes" : "No"}`
+      `[1. REQUEST RECEIVED] Saving itinerary for user: ${userId}, chat: ${chatId}`
     );
+    console.log(
+      `[1.1] Received structured itinerary: ${
+        structuredItinerary ? "Yes" : "No"
+      }`
+    );
+    console.log(`[1.2] Format: ${metadata?.format || "unspecified"}`);
+    console.log(
+      `[1.3] Raw itinerary text length: ${
+        typeof itinerary === "string" ? itinerary.length : "N/A"
+      } characters`
+    );
+
+    // Debug: Log the structure of the data
+    console.log("[2. REQUEST VALIDATION] Validating request data");
+    console.log("[2.1] Request parameters:");
+    console.log("  - chatId:", chatId);
+    console.log("  - userId:", userId);
+    console.log("  - metadata:", JSON.stringify(metadata, null, 2));
+    console.log(
+      "  - structuredItinerary keys:",
+      structuredItinerary ? Object.keys(structuredItinerary) : "null"
+    );
+
+    // Debug: Log more details about the days and sections
+    if (structuredItinerary?.days && structuredItinerary.days.length > 0) {
+      console.log(`Itinerary has ${structuredItinerary.days.length} days`);
+
+      // Log details of the first day
+      const firstDay = structuredItinerary.days[0];
+      console.log("First day:", {
+        dayNumber: firstDay.dayNumber,
+        title: firstDay.title,
+        hasSections: !!firstDay.sections,
+        sectionsCount: firstDay.sections?.length || 0,
+      });
+
+      // Log details of sections in the first day
+      if (firstDay.sections && firstDay.sections.length > 0) {
+        console.log(`First day has ${firstDay.sections.length} sections`);
+
+        firstDay.sections.forEach((section, index) => {
+          console.log(`Section ${index}:`, {
+            timeOfDay: section.timeOfDay,
+            time: section.time,
+            hasActivities: !!section.activities,
+            activitiesCount: Array.isArray(section.activities)
+              ? section.activities.length
+              : 0,
+            hasRestaurant: !!section.restaurant,
+            hasOptions: !!section.options,
+            optionsCount: Array.isArray(section.options)
+              ? section.options.length
+              : 0,
+          });
+
+          // Log first activity if exists
+          if (section.activities && section.activities.length > 0) {
+            console.log(`First activity in section ${index}:`, {
+              title: section.activities[0].title,
+              type: section.activities[0].type,
+              hasDescription: !!section.activities[0].description,
+            });
+          }
+        });
+      }
+    }
+
+    // Check for size limits - MongoDB has a 16MB document size limit
+    const estimatedSize = JSON.stringify(structuredItinerary).length;
+    console.log(`Estimated structuredItinerary size: ${estimatedSize} bytes`);
+
+    if (estimatedSize > 15 * 1024 * 1024) {
+      // 15MB safety limit
+      console.error("Itinerary data exceeds MongoDB document size limit");
+      return res.status(400).json({
+        success: false,
+        error: "Itinerary data too large for database storage",
+      });
+    }
+
+    // Clean up any markdown formatting in the itinerary text
+    let cleanItinerary = itinerary;
+    if (typeof cleanItinerary === "string") {
+      cleanItinerary = cleanItinerary.replace(/```json|```/g, "").trim();
+    }
+
+    // Clean up the structured content if needed
+    let cleanStructuredItinerary = structuredItinerary;
+
+    // If structuredItinerary is a string (which shouldn't happen but just in case)
+    if (typeof structuredItinerary === "string") {
+      try {
+        const cleanText = structuredItinerary
+          .replace(/```json|```/g, "")
+          .trim();
+        cleanStructuredItinerary = JSON.parse(cleanText);
+        console.log("Parsed structuredItinerary from string");
+      } catch (error) {
+        console.error("Error parsing structuredItinerary string:", error);
+      }
+    }
+
+    // Ensure we have a valid object even if null was provided
+    if (!cleanStructuredItinerary) {
+      cleanStructuredItinerary = {};
+      console.log("Created empty object for null structuredItinerary");
+    }
+
+    // Extract destination from multiple sources and fix incorrect values
+    let destinationFromText = null;
+
+    // First try to extract from formatted text
+    if (typeof cleanItinerary === "string") {
+      // Try to extract destination from formatted text using regex patterns
+      const destinationPatterns = [
+        /\*\*Destination:\*\*\s+([^\n]+)/,
+        /Destination:\s+([^\n]+)/i,
+        /Trip to\s+([A-Za-z\s,]+)(?:\.|,|\n)/i,
+        /Exploring\s+([A-Za-z\s,]+)(?:\.|,|\n)/i,
+        /Experience in\s+([A-Za-z\s,]+)(?:\.|,|\n)/i,
+        /Days? in\s+([A-Za-z\s,]+)(?:\.|,|\n)/i,
+      ];
+
+      for (const pattern of destinationPatterns) {
+        const match = cleanItinerary.match(pattern);
+        if (match && match[1]) {
+          destinationFromText = match[1].trim();
+          console.log(
+            `Extracted destination from text: "${destinationFromText}"`
+          );
+          break;
+        }
+      }
+
+      // If still not found, try to extract from the title
+      if (!destinationFromText) {
+        const titleMatch = cleanItinerary.match(
+          /^#\s+.*?(?:in|at|to)\s+([A-Za-z\s,]+)(?::|\.|\n)/i
+        );
+        if (titleMatch && titleMatch[1]) {
+          destinationFromText = titleMatch[1].trim();
+          console.log(
+            `Extracted destination from title: "${destinationFromText}"`
+          );
+        }
+      }
+
+      // If still not found, look for common city names in the text
+      if (!destinationFromText) {
+        const cityNames = [
+          "Berlin",
+          "Paris",
+          "London",
+          "Rome",
+          "Barcelona",
+          "Madrid",
+          "Amsterdam",
+          "Prague",
+          "Vienna",
+          "Budapest",
+          "Athens",
+          "Istanbul",
+          "New York",
+          "Tokyo",
+          "Kyoto",
+          "Bangkok",
+          "Singapore",
+          "Sydney",
+          "Dubai",
+          "Cairo",
+        ];
+
+        for (const city of cityNames) {
+          if (cleanItinerary.includes(city)) {
+            destinationFromText = city;
+            console.log(`Found city name in text: "${destinationFromText}"`);
+            break;
+          }
+        }
+      }
+    }
+
+    // List of known incorrect destination values
+    const incorrectDestinations = [
+      "advance",
+      "gourmet experiences",
+      "culinary delights",
+      "experiences",
+      "luxury",
+      "historical",
+      "cultural",
+    ];
+
+    // Determine the final destination value using all available sources
+    let cleanDestination;
+
+    // First check if the current destination is incorrect
+    if (
+      !cleanStructuredItinerary.destination ||
+      incorrectDestinations.includes(
+        cleanStructuredItinerary.destination.toLowerCase()
+      )
+    ) {
+      // Use the extracted text destination or metadata destination
+      cleanDestination = destinationFromText || metadata?.destination;
+
+      if (cleanDestination) {
+        console.log(
+          `Fixed incorrect destination "${cleanStructuredItinerary.destination}" to "${cleanDestination}"`
+        );
+        // Update the structured itinerary with the correct destination
+        cleanStructuredItinerary.destination = cleanDestination;
+      } else {
+        cleanDestination = "Unknown Location";
+        console.log(
+          `Could not determine destination, using default: "${cleanDestination}"`
+        );
+      }
+    } else {
+      // Use the existing destination which is valid
+      cleanDestination = cleanStructuredItinerary.destination;
+      console.log(`Using existing destination: "${cleanDestination}"`);
+    }
+
+    // Clean up destination from markdown if needed
+    if (
+      typeof cleanDestination === "string" &&
+      cleanDestination.includes("```")
+    ) {
+      cleanDestination = cleanDestination.replace(/```json|```/g, "").trim();
+    }
+
+    // Extract title from structured itinerary or metadata
+    let cleanTitle =
+      cleanStructuredItinerary.title || metadata?.title || "Travel Itinerary";
+
+    // Clean up title from markdown if needed
+    if (typeof cleanTitle === "string" && cleanTitle.includes("```")) {
+      cleanTitle = cleanTitle.replace(/```json|```/g, "").trim();
+    }
+
+    // Extract dates
+    let fromDate = "";
+    let toDate = "";
+
+    // First try to get dates from structuredItinerary
+    if (cleanStructuredItinerary.dates) {
+      fromDate =
+        cleanStructuredItinerary.dates.from ||
+        cleanStructuredItinerary.dates.start ||
+        "";
+      toDate =
+        cleanStructuredItinerary.dates.to ||
+        cleanStructuredItinerary.dates.end ||
+        "";
+    }
+
+    // If not found, try metadata
+    if ((!fromDate || !toDate) && metadata?.dates) {
+      fromDate = fromDate || metadata.dates.from || metadata.dates.start || "";
+      toDate = toDate || metadata.dates.to || metadata.dates.end || "";
+    }
+
+    // Try to extract dates from text if still not found
+    if ((!fromDate || !toDate) && typeof cleanItinerary === "string") {
+      const dateMatch = cleanItinerary.match(
+        /\*\*Dates:\*\*\s+([^\n]+?)\s+to\s+([^\n]+)/i
+      );
+      if (dateMatch && dateMatch[1] && dateMatch[2]) {
+        fromDate = fromDate || dateMatch[1].trim();
+        toDate = toDate || dateMatch[2].trim();
+        console.log(`Extracted dates from text: ${fromDate} to ${toDate}`);
+      }
+    }
+
+    // Ensure days have proper structure with sections
+    if (
+      cleanStructuredItinerary.days &&
+      Array.isArray(cleanStructuredItinerary.days)
+    ) {
+      cleanStructuredItinerary.days.forEach((day) => {
+        // Ensure sections array exists
+        if (!day.sections) {
+          day.sections = [];
+          console.log(`Added missing sections array to day ${day.dayNumber}`);
+        }
+
+        // Process each section to ensure proper structure
+        if (day.sections && Array.isArray(day.sections)) {
+          day.sections.forEach((section, sectionIndex) => {
+            // Ensure section has timeOfDay
+            if (!section.timeOfDay) {
+              section.timeOfDay = getDefaultTimeOfDay(sectionIndex);
+              console.log(
+                `Added missing timeOfDay "${section.timeOfDay}" to section ${sectionIndex}`
+              );
+            }
+
+            // Ensure section has time
+            if (!section.time) {
+              section.time = getDefaultTimeForBlock(
+                section.timeOfDay.toLowerCase()
+              );
+              console.log(
+                `Added missing time "${section.time}" to section ${sectionIndex}`
+              );
+            }
+
+            // Fix activities array if it exists but is empty or undefined
+            if (section.activities === undefined) {
+              section.activities = [];
+              console.log(
+                `Added missing activities array to section ${sectionIndex}`
+              );
+            } else if (!Array.isArray(section.activities)) {
+              // Convert to array if not already
+              section.activities = [section.activities];
+              console.log(
+                `Converted activities to array in section ${sectionIndex}`
+              );
+            }
+
+            // Ensure each activity has required fields
+            if (section.activities && Array.isArray(section.activities)) {
+              section.activities = section.activities.map(
+                (activity, actIndex) => {
+                  if (!activity.activityId) {
+                    activity.activityId = `activity-${section.timeOfDay.toLowerCase()}-${actIndex}`;
+                    console.log(
+                      `Added missing activityId to activity ${actIndex} in section ${sectionIndex}`
+                    );
+                  }
+
+                  // Ensure transition field has proper structure if present
+                  if (activity.transition) {
+                    if (!activity.transition.mode) {
+                      activity.transition.mode = "Walking";
+                      console.log(
+                        `Added default mode to transition for activity ${actIndex} in section ${sectionIndex}`
+                      );
+                    }
+                    if (!activity.transition.duration) {
+                      activity.transition.duration = "10 min";
+                      console.log(
+                        `Added default duration to transition for activity ${actIndex} in section ${sectionIndex}`
+                      );
+                    }
+                    if (!activity.transition.cost) {
+                      activity.transition.cost = { currency: "EUR", amount: 0 };
+                      console.log(
+                        `Added default cost to transition for activity ${actIndex} in section ${sectionIndex}`
+                      );
+                    }
+                  }
+
+                  return activity;
+                }
+              );
+            }
+
+            // Fix restaurant if needed
+            if (section.restaurant && typeof section.restaurant === "object") {
+              // Make sure restaurant has required fields
+              if (!section.restaurant.activityId) {
+                section.restaurant.activityId = `restaurant-${section.timeOfDay.toLowerCase()}`;
+                console.log(
+                  `Added missing activityId to restaurant in section ${sectionIndex}`
+                );
+              }
+              if (!section.restaurant.name) {
+                section.restaurant.name = "Local Restaurant";
+                console.log(
+                  `Added missing name to restaurant in section ${sectionIndex}`
+                );
+              }
+              if (!section.restaurant.type) {
+                section.restaurant.type = "Restaurant";
+                console.log(
+                  `Added missing type to restaurant in section ${sectionIndex}`
+                );
+              }
+
+              // Ensure transition field has proper structure if present
+              if (section.restaurant.transition) {
+                if (!section.restaurant.transition.mode) {
+                  section.restaurant.transition.mode = "Walking";
+                  console.log(
+                    `Added default mode to transition for restaurant in section ${sectionIndex}`
+                  );
+                }
+                if (!section.restaurant.transition.duration) {
+                  section.restaurant.transition.duration = "10 min";
+                  console.log(
+                    `Added default duration to transition for restaurant in section ${sectionIndex}`
+                  );
+                }
+                if (!section.restaurant.transition.cost) {
+                  section.restaurant.transition.cost = {
+                    currency: "EUR",
+                    amount: 0,
+                  };
+                  console.log(
+                    `Added default cost to transition for restaurant in section ${sectionIndex}`
+                  );
+                }
+              }
+            }
+
+            // Fix options array if it exists but is empty or undefined
+            if (section.options === undefined) {
+              section.options = [];
+              console.log(
+                `Added missing options array to section ${sectionIndex}`
+              );
+            } else if (!Array.isArray(section.options)) {
+              // Convert to array if not already
+              section.options = [section.options];
+              console.log(
+                `Converted options to array in section ${sectionIndex}`
+              );
+            }
+
+            // Ensure each option has required fields
+            if (section.options && Array.isArray(section.options)) {
+              section.options = section.options.map((option, optIndex) => {
+                if (!option.activityId) {
+                  option.activityId = `option-${section.timeOfDay.toLowerCase()}-${optIndex}`;
+                  console.log(
+                    `Added missing activityId to option ${optIndex} in section ${sectionIndex}`
+                  );
+                }
+
+                // Ensure transition field has proper structure if present
+                if (option.transition) {
+                  if (!option.transition.mode) {
+                    option.transition.mode = "Taxi";
+                    console.log(
+                      `Added default mode to transition for option ${optIndex} in section ${sectionIndex}`
+                    );
+                  }
+                  if (!option.transition.duration) {
+                    option.transition.duration = "15 min";
+                    console.log(
+                      `Added default duration to transition for option ${optIndex} in section ${sectionIndex}`
+                    );
+                  }
+                  if (!option.transition.cost) {
+                    option.transition.cost = { currency: "EUR", amount: 10 };
+                    console.log(
+                      `Added default cost to transition for option ${optIndex} in section ${sectionIndex}`
+                    );
+                  }
+                }
+
+                return option;
+              });
+            }
+          });
+        }
+
+        // If we have day.activities (legacy format) but no content in sections,
+        // try to convert the legacy activities to the new format
+        if (
+          day.activities &&
+          Object.keys(day.activities).length > 0 &&
+          (day.sections.length === 0 ||
+            !day.sections.some(
+              (s) => s.activities?.length || s.restaurant || s.options?.length
+            ))
+        ) {
+          console.log(
+            `Converting legacy activities to sections for day ${day.dayNumber}`
+          );
+
+          // Convert legacy activities to sections
+          const timeBlocks = [
+            "morning",
+            "lunch",
+            "afternoon",
+            "evening",
+            "dinner",
+          ];
+
+          timeBlocks.forEach((timeBlock) => {
+            if (
+              day.activities[timeBlock] &&
+              day.activities[timeBlock].length > 0
+            ) {
+              const formattedTimeBlock =
+                timeBlock.charAt(0).toUpperCase() + timeBlock.slice(1);
+
+              if (timeBlock === "lunch" || timeBlock === "dinner") {
+                // Create restaurant section
+                const restaurant = day.activities[timeBlock][0];
+                if (restaurant) {
+                  day.sections.push({
+                    timeOfDay: formattedTimeBlock,
+                    time: getDefaultTimeForBlock(timeBlock),
+                    restaurant: {
+                      activityId: `restaurant-${timeBlock}-${
+                        restaurant.name
+                          ? restaurant.name.toLowerCase().replace(/\s+/g, "-")
+                          : "meal"
+                      }`,
+                      name: restaurant.name || "Restaurant",
+                      type: "Restaurant",
+                      cuisine: restaurant.description || "Local Cuisine",
+                      notes: restaurant.text || "",
+                      tags: ["dining"],
+                    },
+                  });
+                }
+              } else {
+                // Create regular activities section
+                const sectionActivities = day.activities[timeBlock].map(
+                  (act, index) => ({
+                    activityId: `activity-${timeBlock}-${index}`,
+                    title: act.name || "Activity",
+                    type: act.type || "Activity",
+                    description: act.description || act.text || "",
+                    tags: [],
+                  })
+                );
+
+                day.sections.push({
+                  timeOfDay: formattedTimeBlock,
+                  time: getDefaultTimeForBlock(timeBlock),
+                  activities: sectionActivities,
+                });
+              }
+            }
+          });
+
+          console.log(
+            `Added ${day.sections.length} sections from legacy activities for day ${day.dayNumber}`
+          );
+        }
+      });
+    }
+
+    // Check if we have the new JSON v2 format or the old format
+    const isNewFormat =
+      metadata?.format === "structured-json-v2" ||
+      (cleanStructuredItinerary &&
+        cleanStructuredItinerary.days &&
+        cleanStructuredItinerary.days[0] &&
+        cleanStructuredItinerary.days[0].sections);
+
+    console.log(`Using ${isNewFormat ? "NEW" : "OLD"} itinerary format`);
+
+    // Ensure the structuredContent is properly serializable for MongoDB
+    // This prevents any circular references or non-serializable objects
+    let safeStructuredContent;
+    try {
+      // First convert to JSON string and back to strip any non-serializable data
+      safeStructuredContent = JSON.parse(
+        JSON.stringify(cleanStructuredItinerary)
+      );
+      console.log("Successfully sanitized structuredContent for MongoDB");
+
+      // Log the sections structure after sanitization
+      if (safeStructuredContent.days && safeStructuredContent.days.length > 0) {
+        const firstDay = safeStructuredContent.days[0];
+        if (firstDay.sections && firstDay.sections.length > 0) {
+          console.log(
+            `After sanitization: first day has ${firstDay.sections.length} sections`
+          );
+          firstDay.sections.forEach((section, index) => {
+            console.log(`After sanitization - Section ${index}:`, {
+              timeOfDay: section.timeOfDay,
+              activitiesCount: Array.isArray(section.activities)
+                ? section.activities.length
+                : 0,
+              hasRestaurant: !!section.restaurant,
+              optionsCount: Array.isArray(section.options)
+                ? section.options.length
+                : 0,
+            });
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error sanitizing structuredContent:", error);
+      // Create a simplified version with just the essential data
+      safeStructuredContent = {
+        title: cleanTitle,
+        destination: cleanDestination,
+        dates: {
+          from: fromDate,
+          to: toDate,
+        },
+        format:
+          metadata?.format || (isNewFormat ? "structured-json-v2" : "legacy"),
+        days: cleanStructuredItinerary?.days || [],
+      };
+      console.log(
+        "Created simplified structuredContent due to serialization error"
+      );
+    }
 
     // יצירת רשומת יומן חדשה במודל הנפרד
     const newItinerary = new Itinerary({
       chatId: chatId,
       userId: userId,
-      title: structuredItinerary?.title || "יומן טיול",
-      destination:
-        structuredItinerary?.destination || metadata?.destination || "",
-      duration: structuredItinerary?.duration || metadata?.duration || "",
+      title: cleanTitle,
+      destination: cleanDestination,
+      duration: metadata?.duration || cleanStructuredItinerary?.duration || "",
       dates: {
-        from: structuredItinerary?.dates?.from || metadata?.dates?.from || "",
-        to: structuredItinerary?.dates?.to || metadata?.dates?.to || "",
+        from: fromDate,
+        to: toDate,
       },
-      rawContent: itinerary,
-      structuredContent: structuredItinerary,
-      metadata: metadata || {},
+      rawContent: cleanItinerary,
+      structuredContent: safeStructuredContent,
+      metadata: {
+        ...metadata,
+        format:
+          metadata?.format || (isNewFormat ? "structured-json-v2" : "legacy"),
+        savedAt: new Date().toISOString(),
+        destination: cleanDestination, // Ensure metadata also has the correct destination
+      },
       version: 1,
     });
 
+    // Debug: Log the validation errors if any
+    const validationError = newItinerary.validateSync();
+    if (validationError) {
+      console.error("Validation error:", validationError);
+      return res.status(400).json({
+        success: false,
+        error: "Validation error",
+        details: validationError,
+      });
+    }
+
     // שמירת היומן במסד הנתונים
+    console.log("[7. DATABASE SAVE] Saving itinerary to database");
+    console.time("DatabaseSaveTime");
     const savedItinerary = await newItinerary.save();
-    console.log(`Saved new itinerary with ID: ${savedItinerary._id}`);
+    console.timeEnd("DatabaseSaveTime");
+    console.log(`[7.1] Saved new itinerary with ID: ${savedItinerary._id}`);
 
     // הוספת קישור ליומן בצ'אט
+    console.log("[8. CHAT UPDATE] Updating chat with itinerary reference");
     const updatedChat = await Chat.updateOne(
       { _id: chatId, userId },
       {
@@ -1607,8 +2226,14 @@ app.post("/api/itineraries", authMiddleware, async (req, res) => {
     );
 
     if (updatedChat.matchedCount === 0) {
+      console.error(
+        `[ERROR] No chat found with ID: ${chatId} for user: ${userId}`
+      );
       return res.status(404).send("Chat not found");
     }
+
+    console.log(`[8.1] Successfully linked itinerary to chat: ${chatId}`);
+    console.log("=== ITINERARY SAVE PROCESS COMPLETED ===");
 
     res.status(201).json({
       success: true,
@@ -1616,10 +2241,65 @@ app.post("/api/itineraries", authMiddleware, async (req, res) => {
       itineraryId: savedItinerary._id,
     });
   } catch (error) {
-    console.error("Error saving itinerary:", error);
-    res.status(500).send("Error saving itinerary");
+    console.error("=== ITINERARY SAVE ERROR ===");
+    console.error("[ERROR] Error saving itinerary");
+    console.error("Error name:", error.name);
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+
+    // Log more context about the error
+    console.error(
+      "[ERROR CONTEXT] Error occurred during itinerary save process"
+    );
+    console.error("ChatId:", chatId);
+    console.error("UserId:", userId);
+    console.error("Metadata format:", metadata?.format || "unspecified");
+    console.error("Has structured itinerary:", !!structuredItinerary);
+    console.error("Has raw itinerary:", !!itinerary);
+
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        error: "Validation error",
+        details: error.message,
+      });
+    }
+
+    res.status(500).send(`Error saving itinerary: ${error.message}`);
   }
 });
+
+/**
+ * Helper function to get default time of day based on section index
+ * @param {number} index - The section index
+ * @returns {string} - Default time of day
+ */
+function getDefaultTimeOfDay(index) {
+  const timeOfDays = ["Morning", "Lunch", "Afternoon", "Evening", "Dinner"];
+  return index < timeOfDays.length ? timeOfDays[index] : "Activity";
+}
+
+/**
+ * Helper function to get default time range for a time block
+ * @param {string} timeBlock - The time block name
+ * @returns {string} - Default time range
+ */
+function getDefaultTimeForBlock(timeBlock) {
+  switch (timeBlock.toLowerCase()) {
+    case "morning":
+      return "9:00 AM - 1:00 PM";
+    case "lunch":
+      return "1:00 PM - 2:00 PM";
+    case "afternoon":
+      return "2:00 PM - 6:00 PM";
+    case "evening":
+      return "7:00 PM onwards";
+    case "dinner":
+      return "7:00 PM - 9:00 PM";
+    default:
+      return "";
+  }
+}
 
 // Get all itineraries for a user
 app.get("/api/itineraries", authMiddleware, async (req, res) => {
@@ -1749,4 +2429,62 @@ app.get("/api/places/test", (req, res) => {
     apiKeyFirstFiveChars: apiKey ? apiKey.substring(0, 5) + "..." : null,
     timestamp: new Date().toISOString(),
   });
+});
+
+// Add this after the existing itinerary routes
+
+// Check for existing itinerary
+app.get("/api/itineraries/check", authMiddleware, async (req, res) => {
+  try {
+    console.log("=== ITINERARY CHECK PROCESS STARTED ===");
+    const { chatId } = req.query;
+    const userId = req.auth?.userId;
+
+    console.log(
+      `[1. CHECK REQUEST] Checking for existing itinerary - ChatId: ${chatId}, UserId: ${userId}`
+    );
+
+    if (!chatId) {
+      console.error("[ERROR] Missing chatId in check request");
+      return res.status(400).json({ error: "Missing chatId parameter" });
+    }
+
+    // Query the database
+    console.log("[2. DATABASE QUERY] Querying database for existing itinerary");
+
+    const query = { chatId };
+    if (userId) {
+      query.userId = userId;
+    }
+
+    const itinerary = await Itinerary.findOne(query).select(
+      "_id metadata destination title"
+    );
+
+    if (itinerary) {
+      console.log(`[3. RESULT] Found existing itinerary: ${itinerary._id}`);
+      console.log(
+        `Destination: ${itinerary.destination}, Title: ${itinerary.title}`
+      );
+      console.log(
+        `Metadata format: ${itinerary.metadata?.format || "unspecified"}`
+      );
+      console.log("=== ITINERARY CHECK PROCESS COMPLETED ===");
+
+      return res.json({
+        exists: true,
+        itineraryId: itinerary._id,
+        metadata: itinerary.metadata,
+        destination: itinerary.destination,
+      });
+    }
+
+    console.log("[3. RESULT] No existing itinerary found");
+    console.log("=== ITINERARY CHECK PROCESS COMPLETED ===");
+
+    res.json({ exists: false });
+  } catch (error) {
+    console.error("[ERROR] Error checking for existing itinerary:", error);
+    res.status(500).json({ error: "Failed to check for existing itinerary" });
+  }
 });

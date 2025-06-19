@@ -614,3 +614,228 @@
   margin-top: 6px !important;
   margin-bottom: 6px !important;
 }
+
+/* Add styles for location markers and animation effects */
+.location-marker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  background-color: rgba(59, 130, 246, 0.08);
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: 0 2px;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid transparent;
+  text-decoration: none !important;
+  animation: markerFadeIn 0.5s ease-out forwards;
+}
+
+@keyframes markerFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.location-marker:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: rgb(96, 165, 250);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.location-marker.active {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: rgb(96, 165, 250);
+  font-weight: 500;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.restaurant-marker.active {
+  background-color: rgba(250, 96, 132, 0.2);
+  border-color: rgba(250, 96, 132, 0.5);
+  color: rgb(250, 96, 132);
+}
+
+.hotel-marker.active {
+  background-color: rgba(96, 250, 132, 0.2);
+  border-color: rgba(96, 250, 132, 0.5);
+  color: rgb(96, 250, 132);
+}
+
+.evening-marker.active {
+  background-color: rgba(186, 96, 250, 0.2);
+  border-color: rgba(186, 96, 250, 0.5);
+  color: rgb(186, 96, 250);
+}
+
+/* Itinerary loading indicator */
+.itinerary-loading {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05));
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-left: 3px solid rgba(59, 130, 246, 0.5);
+}
+
+.itinerary-loading .loading-spinner {
+  animation: spin 1.2s linear infinite;
+  margin-right: 10px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Marker animations for progressive display */
+.marker-appear {
+  animation: markerAppear 0.5s ease-out forwards;
+}
+
+@keyframes markerAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Day header animations */
+.day-header {
+  position: relative;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  font-size: 1.25rem;
+  color: #e2e8f0;
+  padding-left: 0.5rem;
+  border-left: 3px solid #3b82f6;
+  transition: all 0.5s ease-in-out;
+}
+
+.day-header.animated {
+  animation: dayHeaderAppear 0.8s ease-out forwards;
+}
+
+.day-header:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), transparent);
+  opacity: 0;
+  animation: dayHeaderGlow 0.6s ease-out forwards;
+  animation-delay: 0.2s;
+}
+
+@keyframes dayHeaderAppear {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes dayHeaderGlow {
+  from {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 0.2;
+  }
+}
+
+/* Ensure markdown content has proper spacing between sections */
+.markdown-content h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Animated day content sections */
+.day-content {
+  animation: dayContentFadeIn 0.7s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes dayContentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Add a transition highlight for the current day */
+.current-day {
+  position: relative;
+  animation: currentDayHighlight 2s ease-out forwards;
+}
+
+@keyframes currentDayHighlight {
+  0% {
+    background-color: rgba(59, 130, 246, 0.1);
+  }
+  50% {
+    background-color: rgba(59, 130, 246, 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Ensure smoother transitions between days */
+.itinerary-animation-active .day-content {
+  transition: all 0.5s ease-in-out;
+  opacity: 0;
+  animation: fadeInSlideUp 0.7s ease-out forwards;
+}
+
+.itinerary-animation-active .day-content[data-day="1"] {
+  animation-delay: 0.2s;
+}
+
+.itinerary-animation-active .day-content[data-day="2"] {
+  animation-delay: 0.3s;
+}
+
+.itinerary-animation-active .day-content[data-day="3"] {
+  animation-delay: 0.4s;
+}
+
+@keyframes fadeInSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

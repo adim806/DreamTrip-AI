@@ -135,6 +135,10 @@ export function TripProvider({ children }) {
   // Track trip cancellation for cleanup
   const [wasTripCancelled, setWasTripCancelled] = useState(false);
 
+  // Map display state
+  const [currentDestination, setCurrentDestination] = useState("");
+  const [displayMode, setDisplayMode] = useState("default");
+
   // נתונים לכל קטגוריה
   const [hotelsData, setHotelsData] = useState(null);
   const [restaurantsData, setRestaurantsData] = useState(null);
@@ -1292,6 +1296,12 @@ export function TripProvider({ children }) {
         setSelectedRestaurant,
         selectedAttraction,
         setSelectedAttraction,
+
+        // Map display state
+        currentDestination,
+        setCurrentDestination,
+        displayMode,
+        setDisplayMode,
       }}
     >
       {children}
