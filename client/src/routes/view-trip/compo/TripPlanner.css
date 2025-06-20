@@ -1,0 +1,592 @@
+.trip-planner-container {
+  width: 100%;
+  position: relative;
+}
+
+/* Quick Add Mode */
+.trip-planner-container.quick-add-mode {
+  overflow: hidden;
+}
+
+/* Days container (horizontal scroll) */
+.days-container {
+  display: flex;
+  overflow-x: auto;
+  gap: 16px;
+  padding: 12px 4px;
+  margin: 0 -4px;
+  scroll-padding: 16px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.5) rgba(15, 23, 42, 0.2);
+  -webkit-overflow-scrolling: touch;
+}
+
+.days-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.days-container::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.2);
+  border-radius: 8px;
+}
+
+.days-container::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.5);
+  border-radius: 8px;
+}
+
+/* Filter tabs */
+.filter-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.filter-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-tab {
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  background-color: rgba(30, 41, 59, 0.5);
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.filter-tab:hover {
+  background-color: rgba(37, 99, 235, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.filter-tab.active {
+  background-color: rgba(37, 99, 235, 0.5);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Day wrapper for each day in horizontal layout */
+.day-wrapper {
+  flex: 0 0 350px;
+  scroll-snap-align: start;
+}
+
+/* Day container */
+.day-container {
+  height: 100%;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.day-container.quick-add-active {
+  transform: scale(1.02);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.5), 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Quick add overlay */
+.quick-add-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(17, 24, 39, 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  border-radius: 0.5rem;
+  padding: 16px;
+}
+
+.quick-add-time-slots {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 16px;
+}
+
+.quick-add-slot {
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.quick-add-slot.morning {
+  background-color: rgba(252, 211, 77, 0.2);
+  color: rgb(252, 211, 77);
+}
+
+.quick-add-slot.morning:hover {
+  background-color: rgba(252, 211, 77, 0.3);
+  transform: scale(1.05);
+}
+
+.quick-add-slot.afternoon {
+  background-color: rgba(96, 165, 250, 0.2);
+  color: rgb(96, 165, 250);
+}
+
+.quick-add-slot.afternoon:hover {
+  background-color: rgba(96, 165, 250, 0.3);
+  transform: scale(1.05);
+}
+
+.quick-add-slot.evening {
+  background-color: rgba(167, 139, 250, 0.2);
+  color: rgb(167, 139, 250);
+}
+
+.quick-add-slot.evening:hover {
+  background-color: rgba(167, 139, 250, 0.3);
+  transform: scale(1.05);
+}
+
+.quick-add-cancel {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+
+.cancel-button {
+  background-color: rgba(239, 68, 68, 0.7);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  transition: all 0.2s ease;
+}
+
+.cancel-button:hover {
+  background-color: rgba(239, 68, 68, 0.9);
+  transform: translateY(-2px);
+}
+
+/* Quick add button on activities */
+.quick-add-button {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 30px;
+  height: 30px;
+  background-color: rgba(37, 99, 235, 0.7);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+.activity-card:hover .quick-add-button {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.quick-add-button:hover {
+  background-color: rgba(37, 99, 235, 0.9);
+  transform: scale(1.1);
+}
+
+.selected-for-quick-add {
+  outline: 2px solid rgba(37, 99, 235, 0.8);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.3), 0 5px 15px rgba(0, 0, 0, 0.2) !important;
+  transform: translateY(-4px) !important;
+}
+
+/* Saved items grid */
+.saved-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  scroll-padding: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  padding: 4px;
+}
+
+.saved-items-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.saved-items-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.saved-items-grid::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+/* Activity cards */
+.activity-card {
+  transition: all 0.2s ease;
+  cursor: grab;
+  position: relative;
+}
+
+.activity-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.activity-card:active {
+  cursor: grabbing;
+}
+
+/* Activity details within cards - improve readability */
+.activity-details {
+  flex: 1;
+  min-width: 0; /* Allow text to be truncated if needed */
+  width: 100%;
+}
+
+.activity-details .font-medium {
+  word-break: break-word;
+  white-space: normal; /* Allow wrapping */
+  line-height: 1.3;
+}
+
+.activity-details .text-gray-300 {
+  word-break: break-word;
+  white-space: normal; /* Allow wrapping */
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+/* Activity type indicators */
+.activity-type-hotel {
+  background-color: rgba(124, 58, 237, 0.7);
+  color: white;
+}
+
+.activity-type-restaurant {
+  background-color: rgba(239, 68, 68, 0.7);
+  color: white;
+}
+
+.activity-type-attraction {
+  background-color: rgba(59, 130, 246, 0.7);
+  color: white;
+}
+
+/* Droppable areas */
+.droppable-area {
+  transition: background-color 0.2s ease, border 0.2s ease, transform 0.2s ease;
+  border-radius: 6px;
+  min-height: 100px;
+  overflow-y: auto;
+  max-height: 250px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.droppable-area::-webkit-scrollbar {
+  width: 4px;
+}
+
+.droppable-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.droppable-area::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.is-dragging-over {
+  background-color: rgba(59, 130, 246, 0.15);
+  border: 1px dashed rgba(59, 130, 246, 0.5);
+  transform: scale(1.01);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+/* Enhanced drag target highlight when dragging */
+.active-drag-target:not(.is-dragging-over) {
+  border: 1px dashed rgba(100, 116, 139, 0.3);
+  background-color: rgba(15, 23, 42, 0.1);
+}
+
+/* Drop indicators */
+.empty-state {
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.drop-indicator {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(156, 163, 175, 0.8);
+  font-size: 0.875rem;
+}
+
+.drop-indicator::before {
+  content: "";
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(156, 163, 175, 0.8)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  margin-right: 8px;
+  opacity: 0.6;
+}
+
+.is-dragging-over .drop-indicator {
+  color: rgba(59, 130, 246, 0.8);
+  font-weight: 500;
+}
+
+.is-dragging-over .drop-indicator::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(59, 130, 246, 0.8)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  animation: bounce 0.6s infinite alternate;
+  opacity: 1;
+}
+
+@keyframes bounce {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(3px);
+  }
+}
+
+/* Time sections */
+.time-section {
+  transition: all 0.3s ease;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  padding: 10px;
+  background-color: rgba(15, 23, 42, 0.2);
+  margin-bottom: 12px;
+}
+
+.time-section:last-child {
+  margin-bottom: 0;
+}
+
+.time-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.time-icon {
+  margin-right: 8px;
+}
+
+.time-section h4 {
+  flex: 0 0 auto;
+}
+
+.time-section .droppable-area {
+  flex: 1;
+}
+
+.time-morning {
+  border-left: 3px solid rgba(252, 211, 77, 0.5);
+}
+
+.time-morning .droppable-area {
+  border: 1px solid rgba(252, 211, 77, 0.2);
+}
+
+.time-morning .is-dragging-over {
+  background-color: rgba(252, 211, 77, 0.15);
+  border: 1px dashed rgba(252, 211, 77, 0.5);
+}
+
+.time-afternoon {
+  border-left: 3px solid rgba(96, 165, 250, 0.5);
+}
+
+.time-afternoon .droppable-area {
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.time-afternoon .is-dragging-over {
+  background-color: rgba(96, 165, 250, 0.15);
+  border: 1px dashed rgba(96, 165, 250, 0.5);
+}
+
+.time-evening {
+  border-left: 3px solid rgba(167, 139, 250, 0.5);
+}
+
+.time-evening .droppable-area {
+  border: 1px solid rgba(167, 139, 250, 0.2);
+}
+
+.time-evening .is-dragging-over {
+  background-color: rgba(167, 139, 250, 0.15);
+  border: 1px dashed rgba(167, 139, 250, 0.5);
+}
+
+/* Activity indicators */
+.activity-type-indicator {
+  min-width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+/* Delete button */
+.delete-button {
+  opacity: 0.6;
+  transition: all 0.2s ease;
+}
+
+.delete-button:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Day header */
+.day-header {
+  position: relative;
+}
+
+/* View on map button */
+.view-on-map-btn {
+  transition: all 0.2s ease;
+}
+
+.view-on-map-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+}
+
+.view-on-map-btn:active {
+  transform: translateY(0);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .day-wrapper {
+    flex: 0 0 300px;
+  }
+
+  .day-container {
+    min-height: 400px;
+  }
+
+  .filter-tab {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+
+  .quick-add-slot {
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .saved-items-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+
+  .view-on-map-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .day-wrapper {
+    flex: 0 0 250px;
+  }
+
+  .quick-add-slot {
+    padding: 10px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Animations */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.pulse-on-add {
+  animation: pulse 1.5s;
+}
+
+/* Empty state styling */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  border-radius: 0.5rem;
+  background-color: rgba(30, 41, 59, 0.3);
+}
+
+/* Help tooltip */
+.help-tooltip {
+  position: relative;
+}
+
+.help-tooltip .tooltip-content {
+  visibility: hidden;
+  width: 200px;
+  background-color: rgba(30, 41, 59, 0.9);
+  color: #fff;
+  text-align: center;
+  padding: 8px;
+  border-radius: 6px;
+  position: absolute;
+  z-index: 100;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -100px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.help-tooltip:hover .tooltip-content {
+  visibility: visible;
+  opacity: 1;
+}

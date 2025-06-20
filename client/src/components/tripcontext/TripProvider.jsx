@@ -128,6 +128,9 @@ export function TripProvider({ children }) {
   // Track which chat ID is associated with the active trip
   const [activeTripChatId, setActiveTripChatId] = useState(null);
 
+  // Chat-specific activities cache
+  const [chatActivities, setChatActivities] = useState({});
+
   // Multi-trip support
   const [tripDrafts, setTripDrafts] = useState([]);
   const [completedTrips, setCompletedTrips] = useState([]);
@@ -154,6 +157,43 @@ export function TripProvider({ children }) {
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const [selectedAttraction, setSelectedAttraction] = useState(null);
 
+  // Check and update active chat ID from URL
+  useEffect(() => {
+    // Try to get chatId from URL if available
+    const pathParts = window.location.pathname.split("/");
+    const possibleChatId = pathParts[pathParts.length - 1];
+    const chatIdFromUrl = possibleChatId.length > 20 ? possibleChatId : null;
+
+    if (chatIdFromUrl && chatIdFromUrl !== activeTripChatId) {
+      console.log(
+        `TripProvider: Updating active chat ID from URL: ${chatIdFromUrl}`
+      );
+      setActiveTripChatId(chatIdFromUrl);
+
+      // Store in localStorage for persistence
+      localStorage.setItem("chatId", chatIdFromUrl);
+
+      // Clear category data when changing chats to ensure fresh data
+      setHotelsData(null);
+      setRestaurantsData(null);
+      setAttractionsData(null);
+    }
+  }, [activeTripChatId]);
+
+  // Set state machine
+  const [handleGenerateItinerary, setHandleGenerateItinerary] = useState(
+    () => () => console.warn("Itinerary generator not registered yet")
+  );
+
+  // State machine transition function
+  const transitionState = useCallback(
+    (newState) => {
+      console.log(`State transition: ${conversationState} -> ${newState}`);
+      setConversationState(newState);
+    },
+    [conversationState]
+  );
+
   /**
    * Updates the UserProfile with new data based on intent type
    * @param {string} intent - The detected intent
@@ -162,130 +202,161 @@ export function TripProvider({ children }) {
    * @returns {Object} - The updated profile section
    */
   const updateUserProfile = useCallback(
-    (intent, data, hasNewData = false) => {
-      if (!intent || !data) return null;
+    (intent, data, hasNewData = true) => {
+      if (!intent || !INTENT_TO_CATEGORY[intent]) {
+        console.warn(
+          `Invalid or unsupported intent for profile update: ${intent}`
+        );
+        return null;
+      }
 
-      // Map the intent to the appropriate category
-      const category = INTENT_TO_CATEGORY[intent] || SERVICE_CATEGORIES.GENERAL;
-
-      console.log(`[UserProfile] Updating ${category} with new data:`, data);
+      const category = INTENT_TO_CATEGORY[intent];
+      console.log(
+        `Updating user profile for intent: ${intent}, category: ${category}`
+      );
 
       setUserProfile((prevProfile) => {
-        // Create a deep copy of the current profile
+        // Only update if we have new data
+        if (!hasNewData) return prevProfile;
+
+        // Create deep copy to avoid direct state mutation
         const updatedProfile = JSON.parse(JSON.stringify(prevProfile));
 
-        // Get the relevant section for this intent
-        const profileSection = updatedProfile[category] || {};
-
-        // Create a timestamp
-        const timestamp = new Date().toISOString();
-
-        // Merge the new data with the existing data
-        const mergedSection = {
-          ...profileSection,
-          ...data,
-          lastUpdated: timestamp,
-        };
-
-        // Update the specific category
-        updatedProfile[category] = mergedSection;
+        // Update the specific category with new data
+        if (updatedProfile[category]) {
+          // Merge new data with existing category data
+          updatedProfile[category] = {
+            ...updatedProfile[category],
+            ...data,
+            lastUpdated: new Date().toISOString(),
+          };
+        }
 
         // Update meta information
         updatedProfile.meta = {
           ...updatedProfile.meta,
           lastIntent: intent,
-          lastUpdated: timestamp,
+          lastUpdated: new Date().toISOString(),
         };
 
-        console.log(
-          `[UserProfile] Updated ${category} section:`,
-          mergedSection
-        );
         return updatedProfile;
       });
 
-      // Return the specific category section for convenience
+      // Return the current category data for convenience
       return userProfile[category];
     },
     [userProfile]
   );
 
   /**
-   * Retrieves user data for a specific intent
-   * @param {string} intent - The intent to get data for
-   * @returns {Object} - The relevant section of the user profile
+   * Gets the relevant profile data for a given category
+   * Useful for retrieving context for follow-up questions
+   * @param {string} category - The category to retrieve
+   * @returns {Object} - The profile data for that category
    */
   const getUserProfileData = useCallback(
-    (intent) => {
-      if (!intent) return null;
+    (category) => {
+      if (!category || !SERVICE_CATEGORIES[category.toUpperCase()]) {
+        console.warn(`Invalid category for profile data: ${category}`);
+        return null;
+      }
 
-      // Map the intent to the appropriate category
-      const category = INTENT_TO_CATEGORY[intent] || SERVICE_CATEGORIES.GENERAL;
-
-      // Return the data for this category
-      return userProfile[category] || null;
+      const categoryKey = SERVICE_CATEGORIES[category.toUpperCase()];
+      return userProfile[categoryKey];
     },
     [userProfile]
   );
 
   /**
-   * Clears specific categories or the entire user profile
-   * @param {string} category - Optional category to clear (clears all if not specified)
+   * Clears some or all of the user profile
+   * @param {string} [category] - Optional specific category to clear
    */
-  const clearUserProfile = useCallback(
-    (category = null) => {
-      if (category && userProfile[category]) {
-        // Clear just one category
-        setUserProfile((prev) => {
-          const updated = { ...prev };
-
-          // Reset this category to default empty values
-          updated[category] = {
+  const clearUserProfile = useCallback((category = null) => {
+    if (category) {
+      const categoryKey = SERVICE_CATEGORIES[category.toUpperCase()];
+      if (categoryKey) {
+        console.log(`Clearing user profile for category: ${category}`);
+        setUserProfile((prevProfile) => {
+          const updatedProfile = { ...prevProfile };
+          // Reset this specific category to default
+          updatedProfile[categoryKey] = {
+            ...updatedProfile[categoryKey],
+            city: null,
+            country: null,
             lastUpdated: new Date().toISOString(),
           };
-
-          return updated;
+          return updatedProfile;
         });
-
-        console.log(`[UserProfile] Cleared category: ${category}`);
-      } else if (!category) {
-        // Reset the entire profile
-        setUserProfile({
-          weather: { lastUpdated: null },
-          hotels: { lastUpdated: null },
-          attractions: { lastUpdated: null },
-          flights: { lastUpdated: null },
-          localEvents: { lastUpdated: null },
-          travelRestrictions: { lastUpdated: null },
-          currency: { lastUpdated: null },
-          general: {
-            language: userProfile.general?.language || "en",
-            units: userProfile.general?.units || "metric",
+      } else {
+        console.warn(`Invalid category for profile clearing: ${category}`);
+      }
+    } else {
+      // Clear all categories except general preferences
+      console.log("Clearing all user profile categories");
+      setUserProfile((prevProfile) => {
+        const generalPreferences = { ...prevProfile.general };
+        const defaultProfile = {
+          weather: {
+            city: null,
+            country: null,
+            time: null,
+            isCurrentTime: false,
+            isToday: false,
+            isTomorrow: false,
+            isWeekend: false,
             lastUpdated: new Date().toISOString(),
           },
+          hotels: {
+            city: null,
+            country: null,
+            checkIn: null,
+            checkOut: null,
+            guests: null,
+            preferences: {},
+            lastUpdated: new Date().toISOString(),
+          },
+          attractions: {
+            city: null,
+            country: null,
+            category: null,
+            lastUpdated: new Date().toISOString(),
+          },
+          flights: {
+            origin: null,
+            destination: null,
+            departDate: null,
+            returnDate: null,
+            travelers: null,
+            lastUpdated: new Date().toISOString(),
+          },
+          localEvents: {
+            city: null,
+            country: null,
+            date: null,
+            category: null,
+            lastUpdated: new Date().toISOString(),
+          },
+          travelRestrictions: {
+            country: null,
+            citizenship: null,
+            lastUpdated: new Date().toISOString(),
+          },
+          currency: {
+            from: null,
+            to: null,
+            amount: null,
+            lastUpdated: new Date().toISOString(),
+          },
+          general: generalPreferences, // Keep user preferences
           meta: {
             lastIntent: null,
             lastUpdated: new Date().toISOString(),
           },
-        });
-
-        console.log(`[UserProfile] Reset entire profile`);
-      }
-    },
-    [userProfile]
-  );
-
-  // Function to generate an itinerary - will be implemented by NewPromt/useProcessUserInput
-  const [handleGenerateItinerary, setHandleGenerateItinerary] = useState(
-    () => () => {
-      console.log(
-        "Default handleGenerateItinerary called - not yet initialized"
-      );
-      // Default implementation will just transition to the generating state
-      // The actual implementation will be set by the useProcessUserInput hook
-      transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
+        };
+        return defaultProfile;
+      });
     }
-  );
+  }, []);
 
   // Allow components to provide the implementation for generating itineraries
   const registerItineraryGenerator = useCallback((generatorFn) => {
@@ -324,28 +395,47 @@ export function TripProvider({ children }) {
     // Reset cancellation flag
     setWasTripCancelled(false);
 
-    // Also reset active trip chat ID
-    setActiveTripChatId(null);
+    // Reset active trip chat ID but keep track of current chat
+    const currentChatId = activeTripChatId;
+    console.log(`Starting new trip in chat: ${currentChatId}`);
 
-    console.log("Started new trip, cleared previous trip details");
-  }, [tripDetails, tripDrafts, wasTripCancelled]);
+    return currentChatId; // Return the current chat ID for convenience
+  }, [tripDetails, tripDrafts, wasTripCancelled, activeTripChatId]);
 
   const switchToTrip = useCallback(
     (tripIndex) => {
       // If index is for a draft trip
       if (tripIndex < tripDrafts.length) {
-        setTripDetails(tripDrafts[tripIndex]);
+        const selectedDraft = tripDrafts[tripIndex];
+        setTripDetails(selectedDraft);
         setallTripData(null); // Clear current itinerary data
         setConversationState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
         setActiveItineraryIndex(tripIndex);
+
+        // Set the chat ID if available in the draft
+        if (selectedDraft.chatId) {
+          console.log(
+            `Switching to draft trip with chatId: ${selectedDraft.chatId}`
+          );
+          setActiveTripChatId(selectedDraft.chatId);
+        }
       }
       // If index is for a completed trip
       else if (tripIndex - tripDrafts.length < completedTrips.length) {
         const completedIndex = tripIndex - tripDrafts.length;
-        setTripDetails(completedTrips[completedIndex].tripDetails);
-        setallTripData(completedTrips[completedIndex]);
+        const selectedTrip = completedTrips[completedIndex];
+        setTripDetails(selectedTrip.tripDetails);
+        setallTripData(selectedTrip);
         setConversationState(CONVERSATION_STATES.DISPLAYING_ITINERARY);
         setActiveItineraryIndex(tripIndex);
+
+        // Set the chat ID if available in the completed trip
+        if (selectedTrip.tripDetails?.chatId) {
+          console.log(
+            `Switching to completed trip with chatId: ${selectedTrip.tripDetails.chatId}`
+          );
+          setActiveTripChatId(selectedTrip.tripDetails.chatId);
+        }
       }
 
       // Reset cancellation flag when switching trips
@@ -358,8 +448,17 @@ export function TripProvider({ children }) {
     (tripData) => {
       // Only add to completed trips if not cancelled
       if (!wasTripCancelled && tripData) {
+        // Make sure the trip data includes the current chat ID
+        const enhancedTripData = {
+          ...tripData,
+          tripDetails: {
+            ...tripData.tripDetails,
+            chatId: activeTripChatId,
+          },
+        };
+
         // Add to completed trips
-        setCompletedTrips((prev) => [...prev, tripData]);
+        setCompletedTrips((prev) => [...prev, enhancedTripData]);
 
         // Remove from drafts if it's there
         if (tripData.tripDetails && tripData.tripDetails.id) {
@@ -368,7 +467,9 @@ export function TripProvider({ children }) {
           );
         }
 
-        console.log("Trip completed and added to completed trips");
+        console.log(
+          `Trip completed in chat ${activeTripChatId} and added to completed trips`
+        );
         setConversationState(CONVERSATION_STATES.DISPLAYING_ITINERARY);
       } else {
         console.log("Trip was cancelled, not adding to completed trips");
@@ -377,780 +478,91 @@ export function TripProvider({ children }) {
       // Reset cancellation flag
       setWasTripCancelled(false);
     },
-    [wasTripCancelled]
+    [wasTripCancelled, activeTripChatId]
   );
 
   // Fully clear a trip - use for cancellations
   const cancelTrip = useCallback(() => {
-    console.log("Cancelling trip");
+    // Store current trip details for debugging
+    const currentTripLocation = tripDetails?.vacation_location;
 
-    // Mark the trip as cancelled so it won't be saved to drafts
+    // Set cancelled flag to prevent saving in drafts
     setWasTripCancelled(true);
 
-    // Reset all trip data
     setTripDetails(null);
     setallTripData(null);
-
-    // Return to idle state
     setConversationState(CONVERSATION_STATES.IDLE);
 
-    // Clear the active trip chat ID
-    setActiveTripChatId(null);
+    console.log(
+      `Trip to ${
+        currentTripLocation || "unknown location"
+      } has been cancelled by user`
+    );
+
+    // Return to advisory mode
+    return CONVERSATION_STATES.ADVISORY_MODE;
+  }, [tripDetails]);
+
+  // Helper to update activities for a specific chat
+  const updateChatActivities = useCallback((chatId, activities) => {
+    if (!chatId) return;
+
+    setChatActivities((prev) => ({
+      ...prev,
+      [chatId]: activities,
+    }));
+
+    console.log(
+      `Updated activities for chat ${chatId}: ${activities.length} items`
+    );
   }, []);
 
-  // All state transitions are managed here for consistency
-  const transitionState = useCallback(
-    (newState, contextData) => {
-      console.log(`Transition state: ${conversationState} → ${newState}`);
-
-      // Handle specific state transitions
-      switch (newState) {
-        case CONVERSATION_STATES.IDLE:
-          // When transitioning to IDLE from AWAITING_USER_TRIP_CONFIRMATION,
-          // it means the user cancelled the trip confirmation
-          if (
-            conversationState ===
-            CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION
-          ) {
-            console.log(
-              "User cancelled trip confirmation, returning to IDLE state"
-            );
-            // Mark the trip as cancelled
-            setWasTripCancelled(true);
-          }
-          break;
-
-        case CONVERSATION_STATES.TRIP_BUILDING_MODE:
-          // בדיקה אם אנחנו כבר במצב של הצגת יומן ויש לנו יומן מלא
-          // במקרה כזה אנחנו לא רוצים לחזור למצב בניית יומן
-          if (
-            (conversationState === CONVERSATION_STATES.DISPLAYING_ITINERARY ||
-              conversationState ===
-                CONVERSATION_STATES.ITINERARY_ADVICE_MODE) &&
-            allTripData !== null
-          ) {
-            console.log(
-              "Already have itinerary, staying in current state instead of TRIP_BUILDING_MODE"
-            );
-            return; // נשאר במצב הנוכחי ולא עוברים למצב בניית יומן
-          }
-
-          // When transitioning back to TRIP_BUILDING_MODE from AWAITING_USER_TRIP_CONFIRMATION,
-          // it means the user wants to edit trip details
-          if (
-            conversationState ===
-            CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION
-          ) {
-            console.log("User chose to edit trip details");
-            // No need to clear trip details - we want to keep them for editing
-          }
-
-          // Handle map updates when location is detected
-          if (contextData && contextData.updateMap && contextData.location) {
-            console.log("Updating map with location:", contextData.location);
-
-            // If we have a vacation_location but no explicit location in contextData,
-            // use the vacation_location for the map
-            const locationToShow =
-              contextData.location || tripDetails?.vacation_location;
-
-            if (locationToShow) {
-              // Update the active layer to show the map
-              setActiveLayer("location");
-
-              // Force a re-render of the map by updating trip details
-              if (!tripDetails) {
-                setTripDetails({ vacation_location: locationToShow });
-              } else if (tripDetails.vacation_location !== locationToShow) {
-                setTripDetails({
-                  ...tripDetails,
-                  vacation_location: locationToShow,
-                });
-              }
-            }
-          }
-          break;
-
-        case CONVERSATION_STATES.ANALYZING_INPUT:
-          // Check if we need to override state transition due to weather query
-          if (contextData?.forceFetchExternal) {
-            console.log(
-              "Force fetching external data due to day-specific weather query bypass"
-            );
-            setConversationState(CONVERSATION_STATES.FETCHING_EXTERNAL_DATA);
-            return; // Skip normal processing
-          }
-
-          // בדיקה אם אנחנו במצב הצגת יומן ויש לנו כבר יומן
-          // במקרה כזה נעבור למצב הייעוץ המיוחד במקום ניתוח רגיל
-          if (
-            (conversationState === CONVERSATION_STATES.DISPLAYING_ITINERARY ||
-              conversationState ===
-                CONVERSATION_STATES.ITINERARY_ADVICE_MODE) &&
-            allTripData !== null
-          ) {
-            console.log(
-              "Have active itinerary, transitioning to ITINERARY_ADVICE_MODE instead"
-            );
-
-            // בדיקה אם השאלה היא שאלת מידע ספציפית לגבי יום ביומן הטיול
-            if (contextData?.userMessage) {
-              // וידוא שמשתנה החלון הגלובלי קיים לצורך העברת המידע
-              if (!window.__processingState) {
-                window.__processingState = {};
-              }
-
-              // ניקוי המידע הקודם על יום ספציפי
-              if (window.__daySpecificInfo) {
-                delete window.__daySpecificInfo;
-              }
-
-              import("../../utils/itineraryGenerator").then(
-                async ({
-                  analyzePostItineraryQuestion,
-                  convertItineraryToJSON,
-                }) => {
-                  try {
-                    // וידוא שיש מבנה נתונים מלא ליומן
-                    let structuredItinerary = allTripData?.structuredItinerary;
-
-                    // אם אין, ננסה לחלץ מטקסט היומן
-                    if (
-                      !structuredItinerary &&
-                      allTripData?.itinerary &&
-                      typeof allTripData.itinerary === "string"
-                    ) {
-                      try {
-                        console.log(
-                          "Converting itinerary text to structured data"
-                        );
-                        structuredItinerary = convertItineraryToJSON(
-                          allTripData.itinerary
-                        );
-                      } catch (e) {
-                        console.error(
-                          "Failed to convert itinerary to structured data:",
-                          e
-                        );
-                      }
-                    }
-
-                    // ניתוח השאלה לזיהוי בקשות מידע ואזכור של יום ספציפי ביומן
-                    const questionAnalysis = analyzePostItineraryQuestion(
-                      contextData.userMessage,
-                      {
-                        vacation_location: tripDetails?.vacation_location,
-                        structuredItinerary: structuredItinerary,
-                        itinerary: allTripData?.itinerary,
-                        dates: tripDetails?.dates,
-                      }
-                    );
-
-                    console.log("Question analysis result:", questionAnalysis);
-
-                    // אם זוהתה שאלת מידע עם התייחסות ליום ספציפי
-                    if (questionAnalysis.isAdviceQuestion) {
-                      console.log(
-                        `Detected advice question for ${questionAnalysis.adviceType}`
-                      );
-
-                      if (questionAnalysis.specificDay) {
-                        console.log(
-                          `Detected specific day query for ${questionAnalysis.adviceType}: ${questionAnalysis.specificDay}`
-                        );
-                      }
-
-                      // שמירת המידע הרלוונטי למצב גלובלי לשימוש כל השירותים
-                      window.__daySpecificInfo = questionAnalysis.locationInfo;
-                      window.__processingState.adviceType =
-                        questionAnalysis.adviceType;
-                      window.__processingState.intent = questionAnalysis.intent;
-                      window.__processingState.specificDay =
-                        questionAnalysis.specificDay;
-
-                      // העברת המידע לקונטקסט הקיים
-                      if (contextData) {
-                        contextData.adviceType = questionAnalysis.adviceType;
-                        contextData.intent = questionAnalysis.intent;
-                        contextData.specificDay = questionAnalysis.specificDay;
-                        contextData.daySpecificInfo =
-                          questionAnalysis.locationInfo;
-                      } else {
-                        contextData = {
-                          adviceType: questionAnalysis.adviceType,
-                          intent: questionAnalysis.intent,
-                          specificDay: questionAnalysis.specificDay,
-                          daySpecificInfo: questionAnalysis.locationInfo,
-                        };
-                      }
-
-                      console.log(
-                        "Updated context with day-specific info",
-                        window.__daySpecificInfo
-                      );
-                    }
-                  } catch (error) {
-                    console.error(
-                      "Error analyzing post-itinerary question:",
-                      error
-                    );
-                  }
-                }
-              );
-            }
-
-            setConversationState(CONVERSATION_STATES.ITINERARY_ADVICE_MODE);
-            return; // מונע את קוד ההמשך ומבצע מעבר מותאם
-          }
-          break;
-
-        case CONVERSATION_STATES.ITINERARY_ADVICE_MODE:
-          console.log(
-            "Entering ITINERARY_ADVICE_MODE - handling post-itinerary questions"
-          );
-
-          // אם יש מידע על יום ספציפי מהניתוח המוקדם יותר, נעביר אותו בהקשר
-          if (window.__daySpecificInfo) {
-            console.log(
-              "Found specific day info for advice:",
-              window.__daySpecificInfo
-            );
-
-            // אם לא הועבר contextData, אתחל אותו
-            if (!contextData) {
-              contextData = {};
-            }
-
-            // שדה זה יועבר ל-AdviceHandler לעיבוד בקשות חיצוניות
-            contextData.daySpecificInfo = window.__daySpecificInfo;
-            contextData.adviceType = window.__processingState?.adviceType;
-            contextData.intent = window.__processingState?.intent;
-            contextData.specificDay = window.__processingState?.specificDay;
-          }
-
-          // מצב חדש שמטפל בשאלות אחרי שכבר יש יומן
-          break;
-
-        case CONVERSATION_STATES.FETCHING_EXTERNAL_DATA:
-          // Set special flags to ensure we stay in this state for day-specific weather queries
-          if (
-            contextData?.bypassMissingFields ||
-            (contextData?.intent === "Weather-Request" &&
-              contextData?.daySpecificInfo)
-          ) {
-            console.log(
-              "Prioritizing external data fetch for day-specific weather query"
-            );
-            // Force the state machine to fetch external data and ignore missing fields checks
-            window.__forceExternalFetch = true;
-            if (!contextData) {
-              contextData = {};
-            }
-            contextData.forceFetchExternal = true;
-          }
-
-          // כאשר יש בקשת מידע בזמן הצגת יומן, נעבור למצב ייעוץ יומן במקום
-          if (
-            (conversationState === CONVERSATION_STATES.DISPLAYING_ITINERARY ||
-              conversationState ===
-                CONVERSATION_STATES.ITINERARY_ADVICE_MODE) &&
-            allTripData !== null
-          ) {
-            console.log("Fetching external data in itinerary context");
-            // לא תמיד צריך לשנות את המצב למצב ייעוץ ספציפי, לפעמים משאירים את FETCHING_EXTERNAL_DATA
-          }
-
-          // Special handling for external data that's already been fetched
-          if (
-            (window.__weatherResponseData &&
-              (contextData?.intent === "Weather-Request" ||
-                window.__forceWeatherResponse)) ||
-            (window.__restaurantsResponseData &&
-              (contextData?.intent === "Find-Restaurants" ||
-                window.__forceRestaurantsResponse)) ||
-            (window.__hotelsResponseData &&
-              (contextData?.intent === "Find-Hotel" ||
-                window.__forceHotelsResponse)) ||
-            (window.__attractionsResponseData &&
-              (contextData?.intent === "Find-Attractions" ||
-                window.__forceAttractionsResponse)) ||
-            (window.__externalDataResponse && window.__forceExternalDataDisplay)
-          ) {
-            console.log(
-              "Weather data already fetched but not displayed - forcing display now"
-            );
-            // Add the weather data directly as a system message
-            if (
-              window.__processingHookState &&
-              window.__processingHookState.addSystemMessage
-            ) {
-              // Set a flag to prevent missing fields form from showing
-              // Initialize contextData if it doesn't exist
-              if (!contextData) {
-                contextData = {};
-              }
-              contextData.bypassMissingFields = true;
-              contextData.forceFetchExternal = true;
-              window.__forceWeatherResponse = true;
-
-              // Determine which data to display
-              let dataToDisplay;
-              if (
-                contextData?.intent === "Weather-Request" &&
-                window.__weatherResponseData
-              ) {
-                dataToDisplay = window.__weatherResponseData;
-                window.__weatherResponseDisplayed = true;
-              } else if (
-                contextData?.intent === "Find-Restaurants" &&
-                window.__restaurantsResponseData
-              ) {
-                dataToDisplay = window.__restaurantsResponseData;
-                window.__restaurantsResponseDisplayed = true;
-              } else if (window.__externalDataResponse) {
-                dataToDisplay = window.__externalDataResponse;
-                window.__externalDataDisplayed = true;
-              } else if (window.__weatherResponseData) {
-                dataToDisplay = window.__weatherResponseData;
-                window.__weatherResponseDisplayed = true;
-              }
-
-              // Only add to the chat if we actually have data to display
-              if (dataToDisplay) {
-                window.__processingHookState.addSystemMessage(dataToDisplay);
-                console.log(
-                  `Added ${
-                    contextData?.intent || "external"
-                  } data directly to chat`
-                );
-
-                // Mark as displayed
-                window.__weatherResponseDisplayed = true;
-
-                // Stay in itinerary advice mode
-                setConversationState(CONVERSATION_STATES.ITINERARY_ADVICE_MODE);
-                return; // Skip the missing fields form entirely
-              } else {
-                console.log("No data available to display in the chat");
-              }
-            }
-          }
-
-          // When transitioning from AWAITING_MISSING_INFO to FETCHING_EXTERNAL_DATA,
-          // it means the user has submitted the missing fields form
-          if (conversationState === CONVERSATION_STATES.AWAITING_MISSING_INFO) {
-            console.log(
-              "User submitted missing fields form, fetching external data"
-            );
-          }
-          break;
-
-        case CONVERSATION_STATES.ADVISORY_MODE:
-          // אם היינו במצב הצגת יומן או ייעוץ יומן, נשאר שם
-          if (
-            (conversationState === CONVERSATION_STATES.DISPLAYING_ITINERARY ||
-              conversationState ===
-                CONVERSATION_STATES.ITINERARY_ADVICE_MODE) &&
-            allTripData !== null
-          ) {
-            console.log(
-              "Already have itinerary, staying in ITINERARY_ADVICE_MODE instead of ADVISORY_MODE"
-            );
-            setConversationState(CONVERSATION_STATES.ITINERARY_ADVICE_MODE);
-            return;
-          }
-          break;
-
-        case CONVERSATION_STATES.GENERATING_ITINERARY:
-          // לא מאפשרים ליצור יומן חדש אם כבר יש יומן פעיל, אלא אם כן זו בקשה מפורשת
-          if (
-            (conversationState === CONVERSATION_STATES.DISPLAYING_ITINERARY ||
-              conversationState ===
-                CONVERSATION_STATES.ITINERARY_ADVICE_MODE) &&
-            allTripData !== null &&
-            (!contextData || !contextData.forceNewItinerary)
-          ) {
-            console.log(
-              "Already have an active itinerary and no explicit request for a new one, staying in current state"
-            );
-            return; // נשאר במצב הנוכחי
-          }
-
-          // Store current chat ID as the active trip chat ID
-          setActiveTripChatId(window.location.pathname.split("/").pop());
-          // Reset cancellation flag when starting to generate itinerary
-          setWasTripCancelled(false);
-
-          // Inform the processing hook that we're generating an itinerary
-          // This ensures that any UI components related to trip summary are hidden
-          if (window.__processingHookState) {
-            // If there's a stale trip summary still showing, force hide it
-            if (window.__processingHookState.setShowTripSummary) {
-              window.__processingHookState.setShowTripSummary(false);
-            }
-
-            // Ensure there's a loading indicator in the chat
-            if (
-              window.__processingHookState.addLoadingMessage &&
-              !window.__itineraryGenerationStarted
-            ) {
-              window.__itineraryGenerationStarted = true;
-              // Add a loading message and ALWAYS store its ID globally
-              window.__itineraryLoadingId =
-                window.__processingHookState.addLoadingMessage({
-                  isGenerating: true,
-                  isItineraryGeneration: true,
-                  message:
-                    "Generating your personalized travel itinerary... This might take a few moments.",
-                });
-
-              console.log(
-                "Created itinerary loading message with ID:",
-                window.__itineraryLoadingId
-              );
-
-              // Reset the flag when the generation completes
-              setTimeout(() => {
-                window.__itineraryGenerationStarted = false;
-              }, 30000); // Reset after 30 seconds as a safeguard
-            }
-          }
-          break;
-
-        case CONVERSATION_STATES.DISPLAYING_ITINERARY:
-          // When displaying itinerary, if we have complete data, save as completed trip
-          if (contextData && !wasTripCancelled) {
-            completeTrip(contextData);
-
-            // Clear any loading indicators that might still be displayed
-            if (window.__processingHookState) {
-              // Reset the itinerary generation flag
-              window.__itineraryGenerationStarted = false;
-
-              // Display the itinerary in the chat directly as a model message
-              console.log("Showing itinerary in chat");
-
-              // DEBUG: הדפסת המידע המלא למסלול שהתקבל מהמודל
-              console.log("========= ITINERARY RAW RESPONSE START =========");
-              console.log(contextData.itinerary);
-              console.log("========= ITINERARY RAW RESPONSE END =========");
-
-              // Format the itinerary for chat display - הצגת המסלול המלא בשיחה
-              // הסרנו את הפורמט המיוחד והכותרת כדי להציג את התשובה המלאה כפי שהתקבלה מהמודל
-              const itineraryMessage = contextData.itinerary;
-
-              // המרת מחרוזת היומן לפורמט JSON מובנה
-              import("../../utils/itineraryGenerator").then(
-                async ({ convertItineraryToJSON }) => {
-                  try {
-                    // המרת היומן לפורמט JSON רק עבור תצוגה וניתוח, לא לשמירה
-                    const structuredItinerary = convertItineraryToJSON(
-                      contextData.itinerary
-                    );
-                    console.log(
-                      "Successfully converted itinerary to JSON structure:",
-                      structuredItinerary
-                    );
-
-                    // לא שומרים יותר את היומן אוטומטית - השמירה תתבצע רק בלחיצת המשתמש על כפתור השמירה
-
-                    // שומרים את היומן המומר בנתוני הטיול המקומיים
-                    setallTripData((prevData) => ({
-                      ...prevData,
-                      structuredItinerary,
-                      itinerary: contextData.itinerary,
-                      metadata: contextData.metadata || {
-                        destination: tripDetails?.vacation_location,
-                        duration: tripDetails?.duration,
-                        dates: tripDetails?.dates,
-                      },
-                    }));
-
-                    // שמירת מזהה הצ'אט לייזום השמירה בהמשך
-                    const chatId = window.location.pathname.split("/").pop();
-
-                    if (chatId) {
-                      // שמירת היומן גם בהיסטוריית השיחה
-                      try {
-                        const headers = {};
-                        // השג טוקן אותנטיקציה אם זמין
-                        if (window.Clerk?.session) {
-                          const token = await window.Clerk.session.getToken();
-                          headers["Authorization"] = `Bearer ${token}`;
-                        }
-
-                        // הוסף את היומן כהודעת מודל בהיסטוריית השיחה
-                        const saveToHistoryResponse = await fetch(
-                          `${import.meta.env.VITE_API_URL}/api/chats/${chatId}`,
-                          {
-                            method: "PUT",
-                            credentials: "include",
-                            headers: {
-                              "Content-Type": "application/json",
-                              ...headers,
-                            },
-                            body: JSON.stringify({
-                              answer: contextData.itinerary,
-                              // לא מוסיפים את הודעת המשתמש כי היא כבר קיימת
-                            }),
-                          }
-                        );
-
-                        if (saveToHistoryResponse.ok) {
-                          console.log(
-                            "Successfully added itinerary to chat history"
-                          );
-                        } else {
-                          console.error(
-                            "Failed to add itinerary to chat history:",
-                            await saveToHistoryResponse.text()
-                          );
-                        }
-                      } catch (historyError) {
-                        console.error(
-                          "Error saving itinerary to chat history:",
-                          historyError
-                        );
-                      }
-                    } else {
-                      console.warn(
-                        "Could not determine chat ID for saving structured itinerary"
-                      );
-                    }
-                  } catch (error) {
-                    console.error(
-                      "Error processing itinerary to JSON format:",
-                      error
-                    );
-                  }
-                }
-              );
-
-              // IMPORTANT: Always display the itinerary message even if we don't have a loading ID
-              // Try to replace the loading message first if we have an ID
-              if (
-                window.__processingHookState.replaceLoadingMessage &&
-                window.__itineraryLoadingId
-              ) {
-                // Use the stored loading ID if available
-                console.log(
-                  "Replacing loading message with itinerary using ID:",
-                  window.__itineraryLoadingId
-                );
-                window.__processingHookState.replaceLoadingMessage(
-                  window.__itineraryLoadingId,
-                  {
-                    role: "model",
-                    message: itineraryMessage,
-                    id: `itinerary-${Date.now()}`,
-                    isItinerary: true,
-                  }
-                );
-
-                // Clear the loading ID
-                window.__itineraryLoadingId = null;
-              }
-              // If no replaceLoadingMessage or no stored ID, try to find a loading message to replace
-              else if (window.__processingHookState.replaceLoadingMessage) {
-                // Get the pending messages from the hook state
-                const pendingMessages =
-                  window.__processingHookState.pendingMessages || [];
-
-                // Look for any loading messages to replace
-                const loadingMessages = pendingMessages.filter(
-                  (msg) =>
-                    msg.isLoadingMessage ||
-                    msg.isGenerating ||
-                    msg.isItineraryGeneration
-                );
-
-                if (loadingMessages.length > 0) {
-                  const loadingId = loadingMessages[0].id;
-                  console.log("Found loading message to replace:", loadingId);
-                  window.__processingHookState.replaceLoadingMessage(
-                    loadingId,
-                    {
-                      role: "model",
-                      message: itineraryMessage,
-                      id: `itinerary-${Date.now()}`,
-                      isItinerary: true,
-                    }
-                  );
-                } else {
-                  // No loading message found, add a new message instead
-                  console.log(
-                    "No loading message found, adding new system message with itinerary"
-                  );
-                  if (window.__processingHookState.addSystemMessage) {
-                    window.__processingHookState.addSystemMessage(
-                      itineraryMessage
-                    );
-                  }
-                }
-              }
-              // Last resort - add a new system message
-              else if (window.__processingHookState.addSystemMessage) {
-                console.log("Adding itinerary as new system message");
-                window.__processingHookState.addSystemMessage(itineraryMessage);
-              }
-
-              // IMPORTANT - תמיד להוסיף את המסלול כהודעה חדשה בשיחה
-              // אפילו אם כבר הוחלפה הודעת הטעינה, ככה נוודא שהמסלול תמיד מוצג
-              setTimeout(() => {
-                // בדיקה שעדיין יש לנו גישה למצב השיחה
-                if (
-                  window.__processingHookState &&
-                  window.__processingHookState.addSystemMessage
-                ) {
-                  console.log(
-                    "Adding itinerary as additional message for guaranteed visibility"
-                  );
-                  window.__processingHookState.addSystemMessage(
-                    itineraryMessage
-                  );
-                }
-
-                // IMPORTANT: Clear all loading messages after displaying the itinerary
-                if (window.__processingHookState.clearLoadingMessages) {
-                  console.log("Clearing any remaining loading messages");
-                  window.__processingHookState.clearLoadingMessages();
-                }
-              }, 500);
-            }
-          }
-          break;
-
-        case CONVERSATION_STATES.AWAITING_MISSING_INFO:
-          // For weather data, check if we already have the data and should show it
-          if (
-            window.__weatherResponseData &&
-            (contextData?.intent === "Weather-Request" ||
-              window.__captureExternalDataResponse ||
-              window.__forceWeatherResponse)
-          ) {
-            console.log(
-              "Found weather data that should be displayed instead of missing fields form"
-            );
-            // Add weather data directly as a system message
-            if (
-              window.__processingHookState &&
-              window.__processingHookState.addSystemMessage
-            ) {
-              // Force the response to be used
-              window.__forceWeatherResponse = true;
-
-              // Add to chat - determine which data to display
-              let dataToDisplay;
-              if (
-                contextData?.intent === "Weather-Request" &&
-                window.__weatherResponseData
-              ) {
-                dataToDisplay = window.__weatherResponseData;
-                window.__weatherResponseDisplayed = true;
-              } else if (
-                contextData?.intent === "Find-Restaurants" &&
-                window.__restaurantsResponseData
-              ) {
-                dataToDisplay = window.__restaurantsResponseData;
-                window.__restaurantsResponseDisplayed = true;
-              } else if (window.__externalDataResponse) {
-                dataToDisplay = window.__externalDataResponse;
-                window.__externalDataDisplayed = true;
-              } else if (window.__weatherResponseData) {
-                dataToDisplay = window.__weatherResponseData;
-                window.__weatherResponseDisplayed = true;
-              }
-
-              // Only add to the chat if we actually have data to display
-              if (dataToDisplay) {
-                window.__processingHookState.addSystemMessage(dataToDisplay);
-                console.log(
-                  `Added ${
-                    contextData?.intent || "external"
-                  } data directly to chat`
-                );
-
-                // Mark as displayed
-                window.__weatherResponseDisplayed = true;
-
-                // Stay in itinerary advice mode
-                setConversationState(CONVERSATION_STATES.ITINERARY_ADVICE_MODE);
-                return; // Skip the missing fields form entirely
-              } else {
-                console.log("No data available to display in the chat");
-              }
-            }
-          }
-
-          // Check for day-specific info for weather in an itinerary context
-          if (
-            contextData?.intent === "Weather-Request" &&
-            contextData?.daySpecificInfo &&
-            allTripData?.structuredItinerary
-          ) {
-            console.log(
-              "Found day-specific weather request in itinerary context"
-            );
-            if (!contextData) {
-              contextData = {};
-            }
-            contextData.bypassMissingFields = true;
-            setConversationState(CONVERSATION_STATES.FETCHING_EXTERNAL_DATA);
-            return; // Skip the missing fields form and directly fetch data
-          }
-
-          // Check for bypass flag from day-specific weather queries
-          if (
-            contextData?.bypassMissingFields ||
-            contextData?.forceFetchExternal
-          ) {
-            console.log(
-              "Bypassing missing fields state due to complete day-specific weather query"
-            );
-            setConversationState(CONVERSATION_STATES.FETCHING_EXTERNAL_DATA);
-            return; // Skip transition to missing fields state
-          }
-
-          // When transitioning to AWAITING_MISSING_INFO, we're waiting for the user to fill in missing fields
-          console.log(
-            "Transitioning to AWAITING_MISSING_INFO state - waiting for user to provide missing information"
-          );
-          // No special handling needed here - the MissingFieldsForm component will handle the UI
-          break;
-
-        // Add other state transitions as needed
-      }
-
-      // Update the state
-      setConversationState(newState);
+  // Helper to get activities for a specific chat
+  const getChatActivities = useCallback(
+    (chatId) => {
+      if (!chatId) return [];
+      return chatActivities[chatId] || [];
     },
-    [
-      conversationState,
-      completeTrip,
-      wasTripCancelled,
-      setActiveLayer,
-      setTripDetails,
-      tripDetails,
-      allTripData,
-    ]
+    [chatActivities]
   );
 
-  // Listen to state changes to detect when a trip is cancelled
+  // Monitor URL changes to detect chat ID changes
   useEffect(() => {
-    if (conversationState === CONVERSATION_STATES.IDLE && tripDetails) {
-      // If we're returning to IDLE state but still have trip details,
-      // check if this was due to cancellation
-      if (wasTripCancelled) {
-        console.log("Completing cleanup for cancelled trip");
-        // Clear trip details since this was a cancellation
-        setTripDetails(null);
-        setallTripData(null);
-        setActiveTripChatId(null);
-      }
-    }
-  }, [conversationState, tripDetails, wasTripCancelled]);
+    const handleUrlChange = () => {
+      // Try to get chatId from URL
+      const pathParts = window.location.pathname.split("/");
+      const possibleChatId = pathParts[pathParts.length - 1];
+      const chatIdFromUrl = possibleChatId.length > 20 ? possibleChatId : null;
 
-  // Monitor trip details changes and auto-transition to confirmation when complete
+      if (chatIdFromUrl && chatIdFromUrl !== activeTripChatId) {
+        console.log(`URL changed, new chatId detected: ${chatIdFromUrl}`);
+        setActiveTripChatId(chatIdFromUrl);
+        localStorage.setItem("chatId", chatIdFromUrl);
+      }
+    };
+
+    // Add event listeners to detect URL changes
+    window.addEventListener("popstate", handleUrlChange);
+
+    // Clean up
+    return () => {
+      window.removeEventListener("popstate", handleUrlChange);
+    };
+  }, [activeTripChatId]);
+
+  // Sync tripDetails with activeTripChatId when changing/updating trip
+  useEffect(() => {
+    if (tripDetails && activeTripChatId && !tripDetails.chatId) {
+      // Add chatId to tripDetails if not already present
+      console.log(`Adding chatId ${activeTripChatId} to trip details`);
+      setTripDetails((prev) => ({
+        ...prev,
+        chatId: activeTripChatId,
+      }));
+    }
+  }, [tripDetails, activeTripChatId]);
+
+  // Monitor trip validation state
   useEffect(() => {
     let debounceTimer;
 
@@ -1274,6 +686,12 @@ export function TripProvider({ children }) {
 
         // Chat-trip association
         activeTripChatId,
+        setActiveTripChatId,
+
+        // Chat-specific activities
+        chatActivities,
+        updateChatActivities,
+        getChatActivities,
 
         // Original category data
         hotelsData,

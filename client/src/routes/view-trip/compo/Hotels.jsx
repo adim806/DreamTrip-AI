@@ -1,8 +1,10 @@
-import React, { useContext, useEffect } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import axios from "axios";
 import mapboxgl from "mapbox-gl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TripContext } from "@/components/tripcontext/TripProvider";
+import activitiesService from "@/utils/services/activitiesService";
+import { HeartIcon } from "@/components/ui/heart-icon";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -71,7 +73,29 @@ const Hotels = ({ trip }) => {
     activeLayer,
   } = useContext(TripContext);
 
+  const [savedActivities, setSavedActivities] = useState([]);
+  const [savingInProgress, setSavingInProgress] = useState({});
   const queryClient = useQueryClient();
+
+  // Get current userId and chatId
+  const [userId, setUserId] = useState(null);
+  const [chatId, setChatId] = useState(null);
+
+  // Get userId and chatId from URL or localStorage
+  useEffect(() => {
+    // Try to get chatId from URL if available
+    const pathParts = window.location.pathname.split("/");
+    const possibleChatId = pathParts[pathParts.length - 1];
+    const chatIdFromUrl = possibleChatId.length > 20 ? possibleChatId : null;
+
+    // Get userId from localStorage or Clerk auth if available
+    const userIdFromStorage =
+      localStorage.getItem("userId") || sessionStorage.getItem("userId");
+
+    // Set the values, prioritizing trip props if available
+    setUserId(trip?.userId || userIdFromStorage);
+    setChatId(trip?.chatId || chatIdFromUrl || localStorage.getItem("chatId"));
+  }, [trip]);
 
   // שימוש ב-React Query:
   // - staleTime: 0 => הנתונים נחשבים מיד ל-stale
@@ -101,16 +125,80 @@ const Hotels = ({ trip }) => {
           queryKey: ["hotels", trip?.vacation_location],
           exact: true,
         });
-      }, 10000 ); // 5 דקות
+      }, 10000); // 5 דקות
     }
     return () => clearTimeout(timeoutId);
   }, [activeLayer, queryClient, trip?.vacation_location]);
 
+  // Fetch saved activities when component mounts or chatId changes
+  useEffect(() => {
+    const fetchSavedActivities = async () => {
+      if (chatId) {
+        try {
+          const activities = await activitiesService.getActivities(chatId);
+          setSavedActivities(activities);
+        } catch (error) {
+          console.error("Error fetching saved activities:", error);
+        }
+      }
+    };
+
+    fetchSavedActivities();
+  }, [chatId]);
+
+  // Function to toggle saving an activity
+  const handleSaveActivity = async (e, hotel) => {
+    e.stopPropagation(); // Prevent hotel selection when clicking the heart
+
+    if (!userId || !chatId) {
+      console.error("Missing userId or chatId", {
+        userId: userId || trip?.userId,
+        chatId: chatId || trip?.chatId,
+      });
+
+      // Try to get them one more time if missing
+      const pathParts = window.location.pathname.split("/");
+      const urlChatId = pathParts[pathParts.length - 1];
+      const fallbackChatId =
+        urlChatId.length > 20 ? urlChatId : localStorage.getItem("chatId");
+      const fallbackUserId =
+        localStorage.getItem("userId") || sessionStorage.getItem("userId");
+
+      if (!fallbackUserId || !fallbackChatId) {
+        alert(
+          "Unable to save hotel. Please try refreshing the page or navigate back to the chat."
+        );
+        return;
+      }
+
+      setUserId(fallbackUserId);
+      setChatId(fallbackChatId);
+      return;
+    }
+
+    setSavingInProgress((prev) => ({ ...prev, [hotel.id]: true }));
+
+    try {
+      await activitiesService.saveActivity(userId, chatId, "hotel", hotel);
+
+      // Refetch saved activities
+      const activities = await activitiesService.getActivities(chatId);
+      setSavedActivities(activities);
+    } catch (error) {
+      console.error("Error saving hotel:", error);
+    } finally {
+      setSavingInProgress((prev) => ({ ...prev, [hotel.id]: false }));
+    }
+  };
+
+  // Check if a hotel is saved
+  const isHotelSaved = (hotelId) => {
+    return activitiesService.isActivitySaved(savedActivities, hotelId);
+  };
+
   if (!trip?.vacation_location) {
     return (
-      <p className="text-center text-gray-600">
-        בחר יעד כדי להציג מלונות.
-      </p>
+      <p className="text-center text-gray-600">בחר יעד כדי להציג מלונות.</p>
     );
   }
 
@@ -146,11 +234,25 @@ const Hotels = ({ trip }) => {
               selectedHotel?.id === hotel.id ? "border-4 border-blue-500" : ""
             }`}
           >
-            <img
-              src={hotel.thumbnail}
-              alt={hotel.name}
-              className="w-full h-48 object-cover"
-            />
+            <div className="relative">
+              <img
+                src={hotel.thumbnail}
+                alt={hotel.name}
+                className="w-full h-48 object-cover"
+              />
+              <button
+                className="absolute top-3 right-3 z-10"
+                onClick={(e) => handleSaveActivity(e, hotel)}
+                disabled={savingInProgress[hotel.id]}
+              >
+                <HeartIcon
+                  filled={isHotelSaved(hotel.id)}
+                  className={`w-7 h-7 ${
+                    isHotelSaved(hotel.id) ? "text-red-500" : "text-white"
+                  }`}
+                />
+              </button>
+            </div>
             <div className="p-4">
               <h3 className="text-xl font-bold mb-2">{hotel.name}</h3>
               <p className="text-gray-700">

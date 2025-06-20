@@ -11,6 +11,8 @@ import dotenv from "dotenv";
 // Add NodeCache for in-memory caching
 import NodeCache from "node-cache";
 
+import ActivityModel from "./models/activities.js";
+
 const port = process.env.PORT || 3000;
 const app = express();
 dotenv.config();
@@ -2486,5 +2488,120 @@ app.get("/api/itineraries/check", authMiddleware, async (req, res) => {
   } catch (error) {
     console.error("[ERROR] Error checking for existing itinerary:", error);
     res.status(500).json({ error: "Failed to check for existing itinerary" });
+  }
+});
+
+// Save activity endpoint
+app.post("/api/activities", async (req, res) => {
+  try {
+    const { userId, chatId, type, activityData } = req.body;
+
+    console.log("Save activity request:", { userId, chatId, type });
+
+    // Validate required fields with better error reporting
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId field" });
+    }
+    if (!chatId) {
+      return res.status(400).json({ error: "Missing chatId field" });
+    }
+    if (!type) {
+      return res.status(400).json({ error: "Missing type field" });
+    }
+    if (!activityData) {
+      return res.status(400).json({ error: "Missing activityData field" });
+    }
+    if (!activityData.id) {
+      return res.status(400).json({ error: "Missing activityData.id field" });
+    }
+
+    console.log(
+      "Activity data structure:",
+      JSON.stringify(activityData, null, 2)
+    );
+
+    // Sanitize the activity data to prevent potential MongoDB errors
+    // Remove any undefined values and ensure types are correct
+    const sanitizedActivityData = {
+      id: String(activityData.id || ""),
+      name: String(activityData.name || ""),
+      rating: String(activityData.rating || ""),
+      address: String(activityData.address || ""),
+      price: String(activityData.price || ""),
+      thumbnail: String(activityData.thumbnail || ""),
+      link: String(activityData.link || ""),
+      lat: Number(activityData.lat || 0),
+      lng: Number(activityData.lng || 0),
+    };
+
+    // Check if activity already exists using the new activityType and activityId fields
+    const existingActivity = await ActivityModel.findOne({
+      userId,
+      chatId,
+      activityType: type,
+      activityId: sanitizedActivityData.id,
+    });
+
+    if (existingActivity) {
+      // Activity already saved - remove it (toggle functionality)
+      console.log("Deleting existing activity:", existingActivity._id);
+      await ActivityModel.deleteOne({ _id: existingActivity._id });
+      return res
+        .status(200)
+        .json({ message: "Activity removed successfully", removed: true });
+    }
+
+    // Create new activity with sanitized data
+    const activity = new ActivityModel({
+      userId,
+      chatId,
+      type,
+      activityType: type, // Add explicit activityType field
+      activityId: sanitizedActivityData.id, // Add explicit activityId field
+      activityData: sanitizedActivityData,
+    });
+
+    const savedActivity = await activity.save();
+    console.log("Activity saved successfully:", savedActivity._id);
+
+    return res.status(201).json({
+      message: "Activity saved successfully",
+      activity: savedActivity,
+    });
+  } catch (error) {
+    console.error("Error saving activity:", error);
+    // Send more detailed error information for debugging
+    return res.status(500).json({
+      error: "Failed to save activity",
+      details: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+});
+
+// Get saved activities by chatId
+app.get("/api/activities/:chatId", async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    if (!chatId) {
+      return res.status(400).json({ error: "Missing chatId parameter" });
+    }
+
+    console.log("Fetching activities for chatId:", chatId);
+
+    const activities = await ActivityModel.find({ chatId }).sort({
+      createdAt: -1,
+    });
+
+    console.log(`Found ${activities.length} activities for chatId ${chatId}`);
+
+    return res.status(200).json(activities);
+  } catch (error) {
+    console.error("Error fetching activities:", error);
+    return res.status(500).json({
+      error: "Failed to fetch activities",
+      details: error.message,
+    });
   }
 });

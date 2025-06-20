@@ -1,105 +1,168 @@
 import React, { useContext, useEffect, useState, useRef } from "react";
 import GeneralInfo from "./GeneralInfo";
-
-import { TripContext } from "@/components/tripcontext/TripProvider";
-
+import PropTypes from "prop-types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Hotels from "./Hotels";
 import Restaurants from "./Restaurants";
 import Attractions from "./Attractions";
+import TripPlanner from "./TripPlanner";
+import SavedActivities from "@/components/ui/SavedActivities";
+import { TripContext } from "@/components/tripcontext/TripProvider";
 
 //import Events from "./Events";
 //import CustomRoute from "./CustomRoute";
 
 const SearchData = ({ trip }) => {
-  const { activeLayer, setActiveLayer, defaultTab } = useContext(TripContext);
-
+  const { activeLayer, setActiveLayer, defaultTab, activeTripChatId } =
+    useContext(TripContext);
   const [activeTab, setActiveTab] = useState("generalInfo");
   const contentRef = useRef(null);
+  const [currentChatId, setCurrentChatId] = useState(null);
+  const [userId, setUserId] = useState(null);
 
+  // עדכון הטאב הפעיל מברירת המחדל
   useEffect(() => {
-    setActiveTab(defaultTab); // ✅ קביעת הלשונית הראשונה כברירת מחדל
+    setActiveTab(defaultTab);
   }, [defaultTab]);
 
   // גלילה אוטומטית רק כשמתקבלים נתוני טיול חדשים
   useEffect(() => {
     if (contentRef.current && trip) {
       contentRef.current.scrollTo({
-        top: contentRef.current.scrollHeight,
+        top: 0,
         behavior: "smooth",
       });
     }
-  }, [trip]); // גלילה רק כשמתקבלים נתוני טיול חדשים
+  }, [trip]);
 
-  const tabs = [
-    { id: "generalInfo", label: "מידע כללי", icon: "🌍" },
-    { id: "hotels", label: "מלונות", icon: "🏨" },
-    { id: "restaurants", label: "מסעדות", icon: "🍽" },
-    { id: "attractions", label: "אטרקציות", icon: "🎡" },
-    { id: "events", label: "אירועים מיוחדים", icon: "⭐" },
-    { id: "customRoute", label: "מסלול הטיול", icon: "🗺" },
-  ];
+  // עדכון ה-chatId ו-userId בעת טעינת הקומפוננטה או שינוי ב-activeTripChatId
+  useEffect(() => {
+    // אם יש chatId פעיל מהקונטקסט, השתמש בו
+    if (activeTripChatId) {
+      console.log(`SearchData: Using activeTripChatId: ${activeTripChatId}`);
+      setCurrentChatId(activeTripChatId);
+      localStorage.setItem("chatId", activeTripChatId);
+    } else {
+      // נסה לקבל chatId מה-URL או מהזיכרון המקומי
+      const pathParts = window.location.pathname.split("/");
+      const possibleChatId = pathParts[pathParts.length - 1];
+      const chatIdFromUrl = possibleChatId.length > 20 ? possibleChatId : null;
+      const storedChatId = localStorage.getItem("chatId");
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case "generalInfo":
-        return <GeneralInfo trip={trip} />;
-      case "hotels":
-        return <Hotels trip={trip} />;
-      case "restaurants":
-        return <Restaurants trip={trip} />;
-      case "attractions":
-        return <Attractions trip={trip} />;
-      case "events":
-      case "customRoute":
-      default:
-        return null;
+      const chatId = chatIdFromUrl || storedChatId || trip?.chatId;
+      if (chatId) {
+        console.log(
+          `SearchData: Setting chatId from URL/localStorage: ${chatId}`
+        );
+        setCurrentChatId(chatId);
+        localStorage.setItem("chatId", chatId);
+      }
     }
+
+    // קבל את ה-userId
+    const storedUserId =
+      localStorage.getItem("userId") || sessionStorage.getItem("userId");
+    if (storedUserId) {
+      setUserId(storedUserId);
+    }
+  }, [activeTripChatId, trip]);
+
+  // לוג שינויים במיקום הטיול
+  useEffect(() => {
+    if (trip?.vacation_location) {
+      console.log(
+        `SearchData: Trip destination changed to ${trip.vacation_location} for chat ${currentChatId}`
+      );
+    }
+  }, [trip?.vacation_location, currentChatId]);
+
+  // עדכון הטאב הפעיל על פי ה-URL
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash === "#hotels") setActiveTab("hotels");
+    else if (hash === "#restaurants") setActiveTab("restaurants");
+    else if (hash === "#attractions") setActiveTab("attractions");
+    else if (hash === "#activities") setActiveTab("activities");
+    else if (hash === "#generalInfo") setActiveTab("generalInfo");
+    else if (hash === "#tripDetails") setActiveTab("tripDetails");
+  }, []);
+
+  // עדכון ה-URL בהתאם לטאב הפעיל
+  const handleTabChange = (value) => {
+    setActiveTab(value);
+    setActiveLayer(value); // עדכון שכבת המפה הפעילה
+    window.location.hash = value;
+  };
+
+  // Make sure trip object has necessary props
+  const enhancedTrip = {
+    ...trip,
+    userId: trip?.userId || userId,
+    chatId: trip?.chatId || currentChatId || activeTripChatId,
   };
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Navigation Tabs */}
-      <nav className="flex-none p-2 bg-opacity-90 rounded-lg shadow-md bg-gradient-to-t from-gray-900 to-gray-900">
-        <div className="flex justify-center items-center gap-1 flex-wrap">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`tab flex justify-center items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                activeTab === tab.id
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-              }`}
-              onClick={() => {
-                setActiveTab(tab.id);
-                setActiveLayer(tab.id);
-              }}
-              style={{
-                minWidth: "80px",
-              }}
-            >
-              <span className="mr-1">{tab.icon}</span> {tab.label}
-            </button>
-          ))}
-        </div>
-      </nav>
+      <h1 className="text-2xl font-bold mb-6 text-center text-blue-100">
+        {trip?.vacation_location
+          ? `Explore ${trip.vacation_location}`
+          : "Search and Save Activities"}
+      </h1>
 
-      {/* Content Section */}
-      <div
-        ref={contentRef}
-        className="flex-1 overflow-y-auto mt-2"
-        style={{
-          scrollbarWidth: "thin",
-          scrollbarColor: "rgba(59, 130, 246, 0.2) rgba(59, 130, 246, 0.1)",
-        }}
-      >
-        <div className="p-4">
-          <div className="bg-white/5 rounded-lg p-4 shadow-lg">
-            {renderContent()}
-          </div>
+      <Tabs defaultValue={activeTab} onValueChange={handleTabChange}>
+        <TabsList className="grid grid-cols-5 mb-6">
+          <TabsTrigger value="generalInfo">🌍 מידע כללי</TabsTrigger>
+          <TabsTrigger value="tripDetails">📋 Trip Details</TabsTrigger>
+          <TabsTrigger value="hotels">🏨 מלונות</TabsTrigger>
+          <TabsTrigger value="restaurants">🍽 מסעדות</TabsTrigger>
+          <TabsTrigger value="attractions">🎡 אטרקציות</TabsTrigger>
+        </TabsList>
+
+        <div
+          ref={contentRef}
+          className="mt-2 overflow-y-auto"
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "rgba(59, 130, 246, 0.2) rgba(59, 130, 246, 0.1)",
+          }}
+        >
+          <TabsContent value="generalInfo">
+            <GeneralInfo trip={enhancedTrip} />
+          </TabsContent>
+
+          <TabsContent value="tripDetails">
+            <TripPlanner trip={enhancedTrip} />
+          </TabsContent>
+
+          <TabsContent value="hotels">
+            <Hotels trip={enhancedTrip} />
+          </TabsContent>
+
+          <TabsContent value="restaurants">
+            <Restaurants trip={enhancedTrip} />
+          </TabsContent>
+
+          <TabsContent value="attractions">
+            <Attractions trip={enhancedTrip} />
+          </TabsContent>
         </div>
-      </div>
+      </Tabs>
+
+      {/* SavedActivities כרכיב נפרד מחוץ לטאבים */}
+      {activeTab === "activities" && (
+        <div className="mt-4 p-4">
+          <SavedActivities
+            userId={userId}
+            chatId={currentChatId || activeTripChatId}
+          />
+        </div>
+      )}
     </div>
   );
+};
+
+SearchData.propTypes = {
+  trip: PropTypes.object,
 };
 
 export default SearchData;

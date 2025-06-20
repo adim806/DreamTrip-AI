@@ -1,4 +1,10 @@
-import React, { useContext, useEffect, useRef, useState, useCallback } from "react";
+import React, {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import mapboxgl from "mapbox-gl";
 import axios from "axios";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -28,15 +34,19 @@ const ViewMap = ({ trip }) => {
     setCurrentDestination,
     displayMode,
     setDisplayMode,
+    activeTripChatId,
   } = useContext(TripContext);
 
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
-  
+  const lastChatIdRef = useRef(null);
+
   // Map configuration state
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [mapStyle, setMapStyle] = useState("mapbox://styles/mapbox/streets-v11");
+  const [mapStyle, setMapStyle] = useState(
+    "mapbox://styles/mapbox/streets-v11"
+  );
   const [showBuildingExtrusions, setShowBuildingExtrusions] = useState(false);
 
   // פונקציה לקבלת קואורדינטות לפי שם מקום
@@ -56,10 +66,12 @@ const ViewMap = ({ trip }) => {
     return null;
   };
 
-  const clearMarkers = () => {
+  // Make the clearMarkers function use useCallback to avoid dependency issues
+  const clearMarkers = useCallback(() => {
+    console.log(`Clearing ${markersRef.current.length} markers from the map`);
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
-  };
+  }, []);
 
   const add3DLayers = () => {
     if (!mapRef.current || mapRef.current.getLayer("3d-buildings")) return;
@@ -96,6 +108,9 @@ const ViewMap = ({ trip }) => {
   const updateDestination = async () => {
     if (trip?.vacation_location) {
       try {
+        console.log(
+          `🌍 Updating map destination to: ${trip.vacation_location}`
+        );
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
           trip.vacation_location
         )}.json?access_token=${mapboxgl.accessToken}`;
@@ -113,6 +128,13 @@ const ViewMap = ({ trip }) => {
             add3DLayers();
           }
           clearMarkers();
+
+          // עדכן את היעד הנוכחי
+          setCurrentDestination(trip.vacation_location);
+
+          console.log(
+            `✅ Map updated to ${trip.vacation_location} at coordinates ${coords}`
+          );
         }
       } catch (error) {
         console.error("❌ Error updating destination:", error);
@@ -121,29 +143,29 @@ const ViewMap = ({ trip }) => {
   };
 
   // פונקציה להצגת סימונים עבור מלונות
-  const displayHotelsOnMap = (hotels) => {
-    if (!mapRef.current || !hotels || hotels.length === 0) return;
+  const displayHotelsOnMap = useCallback(
+    (hotels) => {
+      if (!mapRef.current || !hotels || hotels.length === 0) return;
 
-    // Clear existing hotel markers
-    markersRef.current = markersRef.current.filter((marker) => {
-      if (marker.type === "hotel") {
-        marker.remove();
-        return false;
-      }
-      return true;
-    });
+      // Clear ALL existing markers first
+      clearMarkers();
 
-    // Import the createMarkerElement function
-    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
-      // Add new hotel markers
-      hotels.forEach((hotel) => {
-        if (!hotel.lat || !hotel.lng) return;
+      // Import the createMarkerElement function
+      import("../../../utils/map/ExternalDataAdapter")
+        .then(({ createMarkerElement }) => {
+          // Add new hotel markers
+          hotels.forEach((hotel) => {
+            if (!hotel.lat || !hotel.lng) return;
 
-        // Create popup content
-        const popupContent = `
+            // Create popup content
+            const popupContent = `
           <div class="popup-content">
             <h3 class="font-bold text-lg">${hotel.name}</h3>
-            ${hotel.description ? `<p class="text-sm mt-1">${hotel.description}</p>` : ""}
+            ${
+              hotel.description
+                ? `<p class="text-sm mt-1">${hotel.description}</p>`
+                : ""
+            }
             ${
               hotel.amenities
                 ? `<p class="text-xs mt-1 text-gray-600">${hotel.amenities}</p>`
@@ -152,55 +174,54 @@ const ViewMap = ({ trip }) => {
           </div>
         `;
 
-        // Create popup
-        const popup = new mapboxgl.Popup({
-          offset: 25,
-          closeButton: false,
-          maxWidth: "300px",
-        }).setHTML(popupContent);
+            // Create popup
+            const popup = new mapboxgl.Popup({
+              offset: 25,
+              closeButton: false,
+              maxWidth: "300px",
+            }).setHTML(popupContent);
 
-        // Create marker element using the utility function
-        const el = createMarkerElement("hotel", hotel);
+            // Create marker element using the utility function
+            const el = createMarkerElement("hotel", hotel);
 
-        // Create marker
-        const marker = new mapboxgl.Marker(el)
-        .setLngLat([hotel.lng, hotel.lat])
-          .setPopup(popup)
-        .addTo(mapRef.current);
-        
-        // Store hotel data with marker for later reference
-        marker.type = "hotel";
-        marker.itemData = hotel;
+            // Create marker
+            const marker = new mapboxgl.Marker(el)
+              .setLngLat([hotel.lng, hotel.lat])
+              .setPopup(popup)
+              .addTo(mapRef.current);
 
-        // Add to markers array
-        markersRef.current.push(marker);
-      });
-    }).catch(error => {
-      console.error("Error importing createMarkerElement:", error);
-    });
-  };
+            // Store hotel data with marker for later reference
+            marker.type = "hotel";
+            marker.itemData = hotel;
+
+            // Add to markers array
+            markersRef.current.push(marker);
+          });
+        })
+        .catch((error) => {
+          console.error("Error importing createMarkerElement:", error);
+        });
+    },
+    [clearMarkers]
+  );
 
   // פונקציה להצגת סימונים עבור מסעדות
-  const displayRestaurantsOnMap = (restaurants) => {
-    if (!mapRef.current || !restaurants || restaurants.length === 0) return;
+  const displayRestaurantsOnMap = useCallback(
+    (restaurants) => {
+      if (!mapRef.current || !restaurants || restaurants.length === 0) return;
 
-    // Clear existing restaurant markers
-    markersRef.current = markersRef.current.filter((marker) => {
-      if (marker.type === "restaurant") {
-        marker.remove();
-        return false;
-      }
-      return true;
-    });
+      // Clear ALL existing markers first
+      clearMarkers();
 
-    // Import the createMarkerElement function
-    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
-      // Add new restaurant markers
-      restaurants.forEach((restaurant) => {
-        if (!restaurant.lat || !restaurant.lng) return;
+      // Import the createMarkerElement function
+      import("../../../utils/map/ExternalDataAdapter")
+        .then(({ createMarkerElement }) => {
+          // Add new restaurant markers
+          restaurants.forEach((restaurant) => {
+            if (!restaurant.lat || !restaurant.lng) return;
 
-        // Create popup content
-        const popupContent = `
+            // Create popup content
+            const popupContent = `
           <div class="popup-content">
             <h3 class="font-bold text-lg">${restaurant.name}</h3>
             ${
@@ -215,63 +236,62 @@ const ViewMap = ({ trip }) => {
             }
             ${
               restaurant.price_level
-                ? `<p class="text-xs mt-1">Price: ${
-                    "$".repeat(restaurant.price_level)
-                  }</p>`
+                ? `<p class="text-xs mt-1">Price: ${"$".repeat(
+                    restaurant.price_level
+                  )}</p>`
                 : ""
             }
           </div>
         `;
 
-        // Create popup
-        const popup = new mapboxgl.Popup({
-          offset: 25,
-          closeButton: false,
-          maxWidth: "300px",
-        }).setHTML(popupContent);
+            // Create popup
+            const popup = new mapboxgl.Popup({
+              offset: 25,
+              closeButton: false,
+              maxWidth: "300px",
+            }).setHTML(popupContent);
 
-        // Create marker element using the utility function
-        const el = createMarkerElement("restaurant", restaurant);
+            // Create marker element using the utility function
+            const el = createMarkerElement("restaurant", restaurant);
 
-        // Create marker
-        const marker = new mapboxgl.Marker(el)
-        .setLngLat([restaurant.lng, restaurant.lat])
-          .setPopup(popup)
-        .addTo(mapRef.current);
-        
-        // Store restaurant data with marker for later reference
-        marker.type = "restaurant";
-        marker.itemData = restaurant;
+            // Create marker
+            const marker = new mapboxgl.Marker(el)
+              .setLngLat([restaurant.lng, restaurant.lat])
+              .setPopup(popup)
+              .addTo(mapRef.current);
 
-        // Add to markers array
-        markersRef.current.push(marker);
-      });
-    }).catch(error => {
-      console.error("Error importing createMarkerElement:", error);
-    });
-  };
+            // Store restaurant data with marker for later reference
+            marker.type = "restaurant";
+            marker.itemData = restaurant;
+
+            // Add to markers array
+            markersRef.current.push(marker);
+          });
+        })
+        .catch((error) => {
+          console.error("Error importing createMarkerElement:", error);
+        });
+    },
+    [clearMarkers]
+  );
 
   // פונקציה להצגת סימונים עבור אטרקציות
-  const displayAttractionsOnMap = (attractions) => {
-    if (!mapRef.current || !attractions || attractions.length === 0) return;
+  const displayAttractionsOnMap = useCallback(
+    (attractions) => {
+      if (!mapRef.current || !attractions || attractions.length === 0) return;
 
-    // Clear existing attraction markers
-    markersRef.current = markersRef.current.filter((marker) => {
-      if (marker.type === "attraction") {
-        marker.remove();
-        return false;
-      }
-      return true;
-    });
+      // Clear ALL existing markers first
+      clearMarkers();
 
-    // Import the createMarkerElement function
-    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
-      // Add new attraction markers
-      attractions.forEach((attraction) => {
-        if (!attraction.lat || !attraction.lng) return;
+      // Import the createMarkerElement function
+      import("../../../utils/map/ExternalDataAdapter")
+        .then(({ createMarkerElement }) => {
+          // Add new attraction markers
+          attractions.forEach((attraction) => {
+            if (!attraction.lat || !attraction.lng) return;
 
-        // Create popup content
-        const popupContent = `
+            // Create popup content
+            const popupContent = `
           <div class="popup-content">
             <h3 class="font-bold text-lg">${attraction.name}</h3>
             ${
@@ -292,61 +312,64 @@ const ViewMap = ({ trip }) => {
           </div>
         `;
 
-        // Create popup
-        const popup = new mapboxgl.Popup({
-          offset: 25,
-          closeButton: false,
-          maxWidth: "300px",
-        }).setHTML(popupContent);
+            // Create popup
+            const popup = new mapboxgl.Popup({
+              offset: 25,
+              closeButton: false,
+              maxWidth: "300px",
+            }).setHTML(popupContent);
 
-        // Create marker element using the utility function
-        const el = createMarkerElement("attraction", attraction);
+            // Create marker element using the utility function
+            const el = createMarkerElement("attraction", attraction);
 
-        // Create marker
-        const marker = new mapboxgl.Marker(el)
-        .setLngLat([attraction.lng, attraction.lat])
-          .setPopup(popup)
-        .addTo(mapRef.current);
-        
-        // Store attraction data with marker for later reference
-        marker.type = "attraction";
-        marker.itemData = attraction;
+            // Create marker
+            const marker = new mapboxgl.Marker(el)
+              .setLngLat([attraction.lng, attraction.lat])
+              .setPopup(popup)
+              .addTo(mapRef.current);
 
-        // Add to markers array
-        markersRef.current.push(marker);
-      });
-    }).catch(error => {
-      console.error("Error importing createMarkerElement:", error);
-    });
-  };
+            // Store attraction data with marker for later reference
+            marker.type = "attraction";
+            marker.itemData = attraction;
+
+            // Add to markers array
+            markersRef.current.push(marker);
+          });
+        })
+        .catch((error) => {
+          console.error("Error importing createMarkerElement:", error);
+        });
+    },
+    [clearMarkers]
+  );
 
   // Handle flying to a specific location
   const handleFlyToLocation = useCallback((event) => {
     if (!mapRef.current) return;
-    
+
     const { location, options = {} } = event.detail;
     if (!location) return;
-    
-      const flyOptions = {
-        center: [location.lng, location.lat],
+
+    const flyOptions = {
+      center: [location.lng, location.lat],
       zoom: options.zoom || 15,
-        pitch: options.pitch || 0,
-        bearing: options.bearing || 0,
+      pitch: options.pitch || 0,
+      bearing: options.bearing || 0,
       speed: options.speed || 1.2,
       duration: options.duration || 2000,
-        ...options
-      };
-      
+      ...options,
+    };
+
     console.log(`🌍 Flying to location: [${location.lng}, ${location.lat}]`);
-      mapRef.current.flyTo(flyOptions);
-      
-      // If notification of completion is requested, dispatch an event when the movement ends
-      if (options.shouldNotifyOnComplete) {
-        mapRef.current.once('moveend', () => {
-          console.log('Map movement complete, notifying listeners');
-          window.dispatchEvent(new CustomEvent('mapbox:movement-complete'));
-        });
-      }
+    mapRef.current.flyTo(flyOptions);
+
+    // If notification of completion is requested, dispatch an event when the movement ends
+    if (options.shouldNotifyOnComplete) {
+      mapRef.current.once("moveend", () => {
+        console.log("Map movement complete, notifying listeners");
+        window.dispatchEvent(new CustomEvent("mapbox:movement-complete"));
+      });
+    }
   }, []);
 
   // אתחול המפה – מתבצע פעם אחת
@@ -369,483 +392,635 @@ const ViewMap = ({ trip }) => {
   }, []);
 
   // Define event handler functions with useCallback to prevent unnecessary re-renders
-  const handleDisplayRestaurants = useCallback((event) => {
+  const handleDisplayRestaurants = useCallback(
+    (event) => {
       const { data } = event.detail;
-      console.log("📍 Received restaurants data for map:", data.length, "items");
+      console.log(
+        "📍 Received restaurants data for map:",
+        data.length,
+        "items"
+      );
+
+      // Clear all markers first
+      clearMarkers();
+
       displayRestaurantsOnMap(data);
       setRestaurantsData(data);
       setActiveLayer("restaurants");
-  }, [setRestaurantsData, setActiveLayer]);
+    },
+    [setRestaurantsData, setActiveLayer, clearMarkers]
+  );
 
-  const handleDisplayHotels = useCallback((event) => {
+  const handleDisplayHotels = useCallback(
+    (event) => {
       const { data } = event.detail;
       console.log("📍 Received hotels data for map:", data.length, "items");
+
+      // Clear all markers first
+      clearMarkers();
+
       displayHotelsOnMap(data);
       setHotelsData(data);
       setActiveLayer("hotels");
-  }, [setHotelsData, setActiveLayer]);
+    },
+    [setHotelsData, setActiveLayer, clearMarkers]
+  );
 
-  const handleDisplayAttractions = useCallback((event) => {
+  const handleDisplayAttractions = useCallback(
+    (event) => {
       const { data } = event.detail;
-      console.log("📍 Received attractions data for map:", data.length, "items");
+      console.log(
+        "📍 Received attractions data for map:",
+        data.length,
+        "items"
+      );
+
+      // Clear all markers first
+      clearMarkers();
+
       displayAttractionsOnMap(data);
       setAttractionsData(data);
       setActiveLayer("attractions");
-  }, [setAttractionsData, setActiveLayer]);
+    },
+    [setAttractionsData, setActiveLayer, clearMarkers]
+  );
 
-  const handleDisplayItineraryLocations = useCallback((event) => {
-    const { data, destination } = event.detail;
-    console.log("📍 Received itinerary locations for map:", 
-      Object.values(data).flat().length, "items");
-    
-    // Clear existing markers first
+  const handleDisplayItineraryLocations = useCallback(
+    (event) => {
+      const { data, destination } = event.detail;
+      console.log(
+        "📍 Received itinerary locations for map:",
+        Object.values(data).flat().length,
+        "items"
+      );
+
+      // Clear existing markers first
       clearMarkers();
-    
-    // Try to fly to the destination first
-    if (destination && destination !== currentDestination) {
-      setCurrentDestination(destination);
-      
-      // Try to fly to the destination
-      if (mapRef.current) {
-        fetchCoordinates2(destination)
-          .then((coords) => {
-            if (coords) {
-              mapRef.current.flyTo({
-                center: [coords.lng, coords.lat],
-                zoom: 12,
-                essential: true,
-                duration: 2000,
-              });
-              
-              // After flying to the destination, display markers sequentially with animation
-              mapRef.current.once('moveend', () => {
+
+      // Try to fly to the destination first
+      if (destination && destination !== currentDestination) {
+        setCurrentDestination(destination);
+
+        // Try to fly to the destination
+        if (mapRef.current) {
+          fetchCoordinates2(destination)
+            .then((coords) => {
+              if (coords) {
+                mapRef.current.flyTo({
+                  center: [coords.lng, coords.lat],
+                  zoom: 12,
+                  essential: true,
+                  duration: 2000,
+                });
+
+                // After flying to the destination, display markers sequentially with animation
+                mapRef.current.once("moveend", () => {
+                  displayMarkersSequentially(data);
+                });
+              } else {
+                // If we couldn't get coordinates, still display markers
                 displayMarkersSequentially(data);
-              });
-            } else {
-              // If we couldn't get coordinates, still display markers
+              }
+            })
+            .catch((error) => {
+              console.error("Error flying to destination:", error);
+              // If there was an error, still display markers
               displayMarkersSequentially(data);
-            }
-          })
-          .catch((error) => {
-            console.error("Error flying to destination:", error);
-            // If there was an error, still display markers
-            displayMarkersSequentially(data);
-          });
+            });
+        } else {
+          // If map isn't ready, display markers directly
+          displayMarkersSequentially(data);
+        }
       } else {
-        // If map isn't ready, display markers directly
+        // If no destination change, display markers directly
         displayMarkersSequentially(data);
       }
-    } else {
-      // If no destination change, display markers directly
-      displayMarkersSequentially(data);
-    }
-    
-    // Show all layers
-    setActiveLayer("all");
-    
-    // Update UI to show we're displaying an itinerary
-    setDisplayMode("itinerary");
-  }, [
-    clearMarkers, 
-    currentDestination, 
-    fetchCoordinates2, 
-    setCurrentDestination, 
-    setActiveLayer, 
-    setDisplayMode
-  ]);
+
+      // Show all layers
+      setActiveLayer("all");
+
+      // Update UI to show we're displaying an itinerary
+      setDisplayMode("itinerary");
+    },
+    [
+      clearMarkers,
+      currentDestination,
+      fetchCoordinates2,
+      setCurrentDestination,
+      setActiveLayer,
+      setDisplayMode,
+    ]
+  );
 
   // Function to display markers sequentially with animation
   const displayMarkersSequentially = (data) => {
     // Store all locations to be displayed in order
     const allLocations = [];
-    
+
     // First add hotels (usually where you start/end the day)
     if (data.hotels && data.hotels.length > 0) {
-      data.hotels.forEach(hotel => {
+      data.hotels.forEach((hotel) => {
         if (hotel.lat && hotel.lng && !isNaN(hotel.lat) && !isNaN(hotel.lng)) {
-          allLocations.push({ ...hotel, type: 'hotel', order: 0 });
+          allLocations.push({ ...hotel, type: "hotel", order: 0 });
         }
       });
     }
-    
+
     // Then add attractions (main activities)
     if (data.attractions && data.attractions.length > 0) {
       data.attractions.forEach((attraction, index) => {
-        if (attraction.lat && attraction.lng && !isNaN(attraction.lat) && !isNaN(attraction.lng)) {
-          allLocations.push({ ...attraction, type: 'attraction', order: index + 1 });
+        if (
+          attraction.lat &&
+          attraction.lng &&
+          !isNaN(attraction.lat) &&
+          !isNaN(attraction.lng)
+        ) {
+          allLocations.push({
+            ...attraction,
+            type: "attraction",
+            order: index + 1,
+          });
         }
       });
     }
-    
+
     // Finally add restaurants (usually visited between attractions)
     if (data.restaurants && data.restaurants.length > 0) {
       data.restaurants.forEach((restaurant, index) => {
-        if (restaurant.lat && restaurant.lng && !isNaN(restaurant.lat) && !isNaN(restaurant.lng)) {
-          allLocations.push({ ...restaurant, type: 'restaurant', order: index + 1 });
+        if (
+          restaurant.lat &&
+          restaurant.lng &&
+          !isNaN(restaurant.lat) &&
+          !isNaN(restaurant.lng)
+        ) {
+          allLocations.push({
+            ...restaurant,
+            type: "restaurant",
+            order: index + 1,
+          });
         }
       });
     }
-    
+
     // Sort all locations by order
     allLocations.sort((a, b) => a.order - b.order);
-    
+
     // Display markers with a delay between each one for animation effect
     allLocations.forEach((location, index) => {
       setTimeout(() => {
-        if (location.type === 'hotel') {
+        if (location.type === "hotel") {
           displayHotelMarker(location);
-        } else if (location.type === 'restaurant') {
+        } else if (location.type === "restaurant") {
           displayRestaurantMarker(location);
-        } else if (location.type === 'attraction') {
+        } else if (location.type === "attraction") {
           displayAttractionMarker(location);
         }
       }, index * 100); // 100ms delay between each marker
     });
-    
+
     // Store the data in state for later reference
     setHotelsData(data.hotels || []);
     setRestaurantsData(data.restaurants || []);
     setAttractionsData(data.attractions || []);
   };
-  
+
   // Individual marker display functions for sequential animation
   const displayHotelMarker = (hotel) => {
     if (!mapRef.current || !hotel || !hotel.lat || !hotel.lng) return;
-    
-    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
-      // Create popup content
-      const popupContent = `
+
+    import("../../../utils/map/ExternalDataAdapter")
+      .then(({ createMarkerElement }) => {
+        // Create popup content
+        const popupContent = `
         <div class="popup-content">
           <h3 class="font-bold text-lg">${hotel.name}</h3>
-          ${hotel.description ? `<p class="text-sm mt-1">${hotel.description}</p>` : ""}
-          ${hotel.price_range ? `<p class="text-xs mt-1">Price: ${hotel.price_range}</p>` : ""}
-          ${hotel.rating ? `<p class="text-xs mt-1">Rating: ${hotel.rating} ⭐</p>` : ""}
+          ${
+            hotel.description
+              ? `<p class="text-sm mt-1">${hotel.description}</p>`
+              : ""
+          }
+          ${
+            hotel.price_range
+              ? `<p class="text-xs mt-1">Price: ${hotel.price_range}</p>`
+              : ""
+          }
+          ${
+            hotel.rating
+              ? `<p class="text-xs mt-1">Rating: ${hotel.rating} ⭐</p>`
+              : ""
+          }
         </div>
       `;
-      
-      // Create popup
-      const popup = new mapboxgl.Popup({
-        offset: 25,
-        closeButton: false,
-        maxWidth: "300px",
-      }).setHTML(popupContent);
-      
-      // Create marker element with animation
-      const el = createMarkerElement("hotel", hotel);
-      el.className += " marker-animation";
-      
-      // Create marker
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([hotel.lng, hotel.lat])
-        .setPopup(popup)
-        .addTo(mapRef.current);
-      
-      // Store hotel data with marker for later reference
-      marker.type = "hotel";
-      marker.itemData = hotel;
-      
-      // Add to markers array
-      markersRef.current.push(marker);
-    }).catch(error => {
-      console.error("Error importing createMarkerElement:", error);
-    });
+
+        // Create popup
+        const popup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: false,
+          maxWidth: "300px",
+        }).setHTML(popupContent);
+
+        // Create marker element with animation
+        const el = createMarkerElement("hotel", hotel);
+        el.className += " marker-animation";
+
+        // Create marker
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([hotel.lng, hotel.lat])
+          .setPopup(popup)
+          .addTo(mapRef.current);
+
+        // Store hotel data with marker for later reference
+        marker.type = "hotel";
+        marker.itemData = hotel;
+
+        // Add to markers array
+        markersRef.current.push(marker);
+      })
+      .catch((error) => {
+        console.error("Error importing createMarkerElement:", error);
+      });
   };
-  
+
   const displayRestaurantMarker = (restaurant) => {
-    if (!mapRef.current || !restaurant || !restaurant.lat || !restaurant.lng) return;
-    
-    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
-      // Create popup content
-      const popupContent = `
+    if (!mapRef.current || !restaurant || !restaurant.lat || !restaurant.lng)
+      return;
+
+    import("../../../utils/map/ExternalDataAdapter")
+      .then(({ createMarkerElement }) => {
+        // Create popup content
+        const popupContent = `
         <div class="popup-content">
           <h3 class="font-bold text-lg">${restaurant.name}</h3>
-          ${restaurant.cuisine ? `<p class="text-sm font-medium text-orange-600">${restaurant.cuisine}</p>` : ""}
-          ${restaurant.notes ? `<p class="text-sm mt-1">${restaurant.notes}</p>` : ""}
-          ${restaurant.price_range ? `<p class="text-xs mt-1">Price: ${restaurant.price_range}</p>` : ""}
+          ${
+            restaurant.cuisine
+              ? `<p class="text-sm font-medium text-orange-600">${restaurant.cuisine}</p>`
+              : ""
+          }
+          ${
+            restaurant.notes
+              ? `<p class="text-sm mt-1">${restaurant.notes}</p>`
+              : ""
+          }
+          ${
+            restaurant.price_range
+              ? `<p class="text-xs mt-1">Price: ${restaurant.price_range}</p>`
+              : ""
+          }
         </div>
       `;
-      
-      // Create popup
-      const popup = new mapboxgl.Popup({
-        offset: 25,
-        closeButton: false,
-        maxWidth: "300px",
-      }).setHTML(popupContent);
-      
-      // Create marker element with animation
-      const el = createMarkerElement("restaurant", restaurant);
-      el.className += " marker-animation";
-      
-      // Create marker
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([restaurant.lng, restaurant.lat])
-        .setPopup(popup)
-        .addTo(mapRef.current);
-      
-      // Store restaurant data with marker for later reference
-      marker.type = "restaurant";
-      marker.itemData = restaurant;
-      
-      // Add to markers array
-      markersRef.current.push(marker);
-    }).catch(error => {
-      console.error("Error importing createMarkerElement:", error);
-    });
+
+        // Create popup
+        const popup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: false,
+          maxWidth: "300px",
+        }).setHTML(popupContent);
+
+        // Create marker element with animation
+        const el = createMarkerElement("restaurant", restaurant);
+        el.className += " marker-animation";
+
+        // Create marker
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([restaurant.lng, restaurant.lat])
+          .setPopup(popup)
+          .addTo(mapRef.current);
+
+        // Store restaurant data with marker for later reference
+        marker.type = "restaurant";
+        marker.itemData = restaurant;
+
+        // Add to markers array
+        markersRef.current.push(marker);
+      })
+      .catch((error) => {
+        console.error("Error importing createMarkerElement:", error);
+      });
   };
-  
+
   const displayAttractionMarker = (attraction) => {
-    if (!mapRef.current || !attraction || !attraction.lat || !attraction.lng) return;
-    
-    import("../../../utils/map/ExternalDataAdapter").then(({ createMarkerElement }) => {
-      // Create popup content
-      const popupContent = `
+    if (!mapRef.current || !attraction || !attraction.lat || !attraction.lng)
+      return;
+
+    import("../../../utils/map/ExternalDataAdapter")
+      .then(({ createMarkerElement }) => {
+        // Create popup content
+        const popupContent = `
         <div class="popup-content">
           <h3 class="font-bold text-lg">${attraction.name}</h3>
-          ${attraction.type ? `<p class="text-sm font-medium text-blue-600">${attraction.type}</p>` : ""}
-          ${attraction.description ? `<p class="text-sm mt-1">${attraction.description}</p>` : ""}
-          ${attraction.rating ? `<p class="text-xs mt-1">Rating: ${attraction.rating} ⭐</p>` : ""}
+          ${
+            attraction.type
+              ? `<p class="text-sm font-medium text-blue-600">${attraction.type}</p>`
+              : ""
+          }
+          ${
+            attraction.description
+              ? `<p class="text-sm mt-1">${attraction.description}</p>`
+              : ""
+          }
+          ${
+            attraction.rating
+              ? `<p class="text-xs mt-1">Rating: ${attraction.rating} ⭐</p>`
+              : ""
+          }
         </div>
       `;
-      
-      // Create popup
-      const popup = new mapboxgl.Popup({
-        offset: 25,
-        closeButton: false,
-        maxWidth: "300px",
-      }).setHTML(popupContent);
-      
-      // Create marker element with animation
-      const el = createMarkerElement("attraction", attraction);
-      el.className += " marker-animation";
-      
-      // Create marker
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([attraction.lng, attraction.lat])
-        .setPopup(popup)
-        .addTo(mapRef.current);
-      
-      // Store attraction data with marker for later reference
-      marker.type = "attraction";
-      marker.itemData = attraction;
-      
-      // Add to markers array
-      markersRef.current.push(marker);
-    }).catch(error => {
-      console.error("Error importing createMarkerElement:", error);
-    });
+
+        // Create popup
+        const popup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: false,
+          maxWidth: "300px",
+        }).setHTML(popupContent);
+
+        // Create marker element with animation
+        const el = createMarkerElement("attraction", attraction);
+        el.className += " marker-animation";
+
+        // Create marker
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([attraction.lng, attraction.lat])
+          .setPopup(popup)
+          .addTo(mapRef.current);
+
+        // Store attraction data with marker for later reference
+        marker.type = "attraction";
+        marker.itemData = attraction;
+
+        // Add to markers array
+        markersRef.current.push(marker);
+      })
+      .catch((error) => {
+        console.error("Error importing createMarkerElement:", error);
+      });
   };
 
   // Handle highlighting a specific marker
-  const handleHighlightMarker = useCallback((event) => {
-    const { name, type, coordinates, animation } = event.detail;
-    
-    if (!mapRef.current) return;
-    
-    console.log(`🔍 Highlighting marker: ${name} (${type})`);
-    
-    // Find the marker by name and type
-    let foundMarker = null;
-    
-    // First try to find by exact coordinates if provided
-    if (coordinates && coordinates.lat && coordinates.lng) {
-      foundMarker = markersRef.current.find(
-        marker => 
-          marker.type === type && 
-          marker.itemData && 
-          Math.abs(marker.itemData.lat - coordinates.lat) < 0.0001 &&
-          Math.abs(marker.itemData.lng - coordinates.lng) < 0.0001
-      );
-    }
-    
-    // If not found by coordinates, try by name
-    if (!foundMarker) {
-      // Case insensitive name search
-      const normalizedName = name.toLowerCase().trim();
-      foundMarker = markersRef.current.find(
-        marker => 
-          marker.type === type && 
-          marker.itemData && 
-          marker.itemData.name && 
-          marker.itemData.name.toLowerCase().trim().includes(normalizedName)
-      );
-      
-      // If still not found, try a more flexible search
-      if (!foundMarker) {
-        // Try to find by partial name match
+  const handleHighlightMarker = useCallback(
+    (event) => {
+      const { name, type, coordinates, animation } = event.detail;
+
+      if (!mapRef.current) return;
+
+      console.log(`🔍 Highlighting marker: ${name} (${type})`);
+
+      // Find the marker by name and type
+      let foundMarker = null;
+
+      // First try to find by exact coordinates if provided
+      if (coordinates && coordinates.lat && coordinates.lng) {
         foundMarker = markersRef.current.find(
-          marker => 
-            marker.type === type && 
-            marker.itemData && 
-            marker.itemData.name && 
-            (marker.itemData.name.toLowerCase().includes(normalizedName) || 
-             normalizedName.includes(marker.itemData.name.toLowerCase()))
+          (marker) =>
+            marker.type === type &&
+            marker.itemData &&
+            Math.abs(marker.itemData.lat - coordinates.lat) < 0.0001 &&
+            Math.abs(marker.itemData.lng - coordinates.lng) < 0.0001
         );
-        
-        // If still not found, try across all marker types as a last resort
+      }
+
+      // If not found by coordinates, try by name
+      if (!foundMarker) {
+        // Case insensitive name search
+        const normalizedName = name.toLowerCase().trim();
+        foundMarker = markersRef.current.find(
+          (marker) =>
+            marker.type === type &&
+            marker.itemData &&
+            marker.itemData.name &&
+            marker.itemData.name.toLowerCase().trim().includes(normalizedName)
+        );
+
+        // If still not found, try a more flexible search
         if (!foundMarker) {
+          // Try to find by partial name match
           foundMarker = markersRef.current.find(
-            marker => 
-              marker.itemData && 
-              marker.itemData.name && 
-              (marker.itemData.name.toLowerCase().includes(normalizedName) || 
-               normalizedName.includes(marker.itemData.name.toLowerCase()))
+            (marker) =>
+              marker.type === type &&
+              marker.itemData &&
+              marker.itemData.name &&
+              (marker.itemData.name.toLowerCase().includes(normalizedName) ||
+                normalizedName.includes(marker.itemData.name.toLowerCase()))
           );
+
+          // If still not found, try across all marker types as a last resort
+          if (!foundMarker) {
+            foundMarker = markersRef.current.find(
+              (marker) =>
+                marker.itemData &&
+                marker.itemData.name &&
+                (marker.itemData.name.toLowerCase().includes(normalizedName) ||
+                  normalizedName.includes(marker.itemData.name.toLowerCase()))
+            );
+          }
         }
       }
-    }
-    
-    if (foundMarker) {
-      console.log(`✅ Found marker for ${name} in ${type} collection`);
-      
-      // Reset any previously highlighted markers
-      markersRef.current.forEach(marker => {
-        if (marker.element) {
-          marker.element.classList.remove('highlighted', 'bounce');
-          
-          // Reset any custom styles
-          marker.element.style.zIndex = '';
-          marker.element.style.boxShadow = '';
-          marker.element.style.transform = '';
-          marker.element.style.border = '';
+
+      if (foundMarker) {
+        console.log(`✅ Found marker for ${name} in ${type} collection`);
+
+        // Reset any previously highlighted markers
+        markersRef.current.forEach((marker) => {
+          if (marker.element) {
+            marker.element.classList.remove("highlighted", "bounce");
+
+            // Reset any custom styles
+            marker.element.style.zIndex = "";
+            marker.element.style.boxShadow = "";
+            marker.element.style.transform = "";
+            marker.element.style.border = "";
+          }
+        });
+
+        // Highlight the found marker
+        if (foundMarker.element) {
+          // Add highlighted class
+          foundMarker.element.classList.add("highlighted");
+
+          // Apply animation if specified
+          if (animation?.bounce) {
+            foundMarker.element.classList.add("bounce");
+          }
+
+          // Make the marker stand out
+          foundMarker.element.style.zIndex = 999;
+
+          // Add a glowing effect based on marker type
+          let glowColor = "rgba(59, 130, 246, 0.5)"; // Default blue for attractions
+
+          if (foundMarker.type === "restaurants") {
+            glowColor = "rgba(220, 38, 38, 0.5)"; // Red for restaurants
+          } else if (foundMarker.type === "hotels") {
+            glowColor = "rgba(168, 85, 247, 0.5)"; // Purple for hotels
+          }
+
+          foundMarker.element.style.boxShadow = `0 0 0 4px ${glowColor}, 0 0 10px rgba(0, 0, 0, 0.5)`;
+          foundMarker.element.style.border = "2px solid white";
+
+          // Fly to the marker with animation if requested
+          if (
+            animation?.panToMarker &&
+            foundMarker.itemData.lat &&
+            foundMarker.itemData.lng
+          ) {
+            mapRef.current.flyTo({
+              center: [foundMarker.itemData.lng, foundMarker.itemData.lat],
+              zoom: animation?.zoom
+                ? animation.zoomLevel || 15
+                : mapRef.current.getZoom(),
+              essential: true,
+              duration: animation?.duration || 1500,
+            });
+          }
+
+          // Open a popup with information about the location
+          if (foundMarker.popup) {
+            foundMarker.popup.addTo(mapRef.current);
+          }
         }
-      });
-      
-      // Highlight the found marker
-      if (foundMarker.element) {
-        // Add highlighted class
-        foundMarker.element.classList.add('highlighted');
-        
-        // Apply animation if specified
-        if (animation?.bounce) {
-          foundMarker.element.classList.add('bounce');
-        }
-        
-        // Make the marker stand out
-        foundMarker.element.style.zIndex = 999;
-        
-        // Add a glowing effect based on marker type
-        let glowColor = 'rgba(59, 130, 246, 0.5)'; // Default blue for attractions
-        
-        if (foundMarker.type === 'restaurants') {
-          glowColor = 'rgba(220, 38, 38, 0.5)'; // Red for restaurants
-        } else if (foundMarker.type === 'hotels') {
-          glowColor = 'rgba(168, 85, 247, 0.5)'; // Purple for hotels
-        }
-        
-        foundMarker.element.style.boxShadow = `0 0 0 4px ${glowColor}, 0 0 10px rgba(0, 0, 0, 0.5)`;
-        foundMarker.element.style.border = '2px solid white';
-        
-        // Fly to the marker with animation if requested
-        if (animation?.panToMarker && foundMarker.itemData.lat && foundMarker.itemData.lng) {
+      } else {
+        console.warn(
+          `❌ Could not find marker for ${name} in ${type} collection`
+        );
+
+        // If we have coordinates but no marker, we can still fly to the location
+        if (coordinates && coordinates.lat && coordinates.lng) {
+          console.log(
+            `🌍 Flying to coordinates: [${coordinates.lng}, ${coordinates.lat}]`
+          );
           mapRef.current.flyTo({
-            center: [foundMarker.itemData.lng, foundMarker.itemData.lat],
-            zoom: animation?.zoom ? (animation.zoomLevel || 15) : mapRef.current.getZoom(),
+            center: [coordinates.lng, coordinates.lat],
+            zoom: animation?.zoom
+              ? animation.zoomLevel || 15
+              : mapRef.current.getZoom(),
             essential: true,
             duration: animation?.duration || 1500,
           });
-        }
-        
-        // Open a popup with information about the location
-        if (foundMarker.popup) {
-          foundMarker.popup.addTo(mapRef.current);
+        } else {
+          // If we have a name but no marker or coordinates, try to geocode the name
+          console.log(`🔍 Trying to geocode location name: ${name}`);
+          fetchCoordinates2(name)
+            .then((coords) => {
+              if (coords && coords.lat && coords.lng) {
+                console.log(
+                  `🌍 Found coordinates for ${name}: [${coords.lng}, ${coords.lat}]`
+                );
+                mapRef.current.flyTo({
+                  center: [coords.lng, coords.lat],
+                  zoom: animation?.zoom
+                    ? animation.zoomLevel || 15
+                    : mapRef.current.getZoom(),
+                  essential: true,
+                  duration: animation?.duration || 1500,
+                });
+              }
+            })
+            .catch((error) => {
+              console.error(`Error geocoding ${name}:`, error);
+            });
         }
       }
-    } else {
-      console.warn(`❌ Could not find marker for ${name} in ${type} collection`);
-      
-      // If we have coordinates but no marker, we can still fly to the location
-      if (coordinates && coordinates.lat && coordinates.lng) {
-        console.log(`🌍 Flying to coordinates: [${coordinates.lng}, ${coordinates.lat}]`);
-        mapRef.current.flyTo({
-          center: [coordinates.lng, coordinates.lat],
-          zoom: animation?.zoom ? (animation.zoomLevel || 15) : mapRef.current.getZoom(),
-          essential: true,
-          duration: animation?.duration || 1500,
-        });
-      } else {
-        // If we have a name but no marker or coordinates, try to geocode the name
-        console.log(`🔍 Trying to geocode location name: ${name}`);
-        fetchCoordinates2(name)
-          .then(coords => {
-            if (coords && coords.lat && coords.lng) {
-              console.log(`🌍 Found coordinates for ${name}: [${coords.lng}, ${coords.lat}]`);
-              mapRef.current.flyTo({
-                center: [coords.lng, coords.lat],
-                zoom: animation?.zoom ? (animation.zoomLevel || 15) : mapRef.current.getZoom(),
-                essential: true,
-                duration: animation?.duration || 1500,
-              });
-            }
-          })
-          .catch(error => {
-            console.error(`Error geocoding ${name}:`, error);
-          });
-      }
-    }
-  }, [mapRef, markersRef, fetchCoordinates2]);
+    },
+    [mapRef, markersRef, fetchCoordinates2]
+  );
 
   const handleClearMap = useCallback(() => {
     clearMarkers();
   }, [clearMarkers]);
-  
-  // Handle flying to location by name
-  const handleFlyToLocationName = useCallback(async (event) => {
-    const { locationName } = event.detail;
-    if (!locationName || !mapRef.current) return;
-    
-    console.log(`🔍 Flying to location by name: ${locationName}`);
-    
-    try {
-      const coords = await fetchCoordinates2(locationName);
-      if (coords) {
-        mapRef.current.flyTo({
-          center: [coords.lng, coords.lat],
-          zoom: 15,
-          essential: true,
-          duration: 2000,
-        });
-      }
-    } catch (error) {
-      console.error(`Error flying to location ${locationName}:`, error);
-    }
-  }, [fetchCoordinates2]);
 
-    // Register event listeners
+  // Handle flying to location by name
+  const handleFlyToLocationName = useCallback(
+    async (event) => {
+      const { locationName } = event.detail;
+      if (!locationName || !mapRef.current) return;
+
+      console.log(`🔍 Flying to location by name: ${locationName}`);
+
+      try {
+        const coords = await fetchCoordinates2(locationName);
+        if (coords) {
+          mapRef.current.flyTo({
+            center: [coords.lng, coords.lat],
+            zoom: 15,
+            essential: true,
+            duration: 2000,
+          });
+        }
+      } catch (error) {
+        console.error(`Error flying to location ${locationName}:`, error);
+      }
+    },
+    [fetchCoordinates2]
+  );
+
+  // Register event listeners
   useEffect(() => {
     // Register event listeners for map data updates
-    window.addEventListener(MAP_EVENTS.DISPLAY_RESTAURANTS, handleDisplayRestaurants);
+    window.addEventListener(
+      MAP_EVENTS.DISPLAY_RESTAURANTS,
+      handleDisplayRestaurants
+    );
     window.addEventListener(MAP_EVENTS.DISPLAY_HOTELS, handleDisplayHotels);
-    window.addEventListener(MAP_EVENTS.DISPLAY_ATTRACTIONS, handleDisplayAttractions);
-    window.addEventListener(MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS, handleDisplayItineraryLocations);
+    window.addEventListener(
+      MAP_EVENTS.DISPLAY_ATTRACTIONS,
+      handleDisplayAttractions
+    );
+    window.addEventListener(
+      MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS,
+      handleDisplayItineraryLocations
+    );
     window.addEventListener(MAP_EVENTS.CLEAR_MAP, handleClearMap);
     window.addEventListener(MAP_EVENTS.FLY_TO_LOCATION, handleFlyToLocation);
     window.addEventListener(MAP_EVENTS.HIGHLIGHT_MARKER, handleHighlightMarker);
-    
+
     // Add new event listener for location names
-    window.addEventListener('mapbox:fly-to-location-name', handleFlyToLocationName);
+    window.addEventListener(
+      "mapbox:fly-to-location-name",
+      handleFlyToLocationName
+    );
 
     // Cleanup event listeners on unmount
     return () => {
-      window.removeEventListener(MAP_EVENTS.DISPLAY_RESTAURANTS, handleDisplayRestaurants);
-      window.removeEventListener(MAP_EVENTS.DISPLAY_HOTELS, handleDisplayHotels);
-      window.removeEventListener(MAP_EVENTS.DISPLAY_ATTRACTIONS, handleDisplayAttractions);
-      window.removeEventListener(MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS, handleDisplayItineraryLocations);
+      window.removeEventListener(
+        MAP_EVENTS.DISPLAY_RESTAURANTS,
+        handleDisplayRestaurants
+      );
+      window.removeEventListener(
+        MAP_EVENTS.DISPLAY_HOTELS,
+        handleDisplayHotels
+      );
+      window.removeEventListener(
+        MAP_EVENTS.DISPLAY_ATTRACTIONS,
+        handleDisplayAttractions
+      );
+      window.removeEventListener(
+        MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS,
+        handleDisplayItineraryLocations
+      );
       window.removeEventListener(MAP_EVENTS.CLEAR_MAP, handleClearMap);
-      window.removeEventListener(MAP_EVENTS.FLY_TO_LOCATION, handleFlyToLocation);
-      window.removeEventListener(MAP_EVENTS.HIGHLIGHT_MARKER, handleHighlightMarker);
-      
+      window.removeEventListener(
+        MAP_EVENTS.FLY_TO_LOCATION,
+        handleFlyToLocation
+      );
+      window.removeEventListener(
+        MAP_EVENTS.HIGHLIGHT_MARKER,
+        handleHighlightMarker
+      );
+
       // Remove new event listener for location names
-      window.removeEventListener('mapbox:fly-to-location-name', handleFlyToLocationName);
+      window.removeEventListener(
+        "mapbox:fly-to-location-name",
+        handleFlyToLocationName
+      );
     };
   }, [
-    handleDisplayRestaurants, 
-    handleDisplayHotels, 
-    handleDisplayAttractions, 
-    handleDisplayItineraryLocations, 
-    handleClearMap, 
+    handleDisplayRestaurants,
+    handleDisplayHotels,
+    handleDisplayAttractions,
+    handleDisplayItineraryLocations,
+    handleClearMap,
     handleFlyToLocation,
     handleHighlightMarker,
-    handleFlyToLocationName
+    handleFlyToLocationName,
   ]);
 
   useEffect(() => {
@@ -854,6 +1029,9 @@ const ViewMap = ({ trip }) => {
 
   // כאשר activeLayer משתנה – מציגים סימונים בהתאם
   useEffect(() => {
+    // Clear all markers when switching tabs
+    clearMarkers();
+
     if (activeLayer && activeLayer.startsWith("hotels")) {
       const updateAndDisplayHotels = async () => {
         if (!hotelsData || hotelsData.length === 0) {
@@ -898,6 +1076,11 @@ const ViewMap = ({ trip }) => {
     restaurantsData,
     attractionsData,
     setHotelsData,
+    clearMarkers,
+    fetchCoordinates2,
+    displayHotelsOnMap,
+    displayRestaurantsOnMap,
+    displayAttractionsOnMap,
   ]);
 
   // איפוס הבחירה כאשר activeLayer משתנה
@@ -1027,9 +1210,9 @@ const ViewMap = ({ trip }) => {
   // Add CSS styles for marker highlight animation and interactive markers
   useEffect(() => {
     // Create a style element
-    const styleEl = document.createElement('style');
-    styleEl.id = 'map-marker-styles';
-    
+    const styleEl = document.createElement("style");
+    styleEl.id = "map-marker-styles";
+
     // Add CSS for marker animations
     styleEl.textContent = `
       .custom-marker {
@@ -1109,18 +1292,51 @@ const ViewMap = ({ trip }) => {
         margin: 5px 0;
       }
     `;
-    
+
     // Add the style element to the document head
     document.head.appendChild(styleEl);
-    
+
     // Clean up on unmount
     return () => {
-      const existingStyle = document.getElementById('map-marker-styles');
+      const existingStyle = document.getElementById("map-marker-styles");
       if (existingStyle) {
         existingStyle.remove();
       }
     };
   }, []);
+
+  // הוספת useEffect שיקשיב לשינויים ב-activeTripChatId ובמיקום הטיול
+  useEffect(() => {
+    // בדוק אם זהו חדש chatId או שינוי ביעד
+    const isChatIdChanged = activeTripChatId !== lastChatIdRef.current;
+    const isDestinationChanged =
+      trip?.vacation_location && trip.vacation_location !== currentDestination;
+
+    // בדיקה אם צריך לעדכן את המפה
+    if ((isChatIdChanged || isDestinationChanged) && trip?.vacation_location) {
+      console.log(
+        `Map update needed: New destination ${trip.vacation_location} for chat ${activeTripChatId}`
+      );
+
+      // שמור את ה-chatId החדש
+      lastChatIdRef.current = activeTripChatId;
+
+      // עדכן את היעד הנוכחי
+      setCurrentDestination(trip.vacation_location);
+
+      // נקה את כל הסימונים הקיימים
+      clearMarkers();
+
+      // חפש את הקואורדינטות של היעד החדש ועדכן את המפה
+      updateDestination();
+    }
+  }, [
+    activeTripChatId,
+    trip,
+    currentDestination,
+    setCurrentDestination,
+    clearMarkers,
+  ]);
 
   return (
     <div className="flex flex-col h-full w-full box-border bg-black">

@@ -1,8 +1,10 @@
-import React, { useContext, useEffect } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import axios from "axios";
 import mapboxgl from "mapbox-gl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TripContext } from "@/components/tripcontext/TripProvider";
+import activitiesService from "@/utils/services/activitiesService";
+import { HeartIcon } from "@/components/ui/heart-icon";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -65,7 +67,29 @@ const Restaurants = ({ trip }) => {
     activeLayer,
   } = useContext(TripContext);
 
+  const [savedActivities, setSavedActivities] = useState([]);
+  const [savingInProgress, setSavingInProgress] = useState({});
   const queryClient = useQueryClient();
+
+  // Get current userId and chatId
+  const [userId, setUserId] = useState(null);
+  const [chatId, setChatId] = useState(null);
+
+  // Get userId and chatId from URL or localStorage
+  useEffect(() => {
+    // Try to get chatId from URL if available
+    const pathParts = window.location.pathname.split("/");
+    const possibleChatId = pathParts[pathParts.length - 1];
+    const chatIdFromUrl = possibleChatId.length > 20 ? possibleChatId : null;
+
+    // Get userId from localStorage or Clerk auth if available
+    const userIdFromStorage =
+      localStorage.getItem("userId") || sessionStorage.getItem("userId");
+
+    // Set the values, prioritizing trip props if available
+    setUserId(trip?.userId || userIdFromStorage);
+    setChatId(trip?.chatId || chatIdFromUrl || localStorage.getItem("chatId"));
+  }, [trip]);
 
   // שימוש ב-React Query עם הגדרות:
   // - staleTime: 0 (מיד stale)
@@ -101,6 +125,86 @@ const Restaurants = ({ trip }) => {
     }
     return () => clearTimeout(timeoutId);
   }, [activeLayer, queryClient, trip?.vacation_location]);
+
+  // Fetch saved activities when component mounts or chatId changes
+  useEffect(() => {
+    const fetchSavedActivities = async () => {
+      if (chatId) {
+        try {
+          const activities = await activitiesService.getActivities(chatId);
+          setSavedActivities(activities);
+        } catch (error) {
+          console.error("Error fetching saved activities:", error);
+        }
+      }
+    };
+
+    fetchSavedActivities();
+  }, [chatId]);
+
+  // Function to toggle saving an activity
+  const handleSaveActivity = async (e, restaurant) => {
+    e.stopPropagation(); // Prevent restaurant selection when clicking the heart
+
+    if (!userId || !chatId) {
+      console.error("Missing userId or chatId", {
+        userId: userId || trip?.userId,
+        chatId: chatId || trip?.chatId,
+      });
+
+      // Try to get them one more time if missing
+      const pathParts = window.location.pathname.split("/");
+      const urlChatId = pathParts[pathParts.length - 1];
+      const fallbackChatId =
+        urlChatId.length > 20 ? urlChatId : localStorage.getItem("chatId");
+      const fallbackUserId =
+        localStorage.getItem("userId") || sessionStorage.getItem("userId");
+
+      if (!fallbackUserId || !fallbackChatId) {
+        alert(
+          "Unable to save restaurant. Please try refreshing the page or navigate back to the chat."
+        );
+        return;
+      }
+
+      setUserId(fallbackUserId);
+      setChatId(fallbackChatId);
+      return;
+    }
+
+    setSavingInProgress((prev) => ({ ...prev, [restaurant.id]: true }));
+
+    try {
+      // Ensure all data is properly formatted before saving
+      const processedRestaurant = {
+        ...restaurant,
+        rating: String(restaurant.rating || ""),
+        lat: Number(restaurant.lat || 0),
+        lng: Number(restaurant.lng || 0),
+      };
+
+      await activitiesService.saveActivity(
+        userId,
+        chatId,
+        "restaurant",
+        processedRestaurant
+      );
+
+      // Refetch saved activities
+      const activities = await activitiesService.getActivities(chatId);
+      setSavedActivities(activities);
+    } catch (error) {
+      console.error("Error saving restaurant:", error);
+      alert(`Failed to save restaurant: ${error.message}`);
+    } finally {
+      setSavingInProgress((prev) => ({ ...prev, [restaurant.id]: false }));
+    }
+  };
+
+  // Check if a restaurant is saved
+  const isRestaurantSaved = (restaurantId) => {
+    return activitiesService.isActivitySaved(savedActivities, restaurantId);
+  };
 
   if (!trip?.vacation_location) {
     return (
@@ -142,11 +246,27 @@ const Restaurants = ({ trip }) => {
                 : ""
             }`}
           >
-            <img
-              src={restaurant.thumbnail}
-              alt={restaurant.name}
-              className="w-full h-48 object-cover"
-            />
+            <div className="relative">
+              <img
+                src={restaurant.thumbnail}
+                alt={restaurant.name}
+                className="w-full h-48 object-cover"
+              />
+              <button
+                className="absolute top-3 right-3 z-10"
+                onClick={(e) => handleSaveActivity(e, restaurant)}
+                disabled={savingInProgress[restaurant.id]}
+              >
+                <HeartIcon
+                  filled={isRestaurantSaved(restaurant.id)}
+                  className={`w-7 h-7 ${
+                    isRestaurantSaved(restaurant.id)
+                      ? "text-red-500"
+                      : "text-white"
+                  }`}
+                />
+              </button>
+            </div>
             <div className="p-4">
               <h3 className="text-xl font-bold mb-2">{restaurant.name}</h3>
               <p className="text-gray-700">
