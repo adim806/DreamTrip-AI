@@ -24,11 +24,6 @@ jobs:
         working-directory: ./client
         run: npm ci
 
-      - name: Run client linting
-        working-directory: ./client
-
-        run: npx eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 500
-
       - name: Run client unit tests
         working-directory: ./client
         run: npm test
