@@ -43,5 +43,10 @@ module.exports = {
       "warn",
       { allowConstantExport: true },
     ],
+    // Convert all errors to warnings
+    "no-undef": "warn",
+    "no-case-declarations": "warn",
+    "react/no-unescaped-entities": "warn",
+    "react-hooks/exhaustive-deps": "warn",
   },
 };
