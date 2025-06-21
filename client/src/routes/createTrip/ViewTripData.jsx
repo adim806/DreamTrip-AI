@@ -12,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { NavBar } from "@/components/ui/tubelight-navbar";
 import ItineraryEditor from "@/components/ui/TripDetailsEditor";
+import { resetMap } from "@/utils/map/MapEventService";
 
 const ViewTripData = () => {
   const { tripDetails, setTripDetails, setallTripData, allTripData } =
@@ -274,6 +275,12 @@ const ViewTripData = () => {
     // שמירת הטאב הקודם לפני המעבר לטאב החדש
     setPreviousTab(activeTab);
     setActiveTab(item.id);
+    
+    // Reset the map when switching to Trip Details tab
+    if (item.id === 2) {
+      resetMap();
+      console.log("Map reset triggered when switching to Trip Details tab");
+    }
   };
 
   const renderLeftContent = () => {
@@ -340,7 +347,7 @@ const ViewTripData = () => {
         {/* Left Side: Scrollable Content */}
         <Box
           flex={1}
-          overflow="hidden"
+          overflow="auto"
           sx={{
             "&::-webkit-scrollbar": {
               width: "8px",
@@ -356,6 +363,7 @@ const ViewTripData = () => {
                 background: "rgba(59, 130, 246, 0.3)",
               },
             },
+            maxHeight: "calc(100vh - 32px)",
           }}
         >
           <AnimatePresence mode="wait">

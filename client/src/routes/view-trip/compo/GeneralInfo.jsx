@@ -282,7 +282,7 @@ const GeneralInfo = ({ trip }) => {
           Information Not Found
         </p>
         <p className="text-gray-400">
-          We couldn't find information about this destination.
+          We couldnt find information about this destination.
         </p>
       </div>
     );
@@ -594,8 +594,7 @@ const GeneralInfo = ({ trip }) => {
                 frameBorder="0"
                 referrerPolicy="no-referrer-when-downgrade"
                 src={`https://www.google.com/maps/embed/v1/place?key=${
-                  import.meta.env.VITE_GOOGLE_PLACE_API_KEY ||
-                  "AIzaSyALVjLwOIM1gf7EzdJJVmWLfM-0vUVivLI"
+                  import.meta.env.VITE_GOOGLE_PLACE_API_KEY
                 }&q=${encodeURIComponent(trip?.vacation_location)}&zoom=10`}
                 allowFullScreen
                 onError={(e) => {
@@ -609,8 +608,7 @@ const GeneralInfo = ({ trip }) => {
                 src={`https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(
                   trip?.vacation_location
                 )}&zoom=10&size=400x400&key=${
-                  import.meta.env.VITE_GOOGLE_PLACE_API_KEY ||
-                  "AIzaSyALVjLwOIM1gf7EzdJJVmWLfM-0vUVivLI"
+                  import.meta.env.VITE_GOOGLE_PLACE_API_KEY
                 }`}
                 alt="Map"
                 className="absolute inset-0 w-full h-full object-cover opacity-0"

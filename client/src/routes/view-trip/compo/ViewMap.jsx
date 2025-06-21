@@ -11,6 +11,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { TripContext } from "@/components/tripcontext/TripProvider";
 import { MAP_EVENTS } from "@/utils/map/MapEventService";
 import { getCoordinates } from "@/utils/map/ExternalDataAdapter";
+import * as turf from '@turf/turf';
+import { MapboxGeocoder } from '@mapbox/mapbox-gl-geocoder';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -952,75 +954,495 @@ const ViewMap = ({ trip }) => {
     [fetchCoordinates2]
   );
 
-  // Register event listeners
+  // Handle displaying a route between locations
+  const handleDisplayRoute = useCallback((event) => {
+    if (!mapRef.current) return;
+    
+    const { locations, options } = event.detail;
+    
+    if (!locations || locations.length < 2) {
+      console.warn("Cannot display route: Need at least 2 locations");
+      return;
+    }
+    
+    console.log(`🧭 Displaying route between ${locations.length} locations with options:`, options);
+    
+    // Remove any existing route layers and sources
+    if (mapRef.current.getLayer('route-layer')) {
+      mapRef.current.removeLayer('route-layer');
+    }
+    
+    if (mapRef.current.getLayer('route-arrows')) {
+      mapRef.current.removeLayer('route-arrows');
+    }
+    
+    if (mapRef.current.getLayer('route-waypoints')) {
+      mapRef.current.removeLayer('route-waypoints');
+    }
+    
+    if (mapRef.current.getSource('route')) {
+      mapRef.current.removeSource('route');
+    }
+    
+    if (mapRef.current.getSource('waypoints')) {
+      mapRef.current.removeSource('waypoints');
+    }
+    
+    // Extract coordinates from locations
+    const coordinates = locations.map(loc => [loc.lng, loc.lat]);
+    
+    // Format coordinates for the Mapbox Directions API
+    const coordinateString = coordinates.map(coord => coord.join(',')).join(';');
+    
+    // Determine the profile (walking, cycling, driving)
+    const profile = options.routeType || 'walking';
+    
+    // Build the URL for the Mapbox Directions API
+    const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordinateString}?geometries=geojson&overview=full&steps=false&access_token=${mapboxgl.accessToken}`;
+    
+    console.log("🧭 Fetching route from Mapbox Directions API");
+    
+    axios.get(url)
+      .then(response => {
+        const data = response.data;
+        
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          const routeGeometry = route.geometry;
+
+          // Add the route to the map
+          mapRef.current.addSource('route', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              properties: {},
+              geometry: routeGeometry
+            }
+          });
+
+          // Add the main route line
+          mapRef.current.addLayer({
+            id: 'route-layer',
+            type: 'line',
+            source: 'route',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': options.lineColor || '#4f46e5',
+              'line-width': options.lineWidth || 4,
+              'line-opacity': options.lineOpacity || 0.7
+            }
+          });
+          
+          // Add waypoints if enabled
+          if (options.addWaypoints) {
+            // Create a GeoJSON source for waypoints
+            mapRef.current.addSource('waypoints', {
+              type: 'geojson',
+              data: {
+                type: 'FeatureCollection',
+                features: locations.map((loc, index) => ({
+                  type: 'Feature',
+                  properties: {
+                    title: loc.name || `Location ${index + 1}`,
+                    description: loc.address || '',
+                    index: index,
+                    type: loc.type || 'waypoint',
+                    timeOfDay: loc.timeOfDay || ''
+                  },
+                  geometry: {
+                    type: 'Point',
+                    coordinates: [loc.lng, loc.lat]
+                  }
+                }))
+              }
+            });
+            
+            // Add waypoint circles
+            mapRef.current.addLayer({
+              id: 'route-waypoints',
+              type: 'circle',
+              source: 'waypoints',
+              paint: {
+                'circle-radius': options.waypointSize || 4,
+                'circle-color': options.waypointColor || '#ffffff',
+                'circle-stroke-color': options.waypointBorderColor || '#4f46e5',
+                'circle-stroke-width': options.waypointBorderWidth || 2,
+                'circle-stroke-opacity': 0.9
+              }
+            });
+            
+            // Add waypoint numbers
+            mapRef.current.addLayer({
+              id: 'route-waypoint-labels',
+              type: 'symbol',
+              source: 'waypoints',
+              layout: {
+                'text-field': ['number-format', ['get', 'index'], {'min-fraction-digits': 0, 'max-fraction-digits': 0}],
+                'text-size': 12,
+                'text-offset': [0, 0],
+                'text-anchor': 'center',
+                'text-allow-overlap': true
+              },
+              paint: {
+                'text-color': '#000000',
+                'text-halo-color': '#ffffff',
+                'text-halo-width': 1
+              }
+            });
+            
+            // Add popups to waypoints
+            locations.forEach((loc, index) => {
+              // Create popup content
+              const popupContent = `
+                <div class="waypoint-popup">
+                  <h3 class="font-bold text-sm">${loc.name || `Location ${index + 1}`}</h3>
+                  ${loc.type ? `<p class="text-xs text-blue-600">${loc.type}</p>` : ''}
+                  ${loc.timeOfDay ? `<p class="text-xs">${loc.timeOfDay}</p>` : ''}
+                  ${loc.address ? `<p class="text-xs text-gray-600">${loc.address}</p>` : ''}
+                </div>
+              `;
+              
+              // Create popup
+              const popup = new mapboxgl.Popup({
+                offset: 15,
+                closeButton: false,
+                maxWidth: '200px',
+                className: 'waypoint-popup'
+              }).setHTML(popupContent);
+              
+              // Create marker
+              const markerEl = document.createElement('div');
+              markerEl.className = `waypoint-marker waypoint-${index} ${loc.type || 'default'}-waypoint`;
+              markerEl.style.width = '20px';
+              markerEl.style.height = '20px';
+              markerEl.style.borderRadius = '50%';
+              markerEl.style.display = 'flex';
+              markerEl.style.justifyContent = 'center';
+              markerEl.style.alignItems = 'center';
+              markerEl.style.fontSize = '12px';
+              markerEl.style.fontWeight = 'bold';
+              markerEl.style.backgroundColor = loc.type === 'hotel' ? '#e11d48' : 
+                                              loc.type === 'restaurant' ? '#f59e0b' : 
+                                              '#3b82f6';
+              markerEl.style.color = '#ffffff';
+              markerEl.style.border = '2px solid #ffffff';
+              markerEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+              markerEl.textContent = (index + 1).toString();
+              
+              // Add marker to map
+              new mapboxgl.Marker(markerEl)
+                .setLngLat([loc.lng, loc.lat])
+                .setPopup(popup)
+                .addTo(mapRef.current);
+            });
+          }
+          
+          // Add direction arrows if enabled
+          if (options.showDirectionArrows && routeGeometry.coordinates.length > 1) {
+            // Create arrow features along the route
+            const arrowFeatures = [];
+            const lineDistance = turf.length(routeGeometry);
+            const arrowCount = Math.max(2, Math.floor(lineDistance * 3)); // 3 arrows per km
+            
+            // Place arrows at regular intervals
+            for (let i = 1; i < arrowCount; i++) {
+              const arrowPosition = i / arrowCount;
+              const arrowPoint = turf.along(routeGeometry, lineDistance * arrowPosition);
+              
+              // Get the bearing (angle) for the arrow
+              const pointAhead = turf.along(routeGeometry, lineDistance * (arrowPosition + 0.0001));
+              const bearing = turf.bearing(arrowPoint, pointAhead);
+              
+              arrowFeatures.push({
+                type: 'Feature',
+                properties: {
+                  bearing: bearing
+                },
+                geometry: {
+                  type: 'Point',
+                  coordinates: arrowPoint.geometry.coordinates
+                }
+              });
+            }
+            
+            // Add arrows source
+            mapRef.current.addSource('route-arrows-source', {
+              type: 'geojson',
+              data: {
+                type: 'FeatureCollection',
+                features: arrowFeatures
+              }
+            });
+            
+            // Add arrows layer
+            mapRef.current.addLayer({
+              id: 'route-arrows',
+              type: 'symbol',
+              source: 'route-arrows-source',
+              layout: {
+                'symbol-placement': 'point',
+                'icon-image': 'triangle-11', // Built-in triangle icon
+                'icon-size': options.arrowSize || 0.8,
+                'icon-rotate': ['get', 'bearing'],
+                'icon-rotation-alignment': 'map',
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true
+              },
+              paint: {
+                'icon-color': options.arrowColor || '#ffffff',
+                'icon-halo-color': options.arrowBorderColor || '#4f46e5',
+                'icon-halo-width': 1
+              }
+            });
+          }
+
+          // If fitBounds is true, adjust the map view to show the entire route
+          if (options.fitBounds) {
+            // Create a bounds object that includes all points
+            const bounds = new mapboxgl.LngLatBounds();
+            coordinates.forEach(coord => bounds.extend(coord));
+
+            // Fit the map to the bounds
+            mapRef.current.fitBounds(bounds, {
+              padding: 60, // Padding around the route
+              duration: 1000, // Animation duration
+              maxZoom: 15 // Prevent zooming in too much
+            });
+          }
+
+          console.log("🧭 Route displayed successfully");
+        } else {
+          console.warn("No route found between the provided locations");
+        }
+      })
+      .catch(error => {
+        console.error("Error fetching route:", error);
+      });
+  }, []);
+
+  // Handle clearing all routes from the map
+  const handleClearRoutes = useCallback(() => {
+    if (!mapRef.current) return;
+    
+    console.log("Clearing all routes from map");
+    
+    // Get all layers from the map
+    const layers = mapRef.current.getStyle().layers;
+    
+    // Remove all route layers
+    layers.forEach(layer => {
+      // Check if this is a route layer (by naming convention)
+      if (
+        layer.id.includes('route-') || 
+        layer.id.startsWith('route') ||
+        layer.id.includes('-route') ||
+        layer.id.includes('waypoint') ||
+        layer.id.includes('direction-arrow')
+      ) {
+        if (mapRef.current.getLayer(layer.id)) {
+          console.log(`Removing route layer: ${layer.id}`);
+          mapRef.current.removeLayer(layer.id);
+        }
+      }
+    });
+    
+    // Remove all route sources
+    const sourceIds = Object.keys(mapRef.current.getStyle().sources);
+    sourceIds.forEach(sourceId => {
+      if (
+        sourceId.includes('route') || 
+        sourceId.includes('waypoint') ||
+        sourceId.includes('direction')
+      ) {
+        if (mapRef.current.getSource(sourceId)) {
+          console.log(`Removing route source: ${sourceId}`);
+          mapRef.current.removeSource(sourceId);
+        }
+      }
+    });
+    
+    // Remove any popups that might be associated with routes
+    const popups = document.querySelectorAll('.mapboxgl-popup');
+    popups.forEach(popup => {
+      if (popup.innerHTML.includes('waypoint') || popup.innerHTML.includes('route')) {
+        popup.remove();
+      }
+    });
+    
+  }, []);
+
+  // Handle complete map reset (markers and routes)
+  const handleResetMap = useCallback(() => {
+    if (!mapRef.current) return;
+    
+    console.log("Resetting map completely - clearing all markers and routes");
+    
+    // Clear all markers
+    clearMarkers();
+    
+    // Clear all routes
+    handleClearRoutes();
+    
+    // Reset map view to default
+    if (trip?.vacation_location) {
+      // If we have a destination, fly to it
+      // Use geocoder to get coordinates for the location
+      const geocoder = new MapboxGeocoder({
+        accessToken: mapboxgl.accessToken,
+        mapboxgl: mapboxgl
+      });
+      
+      geocoder.query(trip.vacation_location, (results) => {
+        if (results && results.features && results.features.length > 0) {
+          const coordinates = results.features[0].center;
+          mapRef.current.flyTo({
+            center: coordinates,
+            zoom: 10,
+            essential: true
+          });
+        }
+      });
+    } else {
+      // Otherwise reset to a default view
+      mapRef.current.flyTo({
+        center: [0, 20],
+        zoom: 1.5,
+        essential: true
+      });
+    }
+    
+    // Remove all popups
+    const popups = document.querySelectorAll('.mapboxgl-popup');
+    popups.forEach(popup => {
+      popup.remove();
+    });
+    
+  }, [trip, clearMarkers, handleClearRoutes]);
+  
+  // Handle fitting map bounds to show all features
+  const handleFitBounds = useCallback((event) => {
+    if (!mapRef.current) return;
+    
+    console.log("Fitting map bounds to show all features");
+    
+    const options = event.detail || {};
+    const padding = options.padding || 50;
+    const maxZoom = options.maxZoom || 15;
+    
+    // Collect all marker coordinates
+    const markerCoordinates = [];
+    
+    // Add marker coordinates
+    markersRef.current.forEach(marker => {
+      if (marker && marker._lngLat) {
+        markerCoordinates.push([marker._lngLat.lng, marker._lngLat.lat]);
+      }
+    });
+    
+    // Get all route source coordinates
+    const sources = mapRef.current.getStyle().sources;
+    Object.keys(sources).forEach(sourceId => {
+      if (sourceId.includes('route') && sources[sourceId].type === 'geojson') {
+        try {
+          const source = mapRef.current.getSource(sourceId);
+          if (source && source._data && source._data.geometry && source._data.geometry.coordinates) {
+            // Add all coordinates from this route
+            markerCoordinates.push(...source._data.geometry.coordinates);
+          }
+        } catch (err) {
+          console.error(`Error accessing route source ${sourceId}:`, err);
+        }
+      }
+    });
+    
+    // If we have coordinates, fit the map to them
+    if (markerCoordinates.length > 0) {
+      console.log(`Fitting map to ${markerCoordinates.length} coordinates`);
+      
+      try {
+        // Create a bounds object
+        const bounds = markerCoordinates.reduce((bounds, coord) => {
+          return bounds.extend(coord);
+        }, new mapboxgl.LngLatBounds(markerCoordinates[0], markerCoordinates[0]));
+        
+        // Add padding
+        mapRef.current.fitBounds(bounds, {
+          padding: {
+            top: padding,
+            bottom: padding,
+            left: padding,
+            right: padding
+          },
+          maxZoom: maxZoom
+        });
+      } catch (err) {
+        console.error("Error fitting bounds:", err);
+      }
+    }
+  }, []);
+
+  // Set up event listeners
   useEffect(() => {
-    // Register event listeners for map data updates
-    window.addEventListener(
-      MAP_EVENTS.DISPLAY_RESTAURANTS,
-      handleDisplayRestaurants
-    );
+    // Add event listeners
+    window.addEventListener(MAP_EVENTS.DISPLAY_RESTAURANTS, handleDisplayRestaurants);
     window.addEventListener(MAP_EVENTS.DISPLAY_HOTELS, handleDisplayHotels);
-    window.addEventListener(
-      MAP_EVENTS.DISPLAY_ATTRACTIONS,
-      handleDisplayAttractions
-    );
-    window.addEventListener(
-      MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS,
-      handleDisplayItineraryLocations
-    );
-    window.addEventListener(MAP_EVENTS.CLEAR_MAP, handleClearMap);
+    window.addEventListener(MAP_EVENTS.DISPLAY_ATTRACTIONS, handleDisplayAttractions);
+    window.addEventListener(MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS, handleDisplayItineraryLocations);
+    window.addEventListener(MAP_EVENTS.DISPLAY_ROUTE, handleDisplayRoute);
+    window.addEventListener(MAP_EVENTS.CLEAR_MAP, clearMarkers);
     window.addEventListener(MAP_EVENTS.FLY_TO_LOCATION, handleFlyToLocation);
     window.addEventListener(MAP_EVENTS.HIGHLIGHT_MARKER, handleHighlightMarker);
+    window.addEventListener(MAP_EVENTS.CLEAR_ROUTES, handleClearRoutes);
+    window.addEventListener(MAP_EVENTS.RESET_MAP, handleResetMap);
+    window.addEventListener(MAP_EVENTS.FIT_BOUNDS, handleFitBounds);
+    
+    // Add listener for tab changes
+    const handleTabChange = (event) => {
+      const { tab } = event.detail || {};
+      
+      if (tab === 'tripDetails') {
+        // Reset the map when switching to Trip Details tab
+        handleResetMap();
+      } else if (tab === 'itinerary') {
+        // When switching to the itinerary tab, wait a moment then fit the map to show all routes
+        setTimeout(() => {
+          handleFitBounds();
+        }, 500);
+      }
+    };
+    
+    window.addEventListener('tabChange', handleTabChange);
 
-    // Add new event listener for location names
-    window.addEventListener(
-      "mapbox:fly-to-location-name",
-      handleFlyToLocationName
-    );
-
-    // Cleanup event listeners on unmount
+    // Clean up on unmount
     return () => {
-      window.removeEventListener(
-        MAP_EVENTS.DISPLAY_RESTAURANTS,
-        handleDisplayRestaurants
-      );
-      window.removeEventListener(
-        MAP_EVENTS.DISPLAY_HOTELS,
-        handleDisplayHotels
-      );
-      window.removeEventListener(
-        MAP_EVENTS.DISPLAY_ATTRACTIONS,
-        handleDisplayAttractions
-      );
-      window.removeEventListener(
-        MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS,
-        handleDisplayItineraryLocations
-      );
-      window.removeEventListener(MAP_EVENTS.CLEAR_MAP, handleClearMap);
-      window.removeEventListener(
-        MAP_EVENTS.FLY_TO_LOCATION,
-        handleFlyToLocation
-      );
-      window.removeEventListener(
-        MAP_EVENTS.HIGHLIGHT_MARKER,
-        handleHighlightMarker
-      );
-
-      // Remove new event listener for location names
-      window.removeEventListener(
-        "mapbox:fly-to-location-name",
-        handleFlyToLocationName
-      );
+      window.removeEventListener(MAP_EVENTS.DISPLAY_RESTAURANTS, handleDisplayRestaurants);
+      window.removeEventListener(MAP_EVENTS.DISPLAY_HOTELS, handleDisplayHotels);
+      window.removeEventListener(MAP_EVENTS.DISPLAY_ATTRACTIONS, handleDisplayAttractions);
+      window.removeEventListener(MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS, handleDisplayItineraryLocations);
+      window.removeEventListener(MAP_EVENTS.DISPLAY_ROUTE, handleDisplayRoute);
+      window.removeEventListener(MAP_EVENTS.CLEAR_MAP, clearMarkers);
+      window.removeEventListener(MAP_EVENTS.FLY_TO_LOCATION, handleFlyToLocation);
+      window.removeEventListener(MAP_EVENTS.HIGHLIGHT_MARKER, handleHighlightMarker);
+      window.removeEventListener(MAP_EVENTS.CLEAR_ROUTES, handleClearRoutes);
+      window.removeEventListener(MAP_EVENTS.RESET_MAP, handleResetMap);
+      window.removeEventListener(MAP_EVENTS.FIT_BOUNDS, handleFitBounds);
+      window.removeEventListener('tabChange', handleTabChange);
     };
   }, [
-    handleDisplayRestaurants,
-    handleDisplayHotels,
-    handleDisplayAttractions,
-    handleDisplayItineraryLocations,
-    handleClearMap,
+    handleDisplayRestaurants, 
+    handleDisplayHotels, 
+    handleDisplayAttractions, 
+    handleDisplayItineraryLocations, 
+    handleDisplayRoute,
     handleFlyToLocation,
-    handleHighlightMarker,
-    handleFlyToLocationName,
+    handleHighlightMarker, 
+    clearMarkers,
+    handleClearRoutes,
+    handleResetMap,
+    handleFitBounds,
   ]);
 
   useEffect(() => {

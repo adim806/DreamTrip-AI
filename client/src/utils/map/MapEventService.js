@@ -9,9 +9,14 @@ export const MAP_EVENTS = {
   DISPLAY_HOTELS: "mapbox:display-hotels",
   DISPLAY_ATTRACTIONS: "mapbox:display-attractions",
   DISPLAY_ITINERARY_LOCATIONS: "mapbox:display-itinerary-locations",
+  DISPLAY_ROUTE: "mapbox:display-route",
   CLEAR_MAP: "mapbox:clear-map",
   FLY_TO_LOCATION: "mapbox:fly-to-location",
   HIGHLIGHT_MARKER: "mapbox:highlight-marker",
+  CLEAR_ROUTES: "map:clear-routes",
+  RESET_MAP: "map:reset-all",
+  FIT_BOUNDS: "map:fit-bounds",
+  CHANGE_STYLE: "map:change-style",
 };
 
 /**
@@ -44,6 +49,101 @@ export const displayAttractionsOnMap = (attractions) => {
   const event = new CustomEvent(MAP_EVENTS.DISPLAY_ATTRACTIONS, {
     detail: { data: attractions },
   });
+  window.dispatchEvent(event);
+};
+
+/**
+ * Dispatch an event to display a route on the map connecting multiple locations
+ * @param {Array} locations - Array of locations to connect with a route
+ * @param {Object} options - Additional options for route display (color, width, etc.)
+ */
+export const displayRouteOnMap = (locations, options = {}) => {
+  if (!locations || locations.length < 2) {
+    console.warn("Need at least 2 locations to create a route");
+    return;
+  }
+
+  // Sort locations by timeOfDay if available to ensure correct route order
+  const sortedLocations = [...locations];
+
+  // Define time slot order for sorting
+  const timeSlotOrder = {
+    morning: 0,
+    afternoon: 1,
+    evening: 2,
+  };
+
+  // Sort by timeOfDay if available
+  if (sortedLocations.some((loc) => loc.timeOfDay)) {
+    sortedLocations.sort((a, b) => {
+      const aOrder = timeSlotOrder[a.timeOfDay] ?? 999;
+      const bOrder = timeSlotOrder[b.timeOfDay] ?? 999;
+      return aOrder - bOrder;
+    });
+
+    console.log(
+      "Route locations sorted by time of day:",
+      sortedLocations
+        .map((loc) => `${loc.name} (${loc.timeOfDay || "unknown"})`)
+        .join(" → ")
+    );
+  }
+
+  // Validate all locations have coordinates
+  const validLocations = sortedLocations.filter(
+    (loc) => loc && typeof loc.lng === "number" && typeof loc.lat === "number"
+  );
+
+  if (validLocations.length < 2) {
+    console.warn(
+      `Not enough valid coordinates for route. Found ${validLocations.length} valid locations out of ${locations.length}`
+    );
+    return;
+  }
+
+  // Default options for route appearance
+  const routeOptions = {
+    lineColor: options.lineColor || "#4f46e5", // Default: indigo
+    lineWidth: options.lineWidth || 4,
+    lineOpacity: options.lineOpacity || 0.7,
+    fitBounds: options.fitBounds !== undefined ? options.fitBounds : true,
+    animate: options.animate !== undefined ? options.animate : true,
+    routeType: options.routeType || "walking", // walking, driving, cycling
+    addWaypoints:
+      options.addWaypoints !== undefined ? options.addWaypoints : true,
+    waypointSize: options.waypointSize || 4,
+    waypointColor: options.waypointColor || "#ffffff",
+    waypointBorderColor: options.waypointBorderColor || "#4f46e5",
+    waypointBorderWidth: options.waypointBorderWidth || 2,
+    showDirectionArrows:
+      options.showDirectionArrows !== undefined
+        ? options.showDirectionArrows
+        : true,
+    arrowSpacing: options.arrowSpacing || 100, // pixels between direction arrows
+    arrowSize: options.arrowSize || 0.8, // relative size multiplier
+    arrowColor: options.arrowColor || "#ffffff", // arrow color
+    arrowBorderColor: options.arrowBorderColor || "#4f46e5", // arrow border color
+    pathStyle: options.pathStyle || "curved", // 'curved' or 'straight'
+  };
+
+  // Log the route creation details
+  console.log(
+    `Creating ${routeOptions.routeType} route between ${validLocations.length} locations:`,
+    validLocations
+      .map(
+        (loc) => loc.name || `[${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}]`
+      )
+      .join(" → ")
+  );
+
+  // Dispatch the enhanced event with all options
+  const event = new CustomEvent(MAP_EVENTS.DISPLAY_ROUTE, {
+    detail: {
+      locations: validLocations,
+      options: routeOptions,
+    },
+  });
+
   window.dispatchEvent(event);
 };
 
@@ -891,4 +991,35 @@ export const highlightMarkerOnMap = (markerInfo) => {
   });
 
   window.dispatchEvent(event);
+};
+
+/**
+ * Dispatch an event to clear all routes from the map
+ */
+export const clearRoutesFromMap = () => {
+  window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_ROUTES));
+  console.log("Dispatched event to clear all routes from map");
+};
+
+/**
+ * Dispatch an event to reset the map completely (clear markers and routes)
+ */
+export const resetMap = () => {
+  window.dispatchEvent(new CustomEvent(MAP_EVENTS.RESET_MAP));
+  console.log("Dispatched event to reset the map completely");
+};
+
+/**
+ * Dispatch an event to fit the map bounds to show all markers and routes
+ * @param {Object} options - Options for fitting bounds
+ * @param {number} options.padding - Padding around the bounds in pixels
+ * @param {number} options.maxZoom - Maximum zoom level
+ */
+export const fitMapBounds = (options = {}) => {
+  window.dispatchEvent(
+    new CustomEvent(MAP_EVENTS.FIT_BOUNDS, {
+      detail: options,
+    })
+  );
+  console.log("Dispatched event to fit map bounds");
 };

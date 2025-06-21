@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/StrictModeDndWrapper";
 import { motion } from "framer-motion";
 import activitiesService from "@/utils/services/activitiesService";
+import tripPlanService from "@/utils/services/tripPlanService";
 import {
   RiRefreshLine,
   RiCalendarLine,
@@ -16,8 +17,11 @@ import {
   RiRestaurantLine,
   RiTrophyLine,
   RiAddCircleLine,
+  RiMagicLine,
+  RiLoader4Line,
 } from "react-icons/ri";
 import { StrictModeDroppable as Droppable } from "@/components/ui/StrictModeDndWrapper";
+import TripPlannerResult from "./TripPlannerResult";
 import "./TripPlanner.css";
 import { MAP_EVENTS } from "@/utils/map/MapEventService";
 
@@ -33,6 +37,12 @@ const TripPlanner = ({ trip }) => {
   const [quickAddMode, setQuickAddMode] = useState(false);
   const [selectedActivityForQuickAdd, setSelectedActivityForQuickAdd] =
     useState(null);
+
+  // New state variables for generating trip plan
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [generatedPlan, setGeneratedPlan] = useState(null);
+  const [showPlanResult, setShowPlanResult] = useState(false);
+  const [planError, setPlanError] = useState(null);
 
   // Get chatId and userId
   const [userId, setUserId] = useState(null);
@@ -137,6 +147,12 @@ const TripPlanner = ({ trip }) => {
 
       // Also load saved itinerary specific to this chat
       loadSavedItinerary();
+      
+      // Check if we have a stored plan for this chat
+      const storedPlan = tripPlanService.getStoredPlan(chatId);
+      if (storedPlan && storedPlan.plan) {
+        setGeneratedPlan(storedPlan.plan);
+      }
     }
   }, [chatId]);
 
@@ -152,12 +168,24 @@ const TripPlanner = ({ trip }) => {
     if (start.source.droppableId === "savedItems") {
       const draggedActivity = activities[start.source.index];
       setActiveDraggedItem(draggedActivity);
+      
+      // Add dragging class to the dragged item
+      const draggedElement = document.querySelector(`[data-rbd-draggable-id="${start.draggableId}"]`);
+      if (draggedElement) {
+        draggedElement.classList.add('dragging');
+      }
     } else {
       // If dragging from itinerary
       const [day, timeOfDay] = start.source.droppableId.split("-");
       if (itinerary[day] && itinerary[day][timeOfDay]) {
         const draggedItem = itinerary[day][timeOfDay][start.source.index];
         setActiveDraggedItem(draggedItem);
+        
+        // Add dragging class to the dragged item
+        const draggedElement = document.querySelector(`[data-rbd-draggable-id="${start.draggableId}"]`);
+        if (draggedElement) {
+          draggedElement.classList.add('dragging');
+        }
       }
     }
   };
@@ -166,6 +194,12 @@ const TripPlanner = ({ trip }) => {
   const onDragEnd = (result) => {
     setActiveDraggedItem(null);
     const { source, destination } = result;
+    
+    // Remove dragging class from all draggable items
+    const draggedElements = document.querySelectorAll('.dragging');
+    draggedElements.forEach(element => {
+      element.classList.remove('dragging');
+    });
 
     // Dropped outside the list
     if (!destination) return;
@@ -336,6 +370,8 @@ const TripPlanner = ({ trip }) => {
   // Show day activities on map
   const showDayOnMap = (day, dayNumber) => {
     if (!itinerary[day]) return;
+    
+    console.log(`Showing Day ${dayNumber} activities on map`);
 
     const dayActivities = {
       hotels: [],
@@ -343,22 +379,43 @@ const TripPlanner = ({ trip }) => {
       attractions: [],
     };
 
-    // Collect all activities for this day
-    Object.keys(itinerary[day]).forEach((timeOfDay) => {
+    // Array to hold all activities in proper sequence for creating a route
+    const routeLocations = [];
+
+    // Collect all activities for this day in order of time slots
+    const timeSlots = ["morning", "afternoon", "evening"];
+    
+    timeSlots.forEach((timeOfDay) => {
       const activitiesInTimeSlot = itinerary[day][timeOfDay] || [];
 
       activitiesInTimeSlot.forEach((activity) => {
+        // Create a clean activity object with all necessary data
+        const cleanActivity = {
+          name: activity.name,
+          address: activity.address,
+          type: activity.type || "attraction",
+          timeOfDay: timeOfDay,
+          // Include any coordinates if already available
+          ...(activity.lat && activity.lng ? { lat: activity.lat, lng: activity.lng } : {})
+        };
+        
+        // Add to the appropriate category for markers
         if (activity.type === "hotel") {
-          dayActivities.hotels.push(activity);
+          dayActivities.hotels.push(cleanActivity);
         } else if (activity.type === "restaurant") {
-          dayActivities.restaurants.push(activity);
+          dayActivities.restaurants.push(cleanActivity);
         } else {
-          dayActivities.attractions.push(activity);
+          dayActivities.attractions.push(cleanActivity);
+        }
+        
+        // Add to route locations array for creating the route path
+        if (activity.address || activity.name) {
+          routeLocations.push(cleanActivity);
         }
       });
     });
 
-    // Dispatch event to show on map
+    // Dispatch event to show markers on map
     window.dispatchEvent(
       new CustomEvent(MAP_EVENTS.DISPLAY_ITINERARY_LOCATIONS, {
         detail: {
@@ -368,8 +425,214 @@ const TripPlanner = ({ trip }) => {
         },
       })
     );
+    
+    // If we have locations for a route, get their coordinates and display the route
+    if (routeLocations.length >= 2) {
+      console.log(`Creating route for Day ${dayNumber} with ${routeLocations.length} locations`);
+      
+      // We need to get coordinates for each location before creating the route
+      const getCoordinatesForRoute = async () => {
+        try {
+          // Import the getCoordinates function
+          const { getCoordinates } = await import("@/utils/map/ExternalDataAdapter");
+          
+          // Show loading indicator
+          const loadingToast = document.createElement('div');
+          loadingToast.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-md shadow-lg z-50 flex items-center';
+          loadingToast.innerHTML = `
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Creating route for Day ${dayNumber}...</span>
+          `;
+          document.body.appendChild(loadingToast);
+          
+          // Get coordinates for each location with better error handling
+          const locationsWithCoords = await Promise.all(
+            routeLocations.map(async (location, index) => {
+              try {
+                // Skip geocoding if we already have coordinates
+                if (typeof location.lat === 'number' && typeof location.lng === 'number') {
+                  console.log(`Location ${index + 1} (${location.name}) already has coordinates: [${location.lng}, ${location.lat}]`);
+                  return location;
+                }
+                
+                // Try to get coordinates using address first, then fall back to name
+                const searchTerm = location.address || location.name;
+                if (!searchTerm) {
+                  console.warn(`Location ${index + 1} has no address or name to geocode`);
+                  return null;
+                }
+                
+                // Add destination context to improve geocoding accuracy
+                const searchWithContext = trip?.vacation_location 
+                  ? `${searchTerm}, ${trip.vacation_location}` 
+                  : searchTerm;
+                
+                console.log(`Geocoding location ${index + 1}: "${searchWithContext}"`);
+                const coords = await getCoordinates(searchWithContext);
+                
+                if (coords) {
+                  console.log(`✓ Found coordinates for "${location.name}": [${coords.lng}, ${coords.lat}]`);
+                  return { ...location, ...coords };
+                } else {
+                  console.warn(`✗ Failed to get coordinates for "${location.name}"`);
+                  return null;
+                }
+              } catch (error) {
+                console.error(`Error geocoding location ${index + 1} (${location.name}):`, error);
+                return null;
+              }
+            })
+          );
+          
+          // Remove loading indicator
+          document.body.removeChild(loadingToast);
+          
+          // Filter out locations without coordinates
+          const validLocations = locationsWithCoords.filter(loc => loc !== null);
+          
+          if (validLocations.length >= 2) {
+            // Import the route display function
+            const { displayRouteOnMap } = await import("@/utils/map/MapEventService");
+            
+            // Display the route with enhanced options
+            displayRouteOnMap(validLocations, {
+              lineColor: "#4f46e5", // Indigo color for the route
+              lineWidth: 4,
+              lineOpacity: 0.7,
+              fitBounds: true,
+              routeType: "walking", // walking, driving, cycling
+              addWaypoints: true,
+              showDirectionArrows: true,
+              pathStyle: "curved",
+              animate: true
+            });
+            
+            // Show success message
+            const successToast = document.createElement('div');
+            successToast.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-md shadow-lg z-50 flex items-center';
+            successToast.innerHTML = `
+              <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span>Route created for Day ${dayNumber} with ${validLocations.length} locations</span>
+            `;
+            document.body.appendChild(successToast);
+            
+            // Remove success message after 3 seconds
+            setTimeout(() => {
+              document.body.removeChild(successToast);
+            }, 3000);
+            
+            console.log(`Created route with ${validLocations.length} locations for Day ${dayNumber}`);
+          } else {
+            console.warn(`Not enough valid coordinates to create a route for Day ${dayNumber}. Found ${validLocations.length} valid locations out of ${routeLocations.length}`);
+            
+            // Show error message
+            const errorToast = document.createElement('div');
+            errorToast.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-md shadow-lg z-50 flex items-center';
+            errorToast.innerHTML = `
+              <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>Could not create route: Not enough locations with valid addresses</span>
+            `;
+            document.body.appendChild(errorToast);
+            
+            // Remove error message after 3 seconds
+            setTimeout(() => {
+              document.body.removeChild(errorToast);
+            }, 3000);
+          }
+        } catch (error) {
+          console.error("Error creating route:", error);
+          
+          // Show error message
+          const errorToast = document.createElement('div');
+          errorToast.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-md shadow-lg z-50 flex items-center';
+          errorToast.innerHTML = `
+            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Error creating route: ${error.message || 'Unknown error'}</span>
+          `;
+          document.body.appendChild(errorToast);
+          
+          // Remove error message after 3 seconds
+          setTimeout(() => {
+            document.body.removeChild(errorToast);
+          }, 3000);
+        }
+      };
+      
+      // Execute the async function to get coordinates and create the route
+      getCoordinatesForRoute();
+    }
   };
 
+  // Generate personalized trip plan
+  const handleGeneratePlan = async () => {
+    // Check if we have any activities in the itinerary
+    const hasActivities = Object.values(itinerary).some(day => 
+      day.morning?.length > 0 || day.afternoon?.length > 0 || day.evening?.length > 0
+    );
+    
+    if (!hasActivities) {
+      setPlanError("Please add activities to your itinerary before generating a plan.");
+      return;
+    }
+    
+    setIsGeneratingPlan(true);
+    setPlanError(null);
+    
+    try {
+      console.log("TripPlanner: Starting trip plan generation process...");
+      const tripDetails = {
+        destination: trip?.vacation_location || "Unknown destination",
+        duration: `${numDays} days`,
+        chatId: chatId
+      };
+      
+      console.log("TripPlanner: Sending request to generate plan with details:", tripDetails);
+      console.log(`TripPlanner: Itinerary contains data for ${Object.keys(itinerary).length} days`);
+      
+      const result = await tripPlanService.generateCustomPlan(itinerary, tripDetails);
+      
+      console.log("TripPlanner: Received result from plan generation:", result.success ? "SUCCESS" : "FAILED");
+      
+      if (result.success) {
+        setGeneratedPlan(result.data);
+        
+        // Instead of showing the result in this component, dispatch an event
+        // to notify parent components that a plan has been generated
+        console.log("TripPlanner: Dispatching tripPlanGenerated event");
+        const planGeneratedEvent = new CustomEvent('tripPlanGenerated', {
+          detail: {
+            plan: result.data,
+            tripDetails: {
+              destination: trip?.vacation_location || "Unknown destination",
+              duration: `${numDays} days`,
+              chatId: chatId
+            },
+            itineraryData: itinerary // Pass the itinerary data to be used for route creation
+          }
+        });
+        
+        document.dispatchEvent(planGeneratedEvent);
+      } else {
+        console.error("TripPlanner: Error generating plan:", result.error);
+        setPlanError(result.error || "Failed to generate trip plan. Please try again.");
+      }
+    } catch (error) {
+      console.error("TripPlanner: Exception during plan generation:", error);
+      setPlanError("An unexpected error occurred while generating your trip plan.");
+    } finally {
+      setIsGeneratingPlan(false);
+    }
+  };
+  
   // Render saved activities list
   const renderSavedItems = () => {
     if (isLoading) {
@@ -870,48 +1133,71 @@ const TripPlanner = ({ trip }) => {
         </div>
 
         {/* Itinerary Section */}
-        <div className="bg-gray-900/50 rounded-lg p-4">
-          <h3 className="text-lg font-bold text-blue-200 mb-4">
-            Your Trip Itinerary
-          </h3>
-
-          {/* Days as horizontal scrollable container */}
-          <div className="days-container">
-            {Object.keys(itinerary).map((day, index) => (
-              <motion.div
-                key={day}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="day-wrapper"
-              >
-                {renderDayItinerary(day, index + 1)}
-              </motion.div>
-            ))}
+        <div className="trip-itinerary-section">
+          <div className="trip-itinerary-title">
+            <h3>Your Trip Itinerary</h3>
           </div>
-
-          {/* Number of Days Control */}
-          <div className="flex items-center justify-center mt-6">
-            <label className="text-sm text-gray-300 mr-4">
-              Number of Days:
-            </label>
-            <div className="flex items-center">
-              <button
-                className="px-3 py-1 bg-gray-700 text-white rounded-l-md hover:bg-gray-600 transition-colors"
-                onClick={() => setNumDays(Math.max(1, numDays - 1))}
-              >
-                -
-              </button>
-              <span className="px-4 py-1 bg-gray-800 text-white">
-                {numDays}
-              </span>
-              <button
-                className="px-3 py-1 bg-gray-700 text-white rounded-r-md hover:bg-gray-600 transition-colors"
-                onClick={() => setNumDays(numDays + 1)}
-              >
-                +
-              </button>
+          
+          <div className="trip-itinerary-content">
+            {/* Days as horizontal scrollable container */}
+            <div className="days-container">
+              {Object.keys(itinerary).map((day, index) => (
+                <motion.div
+                  key={day}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="day-wrapper"
+                >
+                  {renderDayItinerary(day, index + 1)}
+                </motion.div>
+              ))}
             </div>
+
+            {/* Number of Days Control */}
+            <div className="days-control">
+              <label>Number of Days:</label>
+              <div className="days-control-buttons">
+                <button
+                  onClick={() => setNumDays(Math.max(1, numDays - 1))}
+                >
+                  -
+                </button>
+                <span className="days-control-count">
+                  {numDays}
+                </span>
+                <button
+                  onClick={() => setNumDays(numDays + 1)}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            
+            {/* Generate Trip Plan Button */}
+            <button 
+              className={`generate-plan-button ${isGeneratingPlan ? 'loading' : ''}`}
+              onClick={handleGeneratePlan}
+              disabled={isGeneratingPlan}
+            >
+              {isGeneratingPlan ? (
+                <>
+                  <RiLoader4Line className="icon loading-spinner" />
+                  Generating Plan...
+                </>
+              ) : (
+                <>
+                  <RiMagicLine className="icon" />
+                  Generate Trip Plan
+                </>
+              )}
+            </button>
+            
+            {planError && (
+              <div className="text-red-400 text-center text-sm mt-2">
+                {planError}
+              </div>
+            )}
           </div>
         </div>
 

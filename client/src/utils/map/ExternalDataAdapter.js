@@ -19,14 +19,25 @@ export const getCoordinates = async (address) => {
     // Log the address we're trying to geocode
     console.log(`Geocoding address: "${address}"`);
 
-    // Clean up the address to improve geocoding success
+    // Enhanced address cleaning for better geocoding success
     const cleanAddress = address
       .replace(/\([^)]*\)/g, "") // Remove content in parentheses
+      .replace(/\[[^\]]*\]/g, "") // Remove content in square brackets
+      .replace(/\{[^}]*\}/g, "") // Remove content in curly braces
+      .replace(/["']/g, "") // Remove quotes
       .replace(/[^\w\s,.-]/g, " ") // Replace special chars with spaces
       .replace(/\s+/g, " ") // Replace multiple spaces with single space
       .trim();
 
     console.log(`Cleaned address for geocoding: "${cleanAddress}"`);
+
+    // If address is too short after cleaning, it might not be a valid address
+    if (cleanAddress.length < 3) {
+      console.warn(
+        `Address "${address}" is too short after cleaning: "${cleanAddress}"`
+      );
+      return null;
+    }
 
     // Check if address contains specific city names and use fallback coordinates
     // This helps when API geocoding fails for certain locations
@@ -85,14 +96,21 @@ export const getCoordinates = async (address) => {
       edinburgh: { lng: -3.1883, lat: 55.9533 },
       krakow: { lng: 19.945, lat: 50.0647 },
       budapest: { lng: 19.0402, lat: 47.4979 },
+      // Add more well-known locations as needed
     };
 
-    // Check for known cities in the address
+    // Check for known cities in the address with improved matching
     const addressLower = cleanAddress.toLowerCase();
+
+    // First try exact city matches
     for (const [city, coords] of Object.entries(cityCoordinates)) {
-      if (addressLower.includes(city)) {
+      if (
+        addressLower === city ||
+        addressLower.endsWith(`, ${city}`) ||
+        addressLower.includes(`${city},`)
+      ) {
         console.log(
-          `Found known city "${city}" in address, using reliable coordinates`
+          `Found exact city match "${city}" in address, using reliable coordinates`
         );
 
         // Add small random offset to avoid markers stacking exactly on top of each other
@@ -100,22 +118,42 @@ export const getCoordinates = async (address) => {
         return {
           lng: coords.lng + randomOffset(),
           lat: coords.lat + randomOffset(),
+          source: "city-exact-match",
         };
       }
     }
 
-    // Try the Mapbox geocoding API
+    // Then try partial city matches
+    for (const [city, coords] of Object.entries(cityCoordinates)) {
+      if (addressLower.includes(city)) {
+        console.log(
+          `Found city "${city}" mentioned in address, using reliable coordinates with offset`
+        );
+
+        // For partial matches, use a slightly larger random offset to distribute points
+        const randomOffset = () => (Math.random() - 0.5) * 0.02;
+        return {
+          lng: coords.lng + randomOffset(),
+          lat: coords.lat + randomOffset(),
+          source: "city-partial-match",
+        };
+      }
+    }
+
+    // Try the Mapbox geocoding API with multiple attempts and error handling
     try {
+      // First attempt with full cleaned address
       const response = await axios.get(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
           cleanAddress
-        )}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN}`
+        )}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN}&limit=1`
       );
 
       if (response.data.features && response.data.features.length > 0) {
         const coordinates = {
           lng: response.data.features[0].center[0],
           lat: response.data.features[0].center[1],
+          source: "mapbox-full-address",
         };
         console.log(`Successfully geocoded "${cleanAddress}" to:`, coordinates);
         return coordinates;
@@ -128,27 +166,33 @@ export const getCoordinates = async (address) => {
       console.error(`Mapbox geocoding error for "${cleanAddress}":`, error);
     }
 
-    // If we still don't have coordinates, try with just the location name without details
+    // If first attempt fails, try with just the first part of the address
+    // This helps when the address has too many details that confuse the geocoder
     const simplifiedAddress = cleanAddress.split(",")[0].trim();
-    if (simplifiedAddress !== cleanAddress) {
+    if (simplifiedAddress !== cleanAddress && simplifiedAddress.length > 3) {
       try {
         console.log(`Trying simplified address: "${simplifiedAddress}"`);
         const response = await axios.get(
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
             simplifiedAddress
-          )}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN}`
+          )}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN}&limit=1`
         );
 
         if (response.data.features && response.data.features.length > 0) {
           const coordinates = {
             lng: response.data.features[0].center[0],
             lat: response.data.features[0].center[1],
+            source: "mapbox-simplified",
           };
           console.log(
             `Successfully geocoded simplified address "${simplifiedAddress}" to:`,
             coordinates
           );
           return coordinates;
+        } else {
+          console.warn(
+            `No geocoding results found for simplified address: "${simplifiedAddress}"`
+          );
         }
       } catch (error) {
         console.error(
@@ -158,25 +202,111 @@ export const getCoordinates = async (address) => {
       }
     }
 
-    // If all else fails, use random coordinates near the main location
-    // to at least show something on the map (better than nothing)
+    // If all attempts fail, try to extract and geocode any location names from the address
+    const possibleLocationNames = extractLocationNames(cleanAddress);
+    for (const locationName of possibleLocationNames) {
+      if (locationName.length > 3) {
+        try {
+          console.log(`Trying extracted location name: "${locationName}"`);
+          const response = await axios.get(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+              locationName
+            )}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN}&limit=1`
+          );
+
+          if (response.data.features && response.data.features.length > 0) {
+            const coordinates = {
+              lng: response.data.features[0].center[0],
+              lat: response.data.features[0].center[1],
+              source: "mapbox-extracted-name",
+            };
+            console.log(
+              `Successfully geocoded extracted location "${locationName}" to:`,
+              coordinates
+            );
+            return coordinates;
+          }
+        } catch (error) {
+          console.error(
+            `Mapbox geocoding error for extracted location "${locationName}":`,
+            error
+          );
+        }
+      }
+    }
+
+    // If all else fails, use random coordinates near a major city as fallback
     console.warn(
-      `Using random nearby coordinates as fallback for "${address}"`
+      `Using fallback coordinates for "${address}" - all geocoding attempts failed`
     );
 
-    // Default to Tokyo if we have no better fallback
-    const baseCoords = { lng: 139.6503, lat: 35.6762 }; // Tokyo
-    const randomOffset = () => (Math.random() - 0.5) * 0.01; // Small random offset
+    // Try to find a major city in the address to use as fallback
+    let baseCoords = { lng: 139.6503, lat: 35.6762 }; // Default to Tokyo
+
+    // Check if any major city is mentioned in the address
+    for (const [city, coords] of Object.entries(cityCoordinates)) {
+      if (addressLower.includes(city)) {
+        baseCoords = coords;
+        console.log(`Using ${city} as fallback coordinate base`);
+        break;
+      }
+    }
+
+    // Generate a random point within ~500m of the base coordinates
+    const randomOffset = () => (Math.random() - 0.5) * 0.01;
     return {
       lng: baseCoords.lng + randomOffset(),
       lat: baseCoords.lat + randomOffset(),
+      source: "fallback-random",
     };
   } catch (error) {
     console.error("Error in getCoordinates:", error);
-    // Final fallback - return Tokyo coordinates
-    return { lng: 139.6503, lat: 35.6762 };
+    // Final fallback - return Tokyo coordinates with a note
+    return {
+      lng: 139.6503 + (Math.random() - 0.5) * 0.01,
+      lat: 35.6762 + (Math.random() - 0.5) * 0.01,
+      source: "error-fallback",
+    };
   }
 };
+
+/**
+ * Extract possible location names from an address string
+ * This helps when the full address fails geocoding but contains valid place names
+ * @param {string} address - The address to extract location names from
+ * @returns {Array} - Array of possible location names
+ */
+function extractLocationNames(address) {
+  if (!address) return [];
+
+  const results = [];
+
+  // Split by common delimiters
+  const parts = address.split(/[,;|\\/]/);
+
+  // Add each part that looks like it might be a location name
+  parts.forEach((part) => {
+    const cleaned = part.trim();
+    // Only include parts that are likely to be location names (not too short, not just numbers)
+    if (cleaned.length > 3 && !/^\d+$/.test(cleaned)) {
+      results.push(cleaned);
+    }
+  });
+
+  // Also try the whole string without certain words that might confuse geocoding
+  const withoutCommonWords = address
+    .replace(
+      /hotel|restaurant|cafe|museum|attraction|near|next to|across from|opposite|behind|in front of/gi,
+      ""
+    )
+    .trim();
+
+  if (withoutCommonWords !== address && withoutCommonWords.length > 3) {
+    results.push(withoutCommonWords);
+  }
+
+  return results;
+}
 
 /**
  * Generate fake coordinates for restaurant items around a city center
