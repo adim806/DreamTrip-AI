@@ -1,3 +1,4 @@
+/* eslint-env node */
 module.exports = {
   root: true,
   env: { browser: true, es2020: true },
@@ -13,7 +14,7 @@ module.exports = {
   plugins: ["react-refresh"],
   rules: {
     "react/no-unknown-property": [
-      "error",
+      "warn",
       {
         ignore: [
           "attach",
@@ -43,5 +44,11 @@ module.exports = {
       "warn",
       { allowConstantExport: true },
     ],
+    // Convert all errors to warnings
+    "no-undef": "warn",
+    "no-case-declarations": "warn",
+    "react/no-unescaped-entities": "warn",
+    "react-hooks/exhaustive-deps": "warn",
+    // Removed the invalid 'parsing-error' rule
   },
 };

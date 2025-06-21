@@ -1,11 +1,12 @@
 import "./homepage2.css";
 import {
   Environment,
-  Sparkles,
   ScrollControls,
   Scroll,
   Float,
+  Stars,
 } from "@react-three/drei";
+import { useThree } from "@react-three/fiber";
 import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
@@ -13,117 +14,80 @@ import Button from "react-bootstrap/Button";
 import "bootstrap/dist/css/bootstrap.min.css";
 import {
   EffectComposer,
-  DepthOfField,
   Bloom,
   Vignette,
+  ChromaticAberration,
 } from "@react-three/postprocessing";
-//import { Butterfly } from "@/models/Butterfly";
-import { Butterfly2 } from "@/models/Butterfly2";
+import { Earth } from "@/models/Earth";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 function Homepage2() {
-  const navigate = useNavigate(); // הגדרת הניווט
+  const navigate = useNavigate();
+  const [earthPosition, setEarthPosition] = useState([25, -2, -45]);
+  const { viewport } = useThree();
+  
+  // Adjust Earth position based on viewport size
+  useEffect(() => {
+    if (viewport.width < 8) {
+      // For smaller screens
+      setEarthPosition([17, -2, -45]);
+    } else {
+      // For larger screens
+      setEarthPosition([25, -2, -45]);
+    }
+  }, [viewport.width]);
+  
   return (
     <>
-      <EffectComposer>
-        <DepthOfField
-          focusDistance={0}
-          focalLength={1.5}
-          bokehScale={3}
-          height={1200}
-        />
+      <EffectComposer enabled={true}>
         <Bloom
-          intensity={2}
-          luminanceThreshold={0.1}
+          intensity={0.8}
+          luminanceThreshold={0.3}
           luminanceSmoothing={0.9}
-          height={1000}
+          height={300}
         />
-        <Vignette eskil={false} offset={0.001} darkness={0.8} />
+        <ChromaticAberration offset={[0.0002, 0.0002]} />
+        <Vignette eskil={false} offset={0.1} darkness={0.6} />
       </EffectComposer>
       
       <color attach="background" args={["#000"]} />
-      <ambientLight intensity={4} />
-      <spotLight
-        position={[0, 25, 0]}
-        angle={1.3}
-        penumbra={1}
-        castShadow
-        intensity={5}
-        shadow-bias={-0.0001}
-      />
-      <Environment preset="warehouse" />
+      
+      {/* Ambient lighting */}
+      <ambientLight intensity={0.45} />
+      
+      {/* Main lights for the Earth - positioned to highlight clouds */}
+      <directionalLight position={[10, 10, 5]} intensity={1.2} color="#ffffff" />
+      <directionalLight position={[-10, -10, -5]} intensity={0.4} color="#6495ED" />
+      <spotLight position={[0, 15, 10]} angle={0.5} penumbra={1} intensity={0.8} color="#ffffff" />
+      
+      {/* Additional light specifically to illuminate clouds */}
+      <pointLight position={[20, 5, -30]} intensity={0.8} color="#ffffff" />
+      
+      <Environment preset="night" />
 
       <ScrollControls pages={6.25} damping={0.25}>
         <Scroll>
-          {/* top */}
-
+          {/* Background stars */}
+          <Stars 
+            radius={100}
+            depth={50}
+            count={2000}
+            factor={4}
+            saturation={0}
+            fade
+            speed={0.2}
+          />
+          
+          {/* Earth with visible cloud layer */}
           <Float
-            speed={1} // Animation speed, defaults to 1
-            rotationIntensity={2} // XYZ rotation intensity, defaults to 1
-            floatIntensity={0.2} // Up/down float intensity, works like a multiplier with floatingRange,defaults to 1
-            floatingRange={[1, 1]} // Range of y-axis values the object will float within, defaults to [-0.1,0.1]
+            speed={0.1}
+            rotationIntensity={0.02}
+            floatIntensity={0.03}
+            floatingRange={[0.01, 0.02]}
           >
-
-            <Butterfly2
-              rotation-x={Math.PI * 0.05}
-              scale={1}
-              position={[0, -3, 0]}
-            />
-            <Butterfly2 scale={2.5} position={[-10, 3, -6]} />
-            <Butterfly2 scale={2.7} position={[10, -1, -10]} />
-
+            <Earth position={earthPosition} scale={0.38} />
           </Float>
-          {/* top */}
-
-          {/* middle */}
-          <Float
-            speed={1} // Animation speed, defaults to 1
-            rotationIntensity={1} // XYZ rotation intensity, defaults to 1
-            floatIntensity={0.2} // Up/down float intensity, works like a multiplier with floatingRange,defaults to 1
-            floatingRange={[1, 1]} // Range of y-axis values the object will float within, defaults to [-0.1,0.1]
-          >
-            <Butterfly2 scale={1.3} position={[-3, -10, 3]} />
-            <Butterfly2 scale={2} position={[12, -15, -10]} />
-
-          </Float>
-          {/* middle */}
-
-          {/* middle */}
-          <Float
-            speed={1} // Animation speed, defaults to 1
-            rotationIntensity={2} // XYZ rotation intensity, defaults to 1
-            floatIntensity={0.2} // Up/down float intensity, works like a multiplier with floatingRange,defaults to 1
-            floatingRange={[1, 1]} // Range of y-axis values the object will float within, defaults to [-0.1,0.1]
-          >
-
-            <Butterfly2 scale={0.9} position={[-3, -19.5, 2]} />
-            <Butterfly2 scale={0.9} position={[8, -23, -10]} />
-            <Butterfly2 scale={1} position={[4, -24, 2]} />
-
-          </Float>
-
-          <Sparkles
-            noise={0}
-            count={1000}
-            speed={0.01}
-            size={4}
-            color={"#FFD2BE"}
-            opacity={0.1}
-            scale={[30, 100, 30]}
-          ></Sparkles>
-          <Sparkles
-            noise={0}
-            count={150}
-            speed={0.5}
-            size={10 }
-            color={"#FFF"}
-            opacity={2}
-            scale={[30, 100, 10]}
-          ></Sparkles>
-            <Butterfly2 scale={8} position={[0, -20, -10]} />
-            <Butterfly2 scale={1.3} position={[-4, -24, 2]} />
-            <Butterfly2 scale={0.8} position={[-4, -37, 2]} />
-            <Butterfly2 scale={0.6} position={[2.5, -35, 2]} />
         </Scroll>
         
         <Scroll html style={{ width: "100%" }}>

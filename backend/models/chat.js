@@ -27,6 +27,14 @@ const chatSchema = new mongoose.Schema(
         },
       },
     ],
+    sessionData: {
+      type: Object,
+      default: null,
+    },
+    itinerary: {
+      type: Object,
+      default: null,
+    },
   },
   { timestamps: true }
 );

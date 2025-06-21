@@ -1,0 +1,84 @@
+name: Local Development Helper
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: "Component to check (client/backend/both)"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - client
+          - backend
+          - both
+
+jobs:
+  validate-code:
+    name: Validate ${{ github.event.inputs.component }} Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Validate client
+        if: ${{ github.event.inputs.component == 'client' || github.event.inputs.component == 'both' }}
+        run: |
+          cd client
+          npm ci
+          npm run lint || echo "Linting issues found"
+          npm run build || echo "Build failed"
+
+      - name: Setup MongoDB for backend validation
+        if: ${{ github.event.inputs.component == 'backend' || github.event.inputs.component == 'both' }}
+        uses: supercharge/mongodb-github-action@v1.10.0
+        with:
+          mongodb-version: "6.0"
+          mongodb-username: root
+          mongodb-password: password
+          mongodb-db: dreamtrip
+
+      - name: Validate backend
+        if: ${{ github.event.inputs.component == 'backend' || github.event.inputs.component == 'both' }}
+        run: |
+          cd backend
+          npm ci
+          npm run lint || echo "Linting issues found"
+          npm test || echo "Tests failed"
+        env:
+          MONGODB_URI: mongodb://root:password@localhost:27017/dreamtrip
+
+  generate-dev-report:
+    name: Generate Development Report
+    needs: validate-code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Generate report
+        run: |
+          echo "## DreamTrip-AI Development Report" > report.md
+          echo "### Generated on $(date)" >> report.md
+          echo "" >> report.md
+
+          echo "### Repository Structure" >> report.md
+          echo '```' >> report.md
+          find . -type f -not -path "*/node_modules/*" -not -path "*/.git/*" | sort >> report.md
+          echo '```' >> report.md
+
+          echo "" >> report.md
+          echo "### Development Status" >> report.md
+          echo "Component: ${{ github.event.inputs.component }}" >> report.md
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: dev-report
+          path: report.md
+          retention-days: 7

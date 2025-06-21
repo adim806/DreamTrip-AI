@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useCallback, useReducer } from "react";
 import "./newPromt.css";
 import { useRef, useEffect } from "react";
 import Upload from "../upload/Upload";
@@ -9,32 +9,41 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { useNavigate } from "react-router-dom";
-import { TripContext } from "../tripcontext/TripProvider";
+import { TripContext, CONVERSATION_STATES } from "../tripcontext/TripProvider";
 import { motion } from "framer-motion";
 import { RiUser3Fill, RiCompass3Fill } from "react-icons/ri";
 import { IoSend, IoImageOutline } from "react-icons/io5";
 
+// Import UI components
+import TripSummary from "../ui/TripSummary";
+import ItineraryDisplay from "../ui/ItineraryDisplay";
+import ItineraryEditor from "../ui/ItineraryEditor";
+
 // Import utility functions
-import { 
-  updateTripDraft, 
-  checkTripDraftCompleteness, 
+import {
+  updateTripDraft,
+  checkTripDraftCompleteness,
   generateFollowUpQuestion,
-  formatTripSummary
+  formatTripSummary,
 } from "../../utils/tripUtils";
-import { 
-  fetchExternalData, 
-  buildPromptWithExternalData 
+import {
+  fetchExternalData,
+  buildPromptWithExternalData,
 } from "../../utils/externalDataService";
 import {
   extractStructuredDataFromResponse,
-  getSystemInstruction,
+  getInitialSystemInstruction,
+  getBaseSystemInstruction,
   getGenerationConfig,
-  intentRequiresExternalData
+  intentRequiresExternalData,
 } from "../../utils/aiPromptUtils";
-import { 
-  generateItinerary, 
-  saveItinerary 
+import {
+  generateItinerary,
+  saveItinerary,
 } from "../../utils/itineraryGenerator";
+
+// Import custom hooks
+import { useProcessUserInput } from "../../utils/hooks/useProcessUserInput";
 
 /**
  * NewPromt Component
@@ -81,7 +90,8 @@ import {
  */
 
 // האווטאר של סוכן הטיולים - נשתמש באותו קישור כמו ב-ChatPage
-const TRAVEL_AGENT_AVATAR = "https://img.freepik.com/premium-vector/artificial-intelligence-character-avatar-futuristic-digital-ai-assistant-profile-picture_555042-38.jpg";
+const TRAVEL_AGENT_AVATAR =
+  "https://img.freepik.com/premium-vector/artificial-intelligence-character-avatar-futuristic-digital-ai-assistant-profile-picture_555042-38.jpg";
 
 const TypingIndicator = () => {
   return (
@@ -138,19 +148,27 @@ const LoadingDots = () => {
   );
 };
 
+// Create a simple reducer for forcing updates
+const forceUpdateReducer = (state) => state + 1;
+
 const NewPromt = ({ data }) => {
-  // Current user input and temporary display states
-  const [currentInput, setCurrentInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [pendingMessages, setPendingMessages] = useState([]);
-  const [isAwaitingConfirmation, setIsAwaitingConfirmation] = useState(false);
-  const [isGeneratingItinerary, setIsGeneratingItinerary] = useState(false);
-  
-  // Remove the local processedChatIds state
-  // Instead we'll use a ref that persists between renders
-  const processedChatIdsRef = useRef(new Set());
-  
-  // Image handling states
+  // Get the trip context
+  const {
+    conversationState,
+    CONVERSATION_STATES,
+    transitionState,
+    startNewTrip,
+    tripDetails,
+    handleGenerateItinerary,
+  } = useContext(TripContext);
+
+  // State to control when to show trip summary
+  const [showTripSummary, setShowTripSummary] = useState(false);
+
+  // Add a force update reducer for when we need to force DOM updates
+  const [forceUpdateCounter, forceUpdate] = useReducer(forceUpdateReducer, 0);
+
+  // Image handling state
   const [img, setImg] = useState({
     isLoading: false,
     error: "",
@@ -158,531 +176,310 @@ const NewPromt = ({ data }) => {
     aiData: {},
   });
 
-  // Navigation and context
-  const navigate = useNavigate();
-  const { tripDetails, setTripDetails, setallTripData } = useContext(TripContext);
-  
-  // References
+  // References for DOM elements
   const endRef = useRef(null);
   const formRef = useRef(null);
   const inputRef = useRef(null);
-  
-  // AI model setup
-  const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_PUBLIC_KEY);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction: getSystemInstruction(),
-  });
 
-  const generationConfig = getGenerationConfig();
+  // Use our custom hook for AI processing
+  const processingHook = useProcessUserInput(data);
+  const { processUserInput, pendingMessages, isTyping } = processingHook;
 
-  // Initialize chat with history
-  const chat = model.startChat({
-    generationConfig,
-    history: [
-      ...(data?.history?.map(({ role, parts }) => ({
-        role,
-        parts: [{ text: parts[0].text }],
-      })) || []),
-    ],
-  });
+  // Share the hook with the parent component by exposing it on window (temporary solution)
+  useEffect(() => {
+    // This is a workaround to share the hook state with ChatPage
+    // A better solution would be to lift this state up or use Context API
+    const updateHookState = () => {
+      window.__processingHookState = {
+        ...processingHook,
+        // Always provide most current reference to functions
+        processInitialMessage: processingHook.processInitialMessage,
+        processUserInput: processingHook.processUserInput,
+        // Add access to the showTripSummary state
+        setShowTripSummary: setShowTripSummary,
+        // Add the forceUpdate function
+        forceUpdate: forceUpdate,
+        // Add pendingMessages for access from other components
+        pendingMessages: processingHook.pendingMessages,
+      };
+    };
+
+    // Update immediately
+    updateHookState();
+
+    // Set a flag in the window object to indicate NewPromt is mounted and ready
+    window.__newPromtReady = true;
+
+    // Clear any ongoing typing indicator when component unmounts
+    return () => {
+      window.__newPromtReady = false;
+      // Explicitly set isTyping to false to ensure indicator is removed
+      if (processingHook && processingHook.setIsTyping) {
+        processingHook.setIsTyping(false);
+      }
+      if (window.__processingHookState) {
+        window.__processingHookState.isTyping = false;
+      }
+    };
+  }, [processingHook, forceUpdate]);
 
   // Auto-scroll handling
   useEffect(() => {
     const scrollToBottom = () => {
-      const chatContainer = document.getElementById('chat-messages-container');
+      const chatContainer = document.getElementById("chat-messages-container");
       if (chatContainer) {
         setTimeout(() => {
           chatContainer.scrollTop = chatContainer.scrollHeight;
         }, 200);
       }
     };
-    
+
     scrollToBottom();
-    
-    const chatContainer = document.getElementById('chat-messages-container');
+
+    const chatContainer = document.getElementById("chat-messages-container");
     if (chatContainer) {
       const observer = new MutationObserver(scrollToBottom);
-      observer.observe(chatContainer, { 
-        childList: true, 
+      observer.observe(chatContainer, {
+        childList: true,
         subtree: true,
-        characterData: true 
+        characterData: true,
       });
-      
+
       return () => observer.disconnect();
     }
   }, [data, pendingMessages]);
 
-  // Query client for mutations
-  const queryClient = useQueryClient();
-
-  // Mutation for saving chat data
-  const mutation = useMutation({
-    mutationFn: async ({ userMessage, aiResponse, image }) => {
-      console.log("Saving to server:", { userMessage, aiResponse, image });
-      
-      return fetch(`${import.meta.env.VITE_API_URL}/api/chats/${data._id}`, {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          question: userMessage,
-          answer: aiResponse,
-          img: image || undefined,
-        }),
-      }).then((res) => res.json());
-    },
-    onSuccess: () => {
-      console.log("Message saved successfully");
-      queryClient.invalidateQueries({ queryKey: ["chat", data._id] })
-        .then(() => {
-          // Clear pending messages as they're now in the main chat
-          setPendingMessages([]);
-          
-          // Reset image state
-          setImg({
-            isLoading: false,
-            error: "",
-            dbData: {},
-            aiData: {},
-          });
-        });
-    },
-    onError: (err) => {
-      console.error("Failed to save message:", err);
-    },
-  });
-
-  // Handle itinerary generation
-  const handleGenerateItinerary = async () => {
-    if (!tripDetails || isGeneratingItinerary) return;
-    
-    setIsGeneratingItinerary(true);
-    
-    try {
-      // Display a message that we're generating an itinerary
-      setPendingMessages(prev => [...prev, {
-        role: 'model',
-        message: "Generating your personalized travel itinerary. This may take a moment..."
-      }]);
-      
-      // Generate the itinerary
-      const itineraryResult = await generateItinerary(tripDetails);
-      
-      if (itineraryResult.success) {
-        console.log("Itinerary generated successfully");
-        
-        // Store the itinerary in the trip context for use elsewhere in the app
-        setallTripData({
-          tripDetails,
-          itinerary: itineraryResult.itinerary,
-          metadata: itineraryResult.metadata
-        });
-        
-        // Save the itinerary to the server (if you have a backend API for this)
-        try {
-          // This is optional - implemented if you have a backend endpoint for itineraries
-          const saveResult = await saveItinerary(data._id, itineraryResult);
-          console.log("Itinerary saved to server:", saveResult);
-        } catch (saveError) {
-          console.error("Error saving itinerary to server:", saveError);
-          // Continue even if saving fails - we still have the data in the context
-        }
-        
-        // Show the generated itinerary in the chat
-        setPendingMessages(prev => {
-          // Find and remove the "Generating..." message
-          const updatedMessages = prev.filter(
-            msg => msg.role !== 'model' || 
-            msg.message !== "Generating your personalized travel itinerary. This may take a moment..."
-          );
-          
-          // Add the complete itinerary message
-          updatedMessages.push({
-            role: 'model',
-            message: `
-## Your Travel Itinerary for ${tripDetails.vacation_location}
-
-${itineraryResult.itinerary}
-
-Would you like to make any adjustments to this itinerary?
-            `
-          });
-          
-          return updatedMessages;
-        });
-        
-        // Save the itinerary message to the chat history
-        mutation.mutate({
-          userMessage: null,  // No user message to save
-          aiResponse: `
-## Your Travel Itinerary for ${tripDetails.vacation_location}
-
-${itineraryResult.itinerary}
-
-Would you like to make any adjustments to this itinerary?
-          `,
-          image: null
-        });
-        
-      } else {
-        // Handle error in itinerary generation
-        console.error("Failed to generate itinerary:", itineraryResult.error);
-        
-        setPendingMessages(prev => {
-          // Find and remove the "Generating..." message
-          const updatedMessages = prev.filter(
-            msg => msg.role !== 'model' || 
-            msg.message !== "Generating your personalized travel itinerary. This may take a moment..."
-          );
-          
-          // Add the error message
-          updatedMessages.push({
-            role: 'model',
-            message: "I'm sorry, I encountered a problem while generating your itinerary. Would you like to try again?"
-          });
-          
-          return updatedMessages;
-        });
-      }
-    } catch (error) {
-      console.error("Error in itinerary generation process:", error);
-      
-      setPendingMessages(prev => {
-        // Find and remove the "Generating..." message
-        const updatedMessages = prev.filter(
-          msg => msg.role !== 'model' || 
-          msg.message !== "Generating your personalized travel itinerary. This may take a moment..."
-        );
-        
-        // Add the error message
-        updatedMessages.push({
-          role: 'model',
-          message: "I apologize, but there was an unexpected error generating your itinerary. Please try again later."
-        });
-        
-        return updatedMessages;
-      });
-    } finally {
-      setIsGeneratingItinerary(false);
-      setIsAwaitingConfirmation(false);
-    }
-  };
-
-  // Add this function to check if a chat has already been processed
-  const markChatAsProcessed = (chatId) => {
-    // Get the query data from the cache
-    const chatData = queryClient.getQueryData(["chat", chatId]);
-    
-    // If the chat already has model responses, consider it processed
-    if (chatData?.history?.length > 1) {
-      console.log(`Chat ${chatId} already has responses, skipping auto-processing`);
-      return true;
-    }
-    
-    // Check our local ref
-    if (processedChatIdsRef.current.has(chatId)) {
-      console.log(`Chat ${chatId} was already processed in this session`);
-      return true;
-    }
-    
-    // Mark as processed in our local ref
-    processedChatIdsRef.current.add(chatId);
-    console.log(`Marking chat ${chatId} as processed for the first time`);
-    return false;
-  };
-
-  // Fix the auto-processing effect to use both cache and ref check
+  // Monitor conversation state to control when to show trip summary
   useEffect(() => {
-    if (!data?._id) return;
-    
-    // Only process if the chat has exactly one message and hasn't been processed
-    if (data.history?.length === 1 && 
-        data.history[0].role === 'user' && 
-        !isTyping) {
-      
-      // Check if this chat has already been processed
-      if (markChatAsProcessed(data._id)) {
-        return; // Skip if already processed
+    // Immediately hide the summary if we're generating an itinerary
+    if (conversationState === CONVERSATION_STATES.GENERATING_ITINERARY) {
+      if (showTripSummary) {
+        console.log("Hiding trip summary due to itinerary generation");
+        setShowTripSummary(false);
       }
-      
-      const initialMessage = data.history[0].parts[0].text;
-      console.log("Auto-processing initial message:", initialMessage);
-      
-      setIsTyping(true);
-      
-      (async () => {
-        try {
-          // Add a small delay to avoid race conditions
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // Recheck to make sure another instance didn't process it
-          if (queryClient.getQueryData(["chat", data._id])?.history?.length > 1) {
-            console.log("Another process already handled this chat, aborting");
-            setIsTyping(false);
-            return;
-          }
-          
-          // Send message to AI
-          const result = await chat.sendMessageStream([initialMessage]);
-          
-          let aiResponse = "";
-          for await (const chunk of result.stream) {
-            aiResponse += chunk.text();
-          }
-          
-          console.log("AI response for initial message:", aiResponse);
-
-          // Process the response with structured data extraction
-          const { formattedResponse, data: structuredData, success } = 
-            extractStructuredDataFromResponse(aiResponse);
-
-          console.log("Extracted structured data:", structuredData);
-          
-          // Only add AI response to pending messages
-          setPendingMessages([{
-            role: 'model',
-            message: formattedResponse
-          }]);
-          
-          // If successful extraction and Trip-Building mode, update trip details
-          if (success && structuredData && structuredData.mode === "Trip-Building") {
-            const newTripDetails = updateTripDraft(tripDetails, structuredData.data);
-            setTripDetails(newTripDetails);
-            console.log("Updated trip details:", newTripDetails);
-            
-            // Check if we need to show a trip summary for confirmation
-            const completenessCheck = checkTripDraftCompleteness(newTripDetails);
-            if (completenessCheck.isComplete && !isAwaitingConfirmation) {
-              const tripSummary = formatTripSummary(newTripDetails);
-              
-              // Add trip summary to pending messages
-              setPendingMessages(prev => [...prev, {
-                role: 'model',
-                message: `${tripSummary}\n\nDoes this summary look correct? Should I generate a detailed itinerary based on this information?`
-              }]);
-              
-              setIsAwaitingConfirmation(true);
-            }
-          }
-          
-          // Save to server (but don't duplicate the user message)
-          mutation.mutate({ 
-            userMessage: null, // Don't add user message again
-            aiResponse: formattedResponse,
-            image: null
-          });
-          
-        } catch (error) {
-          console.error("Error auto-processing initial message:", error);
-          setPendingMessages([{
-            role: 'model',
-            message: "Sorry, I encountered an error processing your request. Please try again."
-          }]);
-        } finally {
-          setIsTyping(false);
-        }
-      })();
+      return;
     }
-  }, [data?._id, data?.history?.length]);
 
-  // Process user input with RAG and structured response handling
-  const processUserInput = async (userMessage) => {
-    setIsTyping(true);
-    
-    // Add the user message to pending messages first
-    setPendingMessages(prev => [...prev, {
-      role: 'user',
-      message: userMessage,
-      img: img.dbData?.filePath || null
-    }]);
-
-    try {
-      console.log("Processing user input:", userMessage);
-      
-      // Check if this is a confirmation to generate an itinerary
-      if (isAwaitingConfirmation && 
-          (userMessage.toLowerCase() === "yes" || 
-           userMessage.toLowerCase().includes("generate") && 
-           userMessage.includes("itinerary"))) {
-        
-        // Save the confirmation message
-        mutation.mutate({ 
-          userMessage, 
-          aiResponse: null, // Will be saved with the itinerary
-          image: img.dbData?.filePath
-        });
-        
-        setIsTyping(false);
-        // Trigger itinerary generation
-        handleGenerateItinerary();
-        return { success: true };
+    if (
+      conversationState ===
+        CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION &&
+      tripDetails
+    ) {
+      // Check if typing has finished before showing the summary
+      if (!isTyping && pendingMessages && pendingMessages.length > 0) {
+        // Delay showing the summary slightly to ensure the response is visible first
+        const timer = setTimeout(() => {
+          setShowTripSummary(true);
+          console.log("Showing trip summary after response completed");
+        }, 500);
+        return () => clearTimeout(timer);
       }
-      
-      // First send message to AI for initial analysis
-      const result = await chat.sendMessageStream(
-        Object.entries(img.aiData).length ? [img.aiData, userMessage] : [userMessage]
-      );
-      
-      let aiResponse = "";
-      for await (const chunk of result.stream) {
-        aiResponse += chunk.text();
-      }
-      
-      console.log("Initial AI response:", aiResponse);
-
-      // Process the response with structured data extraction
-      const { formattedResponse, data: structuredData, success } = 
-        extractStructuredDataFromResponse(aiResponse);
-      
-      console.log("Extracted structured data:", structuredData);
-      
-      let finalResponse = formattedResponse;
-      let finalStructuredData = structuredData;
-      
-      // Check if external data is required for Retrieval-Augmented Generation
-      if (success && structuredData && 
-          (structuredData.requires_external_data === true || 
-           (structuredData.intent && intentRequiresExternalData(structuredData.intent)))) {
-        
-        // Add interim response indicating we're fetching data
-        setPendingMessages(prev => [...prev, {
-          role: 'model',
-          message: "I'm gathering some specific information to better answer your question..."
-        }]);
-        
-        // Fetch external data based on intent
-        const externalData = await fetchExternalData(
-          structuredData.intent, 
-          structuredData.data || {} 
+    } else {
+      // Hide summary when not in confirmation state
+      // Especially hide it during GENERATING_ITINERARY state
+      if (showTripSummary) {
+        console.log(
+          "Hiding trip summary due to state change to:",
+          conversationState
         );
-        
-        console.log("Fetched external data:", externalData);
-        
-        if (externalData.success) {
-          // Build an enriched prompt with the external data
-          const enrichedPrompt = buildPromptWithExternalData(
-            userMessage, 
-            externalData, 
-            structuredData.intent
-          );
-          
-          console.log("Enriched prompt:", enrichedPrompt);
-          
-          // Send the enriched prompt back to the AI
-          const enrichedResult = await chat.sendMessageStream([enrichedPrompt]);
-          
-          let enrichedResponse = "";
-          for await (const chunk of enrichedResult.stream) {
-            enrichedResponse += chunk.text();
-          }
-          
-          console.log("Enriched AI response:", enrichedResponse);
-          
-          // Extract structured data from enriched response
-          const enrichedExtracted = extractStructuredDataFromResponse(enrichedResponse);
-          
-          // Update final response and structured data
-          finalResponse = enrichedExtracted.formattedResponse;
-          finalStructuredData = enrichedExtracted.data;
+        setShowTripSummary(false);
+      }
+    }
+  }, [
+    conversationState,
+    isTyping,
+    pendingMessages,
+    tripDetails,
+    showTripSummary,
+  ]);
+
+  // Monitor conversation state changes to debug TripSummary rendering
+  useEffect(() => {
+    // Debounce to prevent excessive monitoring and logging
+    const debounceTimeout = setTimeout(() => {
+      // Use a counter to only log periodically, not on every render
+      const now = Date.now();
+      const lastLogTime = window.__lastPromtMonitorLog || 0;
+
+      // Only log if it's been more than 2 seconds since the last log
+      if (now - lastLogTime > 2000) {
+        window.__lastPromtMonitorLog = now;
+
+        console.log("NewPromt monitoring state:", {
+          conversationState,
+          hasTripDetails: !!tripDetails,
+          tripDetailsKeys: tripDetails ? Object.keys(tripDetails) : [],
+          shouldDisplaySummary:
+            showTripSummary &&
+            conversationState ===
+              CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION &&
+            !!tripDetails,
+        });
+
+        // Check if all the required trip data is present
+        if (tripDetails) {
+          const hasRequiredFields =
+            tripDetails.vacation_location &&
+            tripDetails.duration &&
+            ((tripDetails.dates &&
+              tripDetails.dates.from &&
+              tripDetails.dates.to) ||
+              tripDetails.isTomorrow) &&
+            (tripDetails.budget ||
+              (tripDetails.constraints && tripDetails.constraints.budget));
+
+          console.log("Trip completeness check in NewPromt:", {
+            hasRequiredFields,
+            vacation_location: !!tripDetails.vacation_location,
+            duration: !!tripDetails.duration,
+            dates: !!(
+              tripDetails.dates &&
+              tripDetails.dates.from &&
+              tripDetails.dates.to
+            ),
+            isTomorrow: !!tripDetails.isTomorrow,
+            budget: !!(
+              tripDetails.budget ||
+              (tripDetails.constraints && tripDetails.constraints.budget)
+            ),
+          });
         }
       }
+    }, 300); // 300ms debounce
+
+    // Cleanup timeout on unmount or when dependencies change
+    return () => clearTimeout(debounceTimeout);
+  }, [conversationState, tripDetails, showTripSummary]);
+
+  // Add an explicit function to hide the trip summary with force update
+  const hideTripSummary = useCallback(() => {
+    if (showTripSummary) {
+      console.log("Explicitly hiding trip summary");
+      setShowTripSummary(false);
+      // Force an immediate update to ensure the DOM changes
+      forceUpdate();
+      // Also set the global flag
+      window.__tripSummaryHidden = true;
+    }
+  }, [showTripSummary]);
+
+  // Trip summary action handlers
+  const handleConfirmTrip = () => {
+    // Hide trip summary first
+    hideTripSummary();
+
+    // Log the trip details for debugging
+    console.log("Trip confirmation with details:", tripDetails);
+
+    // התחלת טעינת מידע חיצוני במקביל ליצירת המסלול
+    if (tripDetails && tripDetails.vacation_location) {
+      console.log("Starting parallel external data fetch for:", tripDetails.vacation_location);
       
-      // Replace the interim message with the final AI response
-      const updatedPendingMessages = [...pendingMessages];
-      // Remove the interim "gathering information" message if it exists
-      const interimMessageIndex = updatedPendingMessages.findIndex(
-        msg => msg.role === 'model' && msg.message === "I'm gathering some specific information to better answer your question..."
-      );
-      if (interimMessageIndex !== -1) {
-        updatedPendingMessages.splice(interimMessageIndex, 1);
-      }
-      
-      // Add the final response
-      updatedPendingMessages.push({
-        role: 'model',
-        message: finalResponse
+      // טעינת מידע על מלונות, מסעדות ואטרקציות במקביל
+      import("../../utils/itineraryGenerator").then(async ({ fetchExternalDataInParallel }) => {
+        try {
+          // התחלת הבקשות במקביל
+          const externalDataPromise = fetchExternalDataInParallel(tripDetails);
+          
+          // שמירת ההבטחה במשתנה גלובלי כדי שנוכל להשתמש בה מאוחר יותר
+          window.__externalDataPromise = externalDataPromise;
+          
+          console.log("External data fetch started in parallel");
+          
+          // לא מחכים כאן לתוצאות - המשך התהליך יקרה בפונקציית generateItinerary
+        } catch (error) {
+          console.error("Error starting parallel data fetch:", error);
+        }
       });
-      
-      setPendingMessages(updatedPendingMessages);
-      
-      // If successful extraction and we're in Trip-Building mode, update trip details
-      if (success && finalStructuredData && finalStructuredData.mode === "Trip-Building") {
-        console.log("Updating trip details from structured data");
-        
-        // Update the trip details in the context
-        const newTripDetails = updateTripDraft(tripDetails, finalStructuredData.data);
-        setTripDetails(newTripDetails);
-        console.log("Updated trip details:", newTripDetails);
-        
-        // Check if the trip details are complete
-        const completenessCheck = checkTripDraftCompleteness(newTripDetails);
-        console.log("Trip completeness check:", completenessCheck);
-        
-        // If trip is complete and we're not already awaiting confirmation, 
-        // add a trip summary and ask for confirmation
-        if (completenessCheck.isComplete && !isAwaitingConfirmation && 
-            userMessage.toLowerCase() !== "yes" && 
-            !userMessage.toLowerCase().includes("generate itinerary")) {
-          
-          const tripSummary = formatTripSummary(newTripDetails);
-          
-          // Add trip summary to pending messages
-          setPendingMessages(prev => [...prev, {
-            role: 'model',
-            message: `${tripSummary}\n\nDoes this summary look correct? Should I generate a detailed itinerary based on this information?`
-          }]);
-          
-          setIsAwaitingConfirmation(true);
-        }
-        // If user confirms or asks to generate itinerary, and trip is complete
-        else if (completenessCheck.isComplete && 
-                (userMessage.toLowerCase() === "yes" || 
-                 userMessage.toLowerCase().includes("generate itinerary"))) {
-          
-          // Trigger itinerary generation
+    } else {
+      console.warn("Cannot start parallel data fetch - missing location in trip details");
+    }
+
+    // Immediately transition to generating state to show proper UI
+    transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
+
+    // Add a loading indicator to the chat
+    if (
+      window.__processingHookState &&
+      window.__processingHookState.addLoadingMessage
+    ) {
+      // First check if we should add a system message
+      if (window.__processingHookState.addSystemMessage) {
+        console.log("Adding initial system message before generation");
+        window.__processingHookState.addSystemMessage(
+          "Great! I'll generate your personalized travel itinerary now. This might take a moment..."
+        );
+      }
+
+      // Create loading indicator and store its ID globally so it can be replaced later
+      console.log("Creating loading indicator for itinerary generation");
+      const loadingId = window.__processingHookState.addLoadingMessage({
+        isGenerating: true,
+        isItineraryGeneration: true,
+        message:
+          "Generating your personalized travel itinerary... This might take a few moments.",
+      });
+
+      console.log("Created itinerary loading message with ID:", loadingId);
+      window.__itineraryLoadingId = loadingId;
+    }
+
+    // Add a slight delay before triggering generation to ensure UI updates
+    setTimeout(() => {
+      console.log("Starting itinerary generation");
+      // Check if handleGenerateItinerary exists before calling it
+      if (typeof handleGenerateItinerary === "function") {
+        try {
+          // Generate the itinerary
+          console.log("Calling itinerary generator function");
           handleGenerateItinerary();
+        } catch (error) {
+          console.error("Error calling handleGenerateItinerary:", error);
+          // Fallback: Directly transition to generating state
+          transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
         }
+      } else {
+        console.error("handleGenerateItinerary is not a function");
+        // Fallback: Directly transition to generating state
+        transitionState(CONVERSATION_STATES.GENERATING_ITINERARY);
       }
-      
-      // Save to server
-      mutation.mutate({ 
-        userMessage, 
-        aiResponse: finalResponse,
-        image: img.dbData?.filePath
-      });
-      
-      // Reset image state after sending
-      setImg({
-        isLoading: false,
-        error: "",
-        dbData: {},
-        aiData: {},
-      });
-      
-      return { success: true };
-    } catch (error) {
-      console.error("Error processing user input:", error);
-      
-      // Add error message to pending messages
-      setPendingMessages(prev => [...prev, {
-        role: 'model',
-        message: "Sorry, I encountered an error processing your request. Please try again."
-      }]);
-      
-      // Reset image state on error too
-      setImg({
-        isLoading: false,
-        error: "",
-        dbData: {},
-        aiData: {},
-      });
-      
-      return { success: false, error };
-    } finally {
-      setIsTyping(false);
+    }, 100);
+  };
+
+  const handleEditTrip = () => {
+    // Hide trip summary first
+    hideTripSummary();
+
+    // Transition back to trip building mode to edit details
+    transitionState(CONVERSATION_STATES.TRIP_BUILDING_MODE);
+
+    // Display a system message for editing
+    if (
+      window.__processingHookState &&
+      window.__processingHookState.addSystemMessage
+    ) {
+      window.__processingHookState.addSystemMessage(
+        "Let's continue editing your trip details. What would you like to change?"
+      );
+    }
+  };
+
+  const handleCancelTrip = () => {
+    // Hide trip summary first
+    hideTripSummary();
+
+    // Reset and transition back to idle
+    startNewTrip();
+    transitionState(CONVERSATION_STATES.IDLE);
+
+    // Display a system message for cancellation
+    if (
+      window.__processingHookState &&
+      window.__processingHookState.addSystemMessage
+    ) {
+      window.__processingHookState.addSystemMessage(
+        "I've cancelled the trip planning. How else can I assist you today?"
+      );
     }
   };
 
@@ -690,117 +487,105 @@ Would you like to make any adjustments to this itinerary?
   const handleSubmit = async (e) => {
     e.preventDefault();
     const text = e.target.text.value.trim();
-    
+
     if (!text) return;
 
-    // Clear input field
+    // Clear input field immediately
     if (inputRef.current) {
       inputRef.current.value = "";
     }
-    
-    // Process the input
-    await processUserInput(text);
+
+    // REMOVED: Don't add user message here - let processUserInput handle it
+    // This prevents duplicate user messages
+    console.log("NewPromt: Submitting user input:", text);
+
+    // Process the input with our custom hook
+    await processUserInput(text, img);
+
+    // Reset image state after processing
+    setImg({
+      isLoading: false,
+      error: "",
+      dbData: {},
+      aiData: {},
+    });
   };
+
+  // Determine if we should disable input based on state
+  const isInputDisabled =
+    conversationState === CONVERSATION_STATES.GENERATING_ITINERARY;
+
+  // Custom message for input placeholder during generation
+  const inputPlaceholder = isInputDisabled
+    ? "Creating your travel itinerary..."
+    : "Ask DreamTrip-AI about your next vacation...";
 
   return (
     <>
-      <div className="newpPromt">
-        <div className="chat-container">
-          {/* Pending messages (not yet saved to server) */}
-          {pendingMessages.map((msg, index) => (
-            <div key={`pending-${index}`} className={`message ${msg.role === 'user' ? 'user' : ''}`}>
-              {msg.role === 'user' ? (
-                <div className="message-header">
-                  <RiUser3Fill className="user-icon text-sm" />
-                </div>
-              ) : (
-                <div className="message-header">
-                  <div className="ai-avatar-container">
-                    <RiCompass3Fill className="text-blue-400 text-sm" />
-                  </div>
-                </div>
-              )}
-              <div className="message-content">
-                {msg.img && (
-                  <div className="image-container">
-          <IKImage
-            urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
-                      path={msg.img}
-                      width="100%"
-                      height="auto"
-                      transformation={[{ width: 300 }]}
-                      className="message-image rounded-lg"
-                      loading="lazy"
-                      lqip={{ active: true, quality: 20 }}
-                    />
-                  </div>
-                )}
-                <Markdown>{msg.message}</Markdown>
-              </div>
-            </div>
-          ))}
-          
-          {/* Typing indicator */}
-          {isTyping && <TypingIndicator />}
+      <div className="w-full flex flex-col relative box-border bg-[#171923] max-h-full">
+        {/* Trip summary with confirm/edit/cancel buttons - only show when showTripSummary is true */}
+        {showTripSummary && (
+          <TripSummary
+            onConfirm={handleConfirmTrip}
+            onEdit={handleEditTrip}
+            onCancel={handleCancelTrip}
+          />
+        )}
 
-          {/* Itinerary generation indicator */}
-          {isGeneratingItinerary && (
-            <div className="typing-indicator">
-              <div className="typing-indicator-content">
-                <div className="ai-avatar-container mr-1">
-                  <RiCompass3Fill className="text-blue-400 text-sm" />
-                </div>
-                <span className="typing-text">Generating your itinerary</span>
-                <div className="typing-dots">
-                  {[0, 1, 2].map((dot) => (
-                    <motion.div
-                      key={dot}
-                      className="dot"
-                      animate={{
-                        y: ["0%", "-40%", "0%"],
-                        opacity: [0.6, 1, 0.6],
-                        scale: [1, 1.2, 1],
-                      }}
-                      transition={{
-                        duration: 0.6,
-                        repeat: Infinity,
-                        delay: dot * 0.2,
-                        ease: "easeInOut",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+        {/* Itinerary display component */}
+        <ItineraryDisplay inChatView={true} />
 
-        <div className="endChat" ref={endRef}></div>
-        </div>
+        {/* Itinerary editor component */}
+        <ItineraryEditor />
 
-        <form className="newform" onSubmit={handleSubmit} ref={formRef}>
-          <Upload setImg={setImg} />
-          {img.isLoading && (
-            <div className="image-loading-indicator">
+        {/* Input form only - messages are displayed in the parent component */}
+        <form
+          className={`w-full relative bg-[#1a1e2d] flex items-center gap-4 mb-3 px-5 py-4 z-20 shadow-[0_-4px_15px_rgba(0,0,0,0.35)] border-t-2 ${
+            isInputDisabled ? "border-blue-500/40" : "border-blue-500/20"
+          } min-h-[70px] rounded-t-lg`}
+          onSubmit={handleSubmit}
+          ref={formRef}
+        >
+          {!isInputDisabled && <Upload setImg={setImg} />}
+          {img.isLoading && !isInputDisabled && (
+            <div className="flex items-center justify-center bg-blue-500/15 rounded-lg px-2 h-6 ml-1">
               <LoadingDots />
             </div>
           )}
-          {img.dbData?.filePath && (
-            <div className="image-preview-badge" title="Image attached">
-              <div className="image-status">📎</div>
+          {img.dbData?.filePath && !isInputDisabled && (
+            <div
+              className="flex items-center justify-center bg-blue-500/20 rounded-lg px-2 h-6 ml-1"
+              title="Image attached"
+            >
+              <div className="text-sm text-gray-300">📎</div>
             </div>
           )}
           <input id="file" type="file" multiple={false} hidden />
-          <input 
-            type="text" 
+          <input
+            type="text"
             name="text"
             ref={inputRef}
-            placeholder="Ask DreamTrip-AI about your next vacation..." 
-            onChange={(e) => setCurrentInput(e.target.value)}
-            disabled={isGeneratingItinerary}
+            placeholder={inputPlaceholder}
+            disabled={isInputDisabled}
+            className={`flex-1 px-4 py-3 border-none outline-none bg-[#2a2d3c] text-gray-100 text-base rounded-xl h-[45px] shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)] ${
+              isInputDisabled
+                ? "bg-[#232532] text-gray-500 italic"
+                : "focus:ring-2 focus:ring-blue-500/40"
+            }`}
           />
-          <button type="submit" disabled={isGeneratingItinerary}>
-            <IoSend className="send-icon" />
-          </button>
+          {isInputDisabled ? (
+            <div className="rounded-full bg-blue-500/40 border-none p-2.5 w-[45px] h-[45px] flex items-center justify-center flex-shrink-0">
+              <LoadingDots />
+            </div>
+          ) : (
+            <button
+              type="submit"
+              disabled={isInputDisabled}
+              className="rounded-full bg-blue-500 border-none p-2.5 w-[45px] h-[45px] flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0 shadow-[0_3px_8px_rgba(59,130,246,0.4)] hover:bg-blue-600 hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(59,130,246,0.5)] active:translate-y-[1px] active:shadow-[0_1px_3px_rgba(59,130,246,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <IoSend className="text-white text-xl" />
+            </button>
+          )}
         </form>
       </div>
     </>

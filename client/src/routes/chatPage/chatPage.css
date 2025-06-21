@@ -72,7 +72,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: linear-gradient(135deg, #1E293B, #1E1F2A);
+  background: linear-gradient(135deg, #1e293b, #1e1f2a);
   color: #ffffff;
   font-weight: medium;
   font-size: 1rem;
@@ -91,11 +91,11 @@
 .chat-header h3 svg {
   margin-right: 8px;
   font-size: 1.25rem;
-  color: #4F46E5;
+  color: #4f46e5;
 }
 
 .toggle-button {
-  background: linear-gradient(90deg, #4F46E5, #6366F1);
+  background: linear-gradient(90deg, #4f46e5, #6366f1);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -107,7 +107,7 @@
 }
 
 .toggle-button:hover {
-  background: linear-gradient(90deg, #6366F1, #818CF8);
+  background: linear-gradient(90deg, #6366f1, #818cf8);
   transform: translateY(-1px);
   box-shadow: 0 3px 6px rgba(79, 70, 229, 0.4);
 }
@@ -132,6 +132,61 @@
   gap: 15px;
 }
 
+/* Improved spacing for chat with map view */
+.chat-with-map {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100vh;
+  overflow: hidden;
+  margin-top: 0;
+}
+
+/* Compact chat container for map view */
+.compact-chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 0;
+  background-color: rgba(23, 25, 35, 0.97);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Optimized chat messages container */
+#chat-messages-container {
+  padding: 8px 10px !important;
+  padding-bottom: 16px !important;
+  gap: 12px !important;
+  max-height: calc(100vh - 110px) !important;
+}
+
+/* Adjust container height when map is visible */
+.with-map #chat-messages-container {
+  max-height: calc(100vh - 90px) !important;
+}
+
+/* Reduced spacing for message groups */
+#chat-messages-container .flex-col {
+  gap: 20px !important;
+}
+
+/* Adjust the message container height */
+.flex-1.overflow-y-auto.p-4.pb-28 {
+  padding: 12px 14px 60px 14px !important;
+}
+
+/* Adjusted gaps between message elements */
+#chat-messages-container .flex-col > * {
+  margin-bottom: 6px;
+}
+
+/* Ensure the first message has proper spacing */
+#chat-messages-container .flex-col > *:first-child {
+  margin-top: 6px;
+}
+
 .message {
   padding: 10px 14px;
   border-radius: 14px;
@@ -143,6 +198,7 @@
   line-height: 1.4;
   display: flex;
   gap: 10px;
+  margin-bottom: 6px;
 }
 
 .message.user {
@@ -152,6 +208,7 @@
   color: #f9f9f9;
   align-self: flex-end;
   flex-direction: row-reverse;
+  margin-top: 8px;
 }
 
 .message:not(.user) {
@@ -159,89 +216,241 @@
   border-top: 1px solid rgba(107, 114, 128, 0.3);
   border-left: 1px solid rgba(107, 114, 128, 0.3);
   align-self: flex-start;
+  margin-top: 8px;
 }
 
-/* Markdown content styling */
+/* Message styling improvements */
 .message-content {
   flex: 1;
   overflow-wrap: break-word;
   max-width: calc(100% - 30px);
+  font-size: 0.83rem;
+  line-height: 1.45;
+  letter-spacing: 0.01rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  color: rgba(255, 255, 255, 0.92);
 }
 
-.message-content p {
+/* Links in messages */
+.message-content a {
+  color: #60a5fa;
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(96, 165, 250, 0.5);
+  transition: all 0.2s ease;
+}
+
+.message-content a:hover {
+  color: #93c5fd;
+  border-bottom: 1px solid rgba(147, 197, 253, 0.7);
+}
+
+/* Bold text */
+.message-content strong {
+  color: #e2e8f0;
+  font-weight: 600;
+  font-size: 0.83rem;
+}
+
+/* Italic text */
+.message-content em {
+  color: #cbd5e1;
+  font-size: 0.83rem;
+}
+
+/* Blockquotes */
+.message-content blockquote {
+  border-left: 3px solid rgba(96, 165, 250, 0.4);
+  padding-left: 0.8em;
+  margin-left: 0;
+  margin-right: 0;
+  color: #cbd5e1;
+  font-style: italic;
+}
+
+/* Tables */
+.message-content table {
+  border-collapse: collapse;
   margin: 0.5em 0;
+  font-size: 0.78em;
+  width: 100%;
 }
 
-.message-content p:first-child {
-  margin-top: 0;
+.message-content th,
+.message-content td {
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  padding: 0.4em 0.6em;
+  text-align: left;
 }
 
-.message-content p:last-child {
-  margin-bottom: 0;
-}
-
-.message-content ul, .message-content ol {
-  margin: 0.5em 0;
-  padding-left: 1.5em;
-}
-
-.message-content li {
-  margin: 0.25em 0;
-}
-
-.message-content h1, .message-content h2, .message-content h3,
-.message-content h4, .message-content h5, .message-content h6 {
-  margin: 0.75em 0 0.5em;
-  font-size: 1em;
+.message-content th {
+  background-color: rgba(30, 41, 59, 0.7);
+  color: #e2e8f0;
   font-weight: 600;
 }
 
+/* System badge in header */
+.text-xs.py-1.px-2.rounded-full.bg-blue-900\/30.text-blue-400.border.border-blue-800\/30 {
+  background: linear-gradient(
+    135deg,
+    rgba(30, 58, 138, 0.3) 0%,
+    rgba(37, 99, 235, 0.2) 100%
+  );
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  color: #93c5fd;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  padding: 0.25rem 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Header title */
+.text-white.font-medium.text-base.tracking-wide {
+  background: linear-gradient(to right, #e2e8f0, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Status indicator text */
+.text-xs.text-gray-400 {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
+}
+
+/* Improved message containers */
+.px-4.py-3.rounded-xl.text-white.text-base.max-w-\[75\%\].shadow-md.leading-relaxed.flex.gap-3 {
+  padding: 7px 10px !important;
+  font-size: 0.83rem !important;
+  line-height: 1.4 !important;
+  border-radius: 12px !important;
+  gap: 8px !important;
+}
+
+/* User message styling */
+.bg-gradient-to-r.from-blue-600\/30.to-blue-500\/20.text-\[\#f9f9f9\].self-end.flex-row-reverse.border-t.border-r.border-blue-500\/20 {
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.25) 0%,
+    rgba(59, 130, 246, 0.15) 100%
+  ) !important;
+  border-top: 1px solid rgba(59, 130, 246, 0.25) !important;
+  border-right: 1px solid rgba(59, 130, 246, 0.25) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* AI message styling */
+.bg-gradient-to-r.from-\[\#2a2d3c\].to-\[\#30324a\].self-start.border-t.border-l.border-gray-700\/30 {
+  background: linear-gradient(
+    135deg,
+    rgba(42, 45, 60, 0.95) 0%,
+    rgba(48, 50, 74, 0.95) 100%
+  ) !important;
+  border-top: 1px solid rgba(75, 85, 99, 0.3) !important;
+  border-left: 1px solid rgba(75, 85, 99, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* System message styling */
+.bg-gradient-to-r.from-\[\#2a3856\].to-\[\#2c3e69\].self-start.border-t.border-l.border-blue-400\/30 {
+  background: linear-gradient(
+    135deg,
+    rgba(42, 56, 86, 0.95) 0%,
+    rgba(44, 62, 105, 0.95) 100%
+  ) !important;
+  border-top: 1px solid rgba(96, 165, 250, 0.3) !important;
+  border-left: 1px solid rgba(96, 165, 250, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Markdown content styling refinements */
+.message-content p {
+  margin: 0.4em 0;
+  font-size: 0.83rem;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4,
+.message-content h5,
+.message-content h6 {
+  margin: 0.6em 0 0.4em;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
 .message-content code {
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: rgba(0, 0, 0, 0.25);
   padding: 0.1em 0.3em;
   border-radius: 3px;
-  font-family: monospace;
-  font-size: 0.85em;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.78em;
+  color: #a5b4fc;
 }
 
 .message-content pre {
-  background-color: rgba(0, 0, 0, 0.2);
-  padding: 0.75em;
+  background-color: rgba(0, 0, 0, 0.25);
+  padding: 0.6em;
   border-radius: 6px;
   overflow-x: auto;
-  margin: 0.75em 0;
-  font-size: 0.85em;
+  margin: 0.6em 0;
+  font-size: 0.78em;
+  border: 1px solid rgba(75, 85, 99, 0.2);
 }
 
-.message-content pre code {
-  background-color: transparent;
-  padding: 0;
+.message-content ul,
+.message-content ol {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
 }
 
-.message-header {
-  display: flex;
-  align-items: flex-start;
-  padding-top: 2px;
-  flex-shrink: 0;
+.message-content li {
+  margin: 0.2em 0;
+  font-size: 0.83rem;
 }
 
+/* Improved avatar styling for AI */
 .ai-avatar-container {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.15) 0%,
+    rgba(59, 130, 246, 0.25) 100%
+  );
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 2px rgba(59, 130, 246, 0.2);
+  transition: all 0.2s ease;
 }
 
-.ai-avatar {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+/* User avatar styling */
+.bg-blue-500\/30.p-1.rounded-full {
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.2) 0%,
+    rgba(59, 130, 246, 0.3) 100%
+  ) !important;
+  border: 1px solid rgba(59, 130, 246, 0.25) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 2px rgba(59, 130, 246, 0.2) !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.15rem !important;
 }
 
 @keyframes fadeIn {
@@ -255,10 +464,378 @@
   }
 }
 
+/* Optimized chat layout with map */
+.chat-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+  overflow: hidden;
+  margin-top: 0;
+}
+
+/* When map is present */
+.with-map {
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+/* Compact chat input */
+.chat-input-container {
+  padding: 4px 6px !important;
+  margin-top: 0 !important;
+  border-top: 1px solid rgba(59, 130, 246, 0.1);
+  background: linear-gradient(
+    180deg,
+    rgba(23, 25, 35, 0.8) 0%,
+    rgba(23, 25, 35, 0.95) 100%
+  );
+  backdrop-filter: blur(5px);
+}
+
+/* State indicators with reduced spacing */
+.state-indicator {
+  margin: 4px 0 4px 8px !important;
+  padding: 4px 8px !important;
+}
+
+/* Typing indicators with reduced spacing */
+.typing-indicator-wrapper {
+  margin-left: 6px !important;
+  margin-top: 8px !important;
+  margin-bottom: 8px !important;
+}
+
+/* Reduced spacing for the header */
+.flex.items-center.justify-between.py-2.px-4 {
+  padding: 4px 8px !important;
+  min-height: 42px !important;
+}
+
+/* Smaller header elements */
+.bg-blue-600\/20.p-1\.5.rounded-full {
+  padding: 0.3rem !important;
+}
+
+/* Smaller text in header */
+.text-white.font-medium.text-base.tracking-wide {
+  font-size: 0.9rem !important;
+}
+
+/* Optimize spacing for dashboard content */
+.DashboardLayout .content {
+  padding: 4px !important;
+  padding-top: 0 !important;
+}
+
+/* Ensure chat container takes full height */
+.flex.flex-col.h-full.w-full.rounded-xl.shadow-lg.bg-\[\#171923\] {
+  height: 100% !important;
+  max-height: 100vh !important;
+  margin: 0 !important;
+}
+
 /* הוספת מרווח מעל הטופס */
 .newform {
   margin-top: auto;
   background-color: #1a1e2d;
   border-top: 1px solid rgba(59, 130, 246, 0.1);
   padding: 10px 15px;
+}
+
+/* Compact form container styling */
+.compact-form-container {
+  margin-left: 1.5rem !important;
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+  max-width: 380px !important;
+  transition: all 0.2s ease;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  padding: 10px !important;
+  border-radius: 10px;
+  background-color: rgba(30, 41, 59, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+/* Adjust form container on smaller screens */
+@media (max-width: 640px) {
+  .compact-form-container {
+    max-width: 92% !important;
+    margin-left: 0.75rem !important;
+  }
+}
+
+/* Custom styles for ChatPage components */
+
+/* Compact trip summary styles */
+.message-content [isTripSummary="true"] {
+  font-size: 0.95rem !important;
+  line-height: 1.4 !important;
+}
+
+/* Make headings in trip summary smaller */
+.message-content h3 {
+  font-size: 1.1rem !important;
+  margin-bottom: 0.5rem !important;
+  font-weight: 600 !important;
+}
+
+/* Make trip summary bullets and list items more compact */
+.message-content ul,
+.message-content ol {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+  padding-left: 1rem !important;
+}
+
+/* Style bullet points in trip summary nicer */
+.message-content .trip-bullet {
+  margin-bottom: 0.2rem !important;
+  display: flex !important;
+  align-items: flex-start !important;
+}
+
+/* Add styles for trip summary emoji */
+.message-content .trip-emoji {
+  margin-right: 0.5rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* Make trip details more compact */
+.message-content p {
+  margin-bottom: 0.5rem !important;
+}
+
+/* State indicators and loading animations */
+.typing-indicator,
+.external-data-loading,
+.state-indicator {
+  max-width: fit-content !important;
+  font-size: 0.9rem !important;
+  margin-top: 6px !important;
+  margin-bottom: 6px !important;
+}
+
+/* Add styles for location markers and animation effects */
+.location-marker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  background-color: rgba(59, 130, 246, 0.08);
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: 0 2px;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid transparent;
+  text-decoration: none !important;
+  animation: markerFadeIn 0.5s ease-out forwards;
+}
+
+@keyframes markerFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.location-marker:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: rgb(96, 165, 250);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.location-marker.active {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: rgb(96, 165, 250);
+  font-weight: 500;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.restaurant-marker.active {
+  background-color: rgba(250, 96, 132, 0.2);
+  border-color: rgba(250, 96, 132, 0.5);
+  color: rgb(250, 96, 132);
+}
+
+.hotel-marker.active {
+  background-color: rgba(96, 250, 132, 0.2);
+  border-color: rgba(96, 250, 132, 0.5);
+  color: rgb(96, 250, 132);
+}
+
+.evening-marker.active {
+  background-color: rgba(186, 96, 250, 0.2);
+  border-color: rgba(186, 96, 250, 0.5);
+  color: rgb(186, 96, 250);
+}
+
+/* Itinerary loading indicator */
+.itinerary-loading {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05));
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-left: 3px solid rgba(59, 130, 246, 0.5);
+}
+
+.itinerary-loading .loading-spinner {
+  animation: spin 1.2s linear infinite;
+  margin-right: 10px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Marker animations for progressive display */
+.marker-appear {
+  animation: markerAppear 0.5s ease-out forwards;
+}
+
+@keyframes markerAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Day header animations */
+.day-header {
+  position: relative;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  font-size: 1.25rem;
+  color: #e2e8f0;
+  padding-left: 0.5rem;
+  border-left: 3px solid #3b82f6;
+  transition: all 0.5s ease-in-out;
+}
+
+.day-header.animated {
+  animation: dayHeaderAppear 0.8s ease-out forwards;
+}
+
+.day-header:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), transparent);
+  opacity: 0;
+  animation: dayHeaderGlow 0.6s ease-out forwards;
+  animation-delay: 0.2s;
+}
+
+@keyframes dayHeaderAppear {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes dayHeaderGlow {
+  from {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 0.2;
+  }
+}
+
+/* Ensure markdown content has proper spacing between sections */
+.markdown-content h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Animated day content sections */
+.day-content {
+  animation: dayContentFadeIn 0.7s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes dayContentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Add a transition highlight for the current day */
+.current-day {
+  position: relative;
+  animation: currentDayHighlight 2s ease-out forwards;
+}
+
+@keyframes currentDayHighlight {
+  0% {
+    background-color: rgba(59, 130, 246, 0.1);
+  }
+  50% {
+    background-color: rgba(59, 130, 246, 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Ensure smoother transitions between days */
+.itinerary-animation-active .day-content {
+  transition: all 0.5s ease-in-out;
+  opacity: 0;
+  animation: fadeInSlideUp 0.7s ease-out forwards;
+}
+
+.itinerary-animation-active .day-content[data-day="1"] {
+  animation-delay: 0.2s;
+}
+
+.itinerary-animation-active .day-content[data-day="2"] {
+  animation-delay: 0.3s;
+}
+
+.itinerary-animation-active .day-content[data-day="3"] {
+  animation-delay: 0.4s;
+}
+
+@keyframes fadeInSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

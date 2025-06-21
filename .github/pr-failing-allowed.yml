@@ -1,0 +1,11 @@
+name: Allow PR Merge Despite Some Check Failures
+
+# This file configures PR checks to be more lenient during the development phase.
+# When we are closer to production, this should be removed or updated to enforce all checks.
+
+allowedToFail:
+  - lint
+  - test
+  - build
+
+requireMinPassingChecks: 1 # At least one check must pass

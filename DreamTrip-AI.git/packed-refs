@@ -1,0 +1,21 @@
+# pack-refs with: peeled fully-peeled sorted 
+177287f1e71da3f0200e3befe322fa1d746241f0 refs/heads/LLM
+de38c7ddd4524877bfcc963f86616b7a8595bbee refs/heads/Model
+8f2a65906a13909b566e6ec8596177c54f0bac36 refs/heads/RAG
+280915d088d3fd845e939af211cf3eb0b23d0502 refs/heads/RAG2
+52fde5bc86c51a69baaca7305f0a116251e5af9d refs/heads/SideBar_chatlist
+52fde5bc86c51a69baaca7305f0a116251e5af9d refs/heads/main
+e79323c7ceeeff8eaddcaf6b2d97677a34c01a44 refs/original/refs/heads/LLM
+1a5de0fa3ceaac580107e34a55b1fb593db89ac3 refs/original/refs/heads/Model
+e79323c7ceeeff8eaddcaf6b2d97677a34c01a44 refs/original/refs/remotes/origin/LLM
+1a5de0fa3ceaac580107e34a55b1fb593db89ac3 refs/original/refs/remotes/origin/Model
+250df5c58d9df498607d10d4f03d5d664ba361e2 refs/original/refs/remotes/origin/RAG
+ec34d6fce194eb18c1ae4feb55da4b26b32c683c refs/original/refs/remotes/origin/SideBar_chatlist
+52fde5bc86c51a69baaca7305f0a116251e5af9d refs/remotes/origin/HEAD
+e79323c7ceeeff8eaddcaf6b2d97677a34c01a44 refs/remotes/origin/LLM
+97d2670ffbb1c0b46b373441f81735568482c519 refs/remotes/origin/Map_Implement
+1a5de0fa3ceaac580107e34a55b1fb593db89ac3 refs/remotes/origin/Model
+250df5c58d9df498607d10d4f03d5d664ba361e2 refs/remotes/origin/RAG
+ec34d6fce194eb18c1ae4feb55da4b26b32c683c refs/remotes/origin/SideBar_chatlist
+a8f62caacd7ac290c806f37df004a8d36f4c9100 refs/remotes/origin/TextAnlayze
+52fde5bc86c51a69baaca7305f0a116251e5af9d refs/remotes/origin/main

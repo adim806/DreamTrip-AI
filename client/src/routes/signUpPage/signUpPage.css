@@ -4,3 +4,29 @@
     align-items: center;
     justify-content: center;
 }
+
+/* Canvas styles */
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Container for signup form */
+.signup-form-container {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Additional styles for Clerk form elements */
+:root {
+    --clerk-primary: #10b981 !important;
+    --clerk-background: rgba(2, 62, 125, 0.8) !important;
+}

@@ -1,14 +1,16 @@
 import { SignIn } from '@clerk/clerk-react';
 import {
   EffectComposer,
-  DepthOfField,
   Bloom,
   Vignette,
+  ChromaticAberration,
 } from '@react-three/postprocessing';
-import { Sparkles, Environment } from '@react-three/drei';
+import { Sparkles, Environment, Stars, Float } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import { dark, neobrutalism, shadesOfPurple } from '@clerk/themes';
-import { Butterfly2 } from "@/models/Butterfly2";
+import { Earth } from "@/models/Earth";
+import './signinPage.css';
+
 const SigninPage = () => {
   return (
     <div className="relative w-screen h-screen">
@@ -19,60 +21,50 @@ const SigninPage = () => {
         style={{ position: 'absolute', top: 0, left: 0 }}
       >
         <EffectComposer>
-          <DepthOfField
-            focusDistance={0}
-            focalLength={0.02}
-            bokehScale={5}
-            height={480}
-          />
           <Bloom
-            intensity={2}
-            luminanceThreshold={0.1}
+            intensity={0.8}
+            luminanceThreshold={0.3}
             luminanceSmoothing={0.9}
-            height={1000}
+            height={300}
           />
-          <Vignette eskil={false} offset={0.001} darkness={1.0} />
+          <ChromaticAberration offset={[0.0002, 0.0002]} />
+          <Vignette eskil={false} offset={0.1} darkness={0.6} />
         </EffectComposer>
         <color attach="background" args={['#000']} />
-        <ambientLight intensity={4} />
-        <spotLight
-          position={[0, 25, 0]}
-          angle={1.3}
-          penumbra={1}
-          castShadow
-          intensity={2}
-          shadow-bias={-0.0001}
-        />
-        <Environment preset="warehouse" />
-        <Butterfly2
-              rotation-x={Math.PI * 0.05}
-              scale={1}
-              position={[-5, -2, 0]}
-            />
-             <Butterfly2
-              rotation-x={Math.PI * 0.05}
-              scale={1}
-              position={[5, 0, 0]}
-            />
-        <Sparkles
-          noise={0}
-          count={1000}
-          speed={0.01}
-          size={0.6}
-          color={'#FFD2BE'}
-          opacity={0.5}
-          scale={[100, 100, 100]}
-        />
-        <Sparkles
-          noise={0}
-          count={800}
-          speed={0.02}
-          size={1}
-          color={'#FFF'}
-          opacity={0.5}
-          scale={[50, 50, 50]}
+        
+        {/* Ambient lighting */}
+        <ambientLight intensity={0.45} />
+        
+        {/* Main lights for the Earth */}
+        <directionalLight position={[10, 10, 5]} intensity={1.2} color="#ffffff" />
+        <directionalLight position={[-10, -10, -5]} intensity={0.4} color="#6495ED" />
+        <spotLight position={[0, 15, 10]} angle={0.5} penumbra={1} intensity={0.8} color="#ffffff" />
+        
+        {/* Additional light specifically for clouds */}
+        <pointLight position={[20, 5, -30]} intensity={0.8} color="#ffffff" />
+        
+        <Environment preset="night" />
+
+        {/* Background stars */}
+        <Stars 
+          radius={100}
+          depth={50}
+          count={2000}
+          factor={4}
+          saturation={0}
+          fade
+          speed={0.2}
         />
 
+        {/* Earth model in the background */}
+        <Float
+          speed={0.1}
+          rotationIntensity={0.02}
+          floatIntensity={0.03}
+          floatingRange={[0.01, 0.02]}
+        >
+          <Earth position={[18, -2, -40]} scale={0.38} />
+        </Float>
       </Canvas>
 
       {/* SignIn container */}
@@ -98,7 +90,6 @@ const SigninPage = () => {
                 baseTheme: [shadesOfPurple],
                 variables: { colorPrimary: 'blue' },
               },
-
             }}
           />
         </div>
