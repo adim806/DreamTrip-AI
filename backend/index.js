@@ -2605,3 +2605,197 @@ app.get("/api/activities/:chatId", async (req, res) => {
     });
   }
 });
+
+// Import the SavedTrip model
+import SavedTrip from "./models/savedTrips.js";
+
+// Save a trip plan to MongoDB
+app.post("/api/trips/save", authMiddleware, async (req, res) => {
+  try {
+    const { plan, tripDetails, chatId, itineraryData } = req.body;
+    const userId = req.auth?.userId || req.body.userId;
+
+    console.log(`Saving trip plan for user ${userId}, chat ${chatId}`);
+
+    if (!plan || !chatId) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        details: "plan and chatId are required",
+      });
+    }
+
+    // Check if this trip already exists
+    const existingTrip = await SavedTrip.findByChatId(chatId, userId);
+
+    if (existingTrip) {
+      console.log(`Updating existing trip plan for chat ${chatId}`);
+
+      // Update the existing trip
+      existingTrip.plan = plan;
+      existingTrip.destination =
+        tripDetails?.destination || existingTrip.destination;
+      existingTrip.duration = tripDetails?.duration || existingTrip.duration;
+
+      if (tripDetails) {
+        existingTrip.tripDetails = tripDetails;
+      }
+
+      if (itineraryData) {
+        existingTrip.itineraryData = itineraryData;
+      }
+
+      existingTrip.lastViewedAt = new Date();
+      await existingTrip.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Trip plan updated successfully",
+        tripId: existingTrip._id,
+        isUpdate: true,
+      });
+    }
+
+    // Create a new saved trip
+    const newTrip = new SavedTrip({
+      userId,
+      chatId,
+      plan,
+      destination: tripDetails?.destination || "Unknown destination",
+      duration: tripDetails?.duration || "Unknown duration",
+      tripDetails: tripDetails || {},
+      itineraryData: itineraryData || {},
+    });
+
+    const savedTrip = await newTrip.save();
+    console.log(`New trip plan saved with ID: ${savedTrip._id}`);
+
+    return res.status(201).json({
+      success: true,
+      message: "Trip plan saved successfully",
+      tripId: savedTrip._id,
+      isUpdate: false,
+    });
+  } catch (error) {
+    console.error("Error saving trip plan:", error);
+    return res.status(500).json({
+      error: "Failed to save trip plan",
+      details: error.message,
+    });
+  }
+});
+
+// Check if a trip plan is saved
+app.get("/api/trips/check/:chatId", authMiddleware, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.auth?.userId;
+
+    if (!chatId) {
+      return res.status(400).json({ error: "Missing chatId parameter" });
+    }
+
+    const trip = await SavedTrip.findByChatId(chatId, userId);
+
+    return res.json({
+      isSaved: !!trip,
+      tripId: trip ? trip._id : null,
+    });
+  } catch (error) {
+    console.error("Error checking saved trip:", error);
+    return res.status(500).json({ error: "Failed to check saved trip" });
+  }
+});
+
+// Get all saved trips for a user
+app.get("/api/trips/saved", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.auth?.userId;
+
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId" });
+    }
+
+    console.log(`Fetching saved trips for user ${userId}`);
+
+    const trips = await SavedTrip.findByUserId(userId);
+
+    // Return limited data for the list view
+    const formattedTrips = trips.map((trip) => ({
+      id: trip._id,
+      chatId: trip.chatId,
+      destination: trip.destination,
+      duration: trip.duration,
+      createdAt: trip.createdAt,
+      updatedAt: trip.updatedAt,
+      lastViewedAt: trip.lastViewedAt,
+    }));
+
+    console.log(
+      `Found ${formattedTrips.length} saved trips for user ${userId}`
+    );
+
+    return res.status(200).json(formattedTrips);
+  } catch (error) {
+    console.error("Error fetching saved trips:", error);
+    return res.status(500).json({ error: "Failed to fetch saved trips" });
+  }
+});
+
+// Get a specific saved trip by ID
+app.get("/api/trips/saved/:tripId", authMiddleware, async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const userId = req.auth?.userId;
+
+    if (!tripId) {
+      return res.status(400).json({ error: "Missing tripId parameter" });
+    }
+
+    console.log(`Fetching saved trip ${tripId} for user ${userId}`);
+
+    const trip = await SavedTrip.findOne({ _id: tripId, userId });
+
+    if (!trip) {
+      return res.status(404).json({ error: "Trip not found" });
+    }
+
+    // Update last viewed timestamp
+    trip.lastViewedAt = new Date();
+    await trip.save();
+
+    return res.status(200).json(trip);
+  } catch (error) {
+    console.error("Error fetching saved trip:", error);
+    return res.status(500).json({ error: "Failed to fetch saved trip" });
+  }
+});
+
+// Delete a saved trip
+app.delete("/api/trips/saved/:tripId", authMiddleware, async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const userId = req.auth?.userId;
+
+    if (!tripId) {
+      return res.status(400).json({ error: "Missing tripId parameter" });
+    }
+
+    console.log(`Deleting saved trip ${tripId} for user ${userId}`);
+
+    const result = await SavedTrip.deleteOne({ _id: tripId, userId });
+
+    if (result.deletedCount === 0) {
+      return res
+        .status(404)
+        .json({ error: "Trip not found or already deleted" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Trip deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting saved trip:", error);
+    return res.status(500).json({ error: "Failed to delete saved trip" });
+  }
+});

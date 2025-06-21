@@ -96,31 +96,132 @@ const SearchData = ({ trip }) => {
 
   // Handle tab change
   const handleTabChange = (value) => {
+    // Set active tab and update hash
     setActiveTab(value);
-    setActiveLayer(value); // עדכון שכבת המפה הפעילה
     window.location.hash = value;
     
-    // Dispatch a tabChange event so the map can respond accordingly
-    window.dispatchEvent(new CustomEvent('tabChange', {
-      detail: {
-        tab: value
-      }
-    }));
-    
-    // If switching to the itinerary tab, reset the map first
-    if (value === 'itinerary') {
-      // First reset the map to clear any previous routes
-      resetMap();
+    // Special handling for Trip Details tab (עריכת היומן)
+    if (value === 'tripDetails') {
+      console.log("Switching to Trip Details tab - using direct map access");
       
-      // If we have generated a plan, create routes for all days
-      if (generatedPlan) {
+      // Reset active layer immediately to prevent new markers
+      setActiveLayer('');
+      
+      // DIRECT MAP ACCESS: Get the Mapbox map instance and forcefully clear it
+      try {
+        // Find the map container and map instance
+        const mapboxContainer = document.querySelector('.mapboxgl-map');
+        if (mapboxContainer && window.mapboxgl) {
+          // Get all markers and forcefully remove them
+          const mapMarkers = document.querySelectorAll('.mapboxgl-marker');
+          console.log(`Found ${mapMarkers.length} markers to remove directly`);
+          mapMarkers.forEach(marker => marker.remove());
+          
+          // Get all popups and remove them
+          const mapPopups = document.querySelectorAll('.mapboxgl-popup');
+          mapPopups.forEach(popup => popup.remove());
+          
+          // Also remove any custom overlays
+          const overlays = document.querySelectorAll('.map-overlay, .map-legend');
+          overlays.forEach(overlay => overlay.remove());
+          
+          // Create a destructive global cleanup function
+          window.__forceCleanMap = () => {
+            const allMapElements = document.querySelectorAll('.mapboxgl-marker, .mapboxgl-popup, .map-overlay, .map-legend');
+            allMapElements.forEach(el => el.remove());
+            console.log(`Forced removal of ${allMapElements.length} map elements`);
+          };
+          
+          // Execute multiple cleanup attempts with increasing delays
+          [0, 100, 300, 500].forEach(delay => {
+            setTimeout(() => window.__forceCleanMap(), delay);
+          });
+        }
+      } catch (error) {
+        console.error("Error directly accessing map:", error);
+      }
+      
+      // Also use the standard event-based method as backup
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RESET_MAP));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_MAP));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_ROUTES));
+      
+      // Tell ViewMap it's a forced cleanup
+      window.dispatchEvent(new CustomEvent('tabChange', {
+        detail: { tab: 'tripDetails-forced-cleanup' }
+      }));
+      
+      // AGGRESSIVE APPROACH: Create a recurring interval to keep removing markers
+      // This ensures any asynchronously added markers are also removed
+      const cleanupInterval = setInterval(() => {
+        if (activeTab === 'tripDetails') {
+          const mapMarkers = document.querySelectorAll('.mapboxgl-marker');
+          if (mapMarkers.length > 0) {
+            console.log(`Interval cleanup: removing ${mapMarkers.length} markers`);
+            mapMarkers.forEach(marker => marker.remove());
+          }
+        } else {
+          // Stop interval if we're no longer on tripDetails tab
+          clearInterval(cleanupInterval);
+        }
+      }, 200);
+      
+      // Safety: clear interval after 5 seconds no matter what
+      setTimeout(() => clearInterval(cleanupInterval), 5000);
+      
+      // ULTIMA RATIO: If all else fails, create a transparent div over the map area to hide markers
+      // Create element for hiding markers
+      const markerBlocker = document.createElement('div');
+      markerBlocker.id = 'marker-blocker';
+      markerBlocker.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: transparent;
+        z-index: 1000;
+        pointer-events: none;
+      `;
+      
+      // Add the blocker to the map container
+      const mapContainer = document.querySelector('.map-container');
+      if (mapContainer && !document.getElementById('marker-blocker')) {
+        mapContainer.appendChild(markerBlocker);
+        
+        // Remove it after 3 seconds
+        setTimeout(() => {
+          if (document.getElementById('marker-blocker')) {
+            document.getElementById('marker-blocker').remove();
+          }
+        }, 3000);
+      }
+    } 
+    else {
+      // Remove marker blocker if it exists
+      if (document.getElementById('marker-blocker')) {
+        document.getElementById('marker-blocker').remove();
+      }
+      
+      // For other tabs, clear existing markers first
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_MAP));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RESET_MAP));
+      
+      // Update the active layer to trigger displaying the correct markers
+      setActiveLayer(value);
+      
+      // Dispatch tab change event
+      window.dispatchEvent(new CustomEvent('tabChange', {
+        detail: { tab: value }
+      }));
+      
+      // If switching to the itinerary tab and we have a generated plan
+      if (value === 'itinerary' && generatedPlan) {
+        // Add a delay before creating routes
         setTimeout(() => {
           createRoutesFromItinerary(itineraryData);
-        }, 300); // Small delay to ensure map is reset first
+        }, 300);
       }
-    } else if (value === 'tripDetails') {
-      // Reset the map when switching to Trip Details tab
-      resetMap();
     }
   };
 
@@ -523,7 +624,7 @@ const SearchData = ({ trip }) => {
       <Tabs defaultValue={activeTab} onValueChange={handleTabChange} value={activeTab}>
         <TabsList className="grid grid-cols-6 mb-6">
           <TabsTrigger value="generalInfo">🌍 מידע כללי</TabsTrigger>
-          <TabsTrigger value="tripDetails">📋 Trip Details</TabsTrigger>
+          <TabsTrigger value="tripDetails">📋 עריכת היומן</TabsTrigger>
           <TabsTrigger value="hotels">🏨 מלונות</TabsTrigger>
           <TabsTrigger value="restaurants">🍽 מסעדות</TabsTrigger>
           <TabsTrigger value="attractions">🎡 אטרקציות</TabsTrigger>

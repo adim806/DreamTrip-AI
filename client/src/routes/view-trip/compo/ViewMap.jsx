@@ -757,178 +757,6 @@ const ViewMap = ({ trip }) => {
       });
   };
 
-  // Handle highlighting a specific marker
-  const handleHighlightMarker = useCallback(
-    (event) => {
-      const { name, type, coordinates, animation } = event.detail;
-
-      if (!mapRef.current) return;
-
-      console.log(`🔍 Highlighting marker: ${name} (${type})`);
-
-      // Find the marker by name and type
-      let foundMarker = null;
-
-      // First try to find by exact coordinates if provided
-      if (coordinates && coordinates.lat && coordinates.lng) {
-        foundMarker = markersRef.current.find(
-          (marker) =>
-            marker.type === type &&
-            marker.itemData &&
-            Math.abs(marker.itemData.lat - coordinates.lat) < 0.0001 &&
-            Math.abs(marker.itemData.lng - coordinates.lng) < 0.0001
-        );
-      }
-
-      // If not found by coordinates, try by name
-      if (!foundMarker) {
-        // Case insensitive name search
-        const normalizedName = name.toLowerCase().trim();
-        foundMarker = markersRef.current.find(
-          (marker) =>
-            marker.type === type &&
-            marker.itemData &&
-            marker.itemData.name &&
-            marker.itemData.name.toLowerCase().trim().includes(normalizedName)
-        );
-
-        // If still not found, try a more flexible search
-        if (!foundMarker) {
-          // Try to find by partial name match
-          foundMarker = markersRef.current.find(
-            (marker) =>
-              marker.type === type &&
-              marker.itemData &&
-              marker.itemData.name &&
-              (marker.itemData.name.toLowerCase().includes(normalizedName) ||
-                normalizedName.includes(marker.itemData.name.toLowerCase()))
-          );
-
-          // If still not found, try across all marker types as a last resort
-          if (!foundMarker) {
-            foundMarker = markersRef.current.find(
-              (marker) =>
-                marker.itemData &&
-                marker.itemData.name &&
-                (marker.itemData.name.toLowerCase().includes(normalizedName) ||
-                  normalizedName.includes(marker.itemData.name.toLowerCase()))
-            );
-          }
-        }
-      }
-
-      if (foundMarker) {
-        console.log(`✅ Found marker for ${name} in ${type} collection`);
-
-        // Reset any previously highlighted markers
-        markersRef.current.forEach((marker) => {
-          if (marker.element) {
-            marker.element.classList.remove("highlighted", "bounce");
-
-            // Reset any custom styles
-            marker.element.style.zIndex = "";
-            marker.element.style.boxShadow = "";
-            marker.element.style.transform = "";
-            marker.element.style.border = "";
-          }
-        });
-
-        // Highlight the found marker
-        if (foundMarker.element) {
-          // Add highlighted class
-          foundMarker.element.classList.add("highlighted");
-
-          // Apply animation if specified
-          if (animation?.bounce) {
-            foundMarker.element.classList.add("bounce");
-          }
-
-          // Make the marker stand out
-          foundMarker.element.style.zIndex = 999;
-
-          // Add a glowing effect based on marker type
-          let glowColor = "rgba(59, 130, 246, 0.5)"; // Default blue for attractions
-
-          if (foundMarker.type === "restaurants") {
-            glowColor = "rgba(220, 38, 38, 0.5)"; // Red for restaurants
-          } else if (foundMarker.type === "hotels") {
-            glowColor = "rgba(168, 85, 247, 0.5)"; // Purple for hotels
-          }
-
-          foundMarker.element.style.boxShadow = `0 0 0 4px ${glowColor}, 0 0 10px rgba(0, 0, 0, 0.5)`;
-          foundMarker.element.style.border = "2px solid white";
-
-          // Fly to the marker with animation if requested
-          if (
-            animation?.panToMarker &&
-            foundMarker.itemData.lat &&
-            foundMarker.itemData.lng
-          ) {
-            mapRef.current.flyTo({
-              center: [foundMarker.itemData.lng, foundMarker.itemData.lat],
-              zoom: animation?.zoom
-                ? animation.zoomLevel || 15
-                : mapRef.current.getZoom(),
-              essential: true,
-              duration: animation?.duration || 1500,
-            });
-          }
-
-          // Open a popup with information about the location
-          if (foundMarker.popup) {
-            foundMarker.popup.addTo(mapRef.current);
-          }
-        }
-      } else {
-        console.warn(
-          `❌ Could not find marker for ${name} in ${type} collection`
-        );
-
-        // If we have coordinates but no marker, we can still fly to the location
-        if (coordinates && coordinates.lat && coordinates.lng) {
-          console.log(
-            `🌍 Flying to coordinates: [${coordinates.lng}, ${coordinates.lat}]`
-          );
-          mapRef.current.flyTo({
-            center: [coordinates.lng, coordinates.lat],
-            zoom: animation?.zoom
-              ? animation.zoomLevel || 15
-              : mapRef.current.getZoom(),
-            essential: true,
-            duration: animation?.duration || 1500,
-          });
-        } else {
-          // If we have a name but no marker or coordinates, try to geocode the name
-          console.log(`🔍 Trying to geocode location name: ${name}`);
-          fetchCoordinates2(name)
-            .then((coords) => {
-              if (coords && coords.lat && coords.lng) {
-                console.log(
-                  `🌍 Found coordinates for ${name}: [${coords.lng}, ${coords.lat}]`
-                );
-                mapRef.current.flyTo({
-                  center: [coords.lng, coords.lat],
-                  zoom: animation?.zoom
-                    ? animation.zoomLevel || 15
-                    : mapRef.current.getZoom(),
-                  essential: true,
-                  duration: animation?.duration || 1500,
-                });
-              }
-            })
-            .catch((error) => {
-              console.error(`Error geocoding ${name}:`, error);
-            });
-        }
-      }
-    },
-    [mapRef, markersRef, fetchCoordinates2]
-  );
-
-  const handleClearMap = useCallback(() => {
-    clearMarkers();
-  }, [clearMarkers]);
-
   // Handle flying to location by name
   const handleFlyToLocationName = useCallback(
     async (event) => {
@@ -1286,41 +1114,74 @@ const ViewMap = ({ trip }) => {
     // Clear all routes
     handleClearRoutes();
     
-    // Reset map view to default
-    if (trip?.vacation_location) {
-      // If we have a destination, fly to it
-      // Use geocoder to get coordinates for the location
-      const geocoder = new MapboxGeocoder({
-        accessToken: mapboxgl.accessToken,
-        mapboxgl: mapboxgl
-      });
-      
-      geocoder.query(trip.vacation_location, (results) => {
-        if (results && results.features && results.features.length > 0) {
-          const coordinates = results.features[0].center;
-          mapRef.current.flyTo({
-            center: coordinates,
-            zoom: 10,
-            essential: true
-          });
-        }
-      });
-    } else {
-      // Otherwise reset to a default view
-      mapRef.current.flyTo({
-        center: [0, 20],
-        zoom: 1.5,
-        essential: true
-      });
-    }
-    
     // Remove all popups
     const popups = document.querySelectorAll('.mapboxgl-popup');
     popups.forEach(popup => {
       popup.remove();
     });
     
-  }, [trip, clearMarkers, handleClearRoutes]);
+    // Remove any custom markers that might have been added
+    const customMarkers = document.querySelectorAll('.mapboxgl-marker');
+    customMarkers.forEach(marker => {
+      marker.remove();
+    });
+    
+    // Clear all sources and layers that might contain routes or markers
+    if (mapRef.current.getStyle() && mapRef.current.getStyle().sources) {
+      const sources = mapRef.current.getStyle().sources;
+      Object.keys(sources).forEach(sourceId => {
+        // Be more thorough - check for any custom sources that aren't part of the base map
+        if (
+          sourceId !== 'composite' && 
+          sourceId !== 'mapbox-terrain' && 
+          sourceId !== 'mapbox-streets' &&
+          !sourceId.startsWith('mapbox-')
+        ) {
+          try {
+            // Remove any associated layers first
+            const layers = mapRef.current.getStyle().layers;
+            layers.forEach(layer => {
+              if (layer.source === sourceId) {
+                if (mapRef.current.getLayer(layer.id)) {
+                  mapRef.current.removeLayer(layer.id);
+                }
+              }
+            });
+            
+            // Then remove the source
+            if (mapRef.current.getSource(sourceId)) {
+              mapRef.current.removeSource(sourceId);
+            }
+          } catch (err) {
+            // Ignore errors if source/layer doesn't exist or is already removed
+            console.log(`Error removing source/layer ${sourceId}:`, err.message);
+          }
+        }
+      });
+    }
+    
+    // Clear any legends or overlays
+    const legends = document.querySelectorAll('.map-legend, .map-overlay, .mapboxgl-ctrl-group');
+    legends.forEach(legend => {
+      legend.remove();
+    });
+    
+    // Clear any additional map controls that might have been added
+    const controls = document.querySelectorAll('.mapboxgl-ctrl:not(.mapboxgl-ctrl-attrib)');
+    controls.forEach(control => {
+      if (!control.classList.contains('mapboxgl-ctrl-bottom-right') && 
+          !control.classList.contains('mapboxgl-ctrl-bottom-left') &&
+          !control.classList.contains('mapboxgl-ctrl-top-right') &&
+          !control.classList.contains('mapboxgl-ctrl-top-left')) {
+        control.remove();
+      }
+    });
+    
+    // Reset any internal tracking variables
+    markersRef.current = [];
+    
+    console.log("Map reset completed");
+  }, [clearMarkers, handleClearRoutes]);
   
   // Handle fitting map bounds to show all features
   const handleFitBounds = useCallback((event) => {
@@ -1384,6 +1245,174 @@ const ViewMap = ({ trip }) => {
     }
   }, []);
 
+  // Handle highlighting a specific marker
+  const handleHighlightMarker = useCallback(
+    (event) => {
+      const { name, type, coordinates, animation } = event.detail;
+
+      if (!mapRef.current) return;
+
+      console.log(`🔍 Highlighting marker: ${name} (${type})`);
+
+      // Find the marker by name and type
+      let foundMarker = null;
+
+      // First try to find by exact coordinates if provided
+      if (coordinates && coordinates.lat && coordinates.lng) {
+        foundMarker = markersRef.current.find(
+          (marker) =>
+            marker.type === type &&
+            marker.itemData &&
+            Math.abs(marker.itemData.lat - coordinates.lat) < 0.0001 &&
+            Math.abs(marker.itemData.lng - coordinates.lng) < 0.0001
+        );
+      }
+
+      // If not found by coordinates, try by name
+      if (!foundMarker) {
+        // Case insensitive name search
+        const normalizedName = name.toLowerCase().trim();
+        foundMarker = markersRef.current.find(
+          (marker) =>
+            marker.type === type &&
+            marker.itemData &&
+            marker.itemData.name &&
+            marker.itemData.name.toLowerCase().trim().includes(normalizedName)
+        );
+
+        // If still not found, try a more flexible search
+        if (!foundMarker) {
+          // Try to find by partial name match
+          foundMarker = markersRef.current.find(
+            (marker) =>
+              marker.type === type &&
+              marker.itemData &&
+              marker.itemData.name &&
+              (marker.itemData.name.toLowerCase().includes(normalizedName) ||
+                normalizedName.includes(marker.itemData.name.toLowerCase()))
+          );
+
+          // If still not found, try across all marker types as a last resort
+          if (!foundMarker) {
+            foundMarker = markersRef.current.find(
+              (marker) =>
+                marker.itemData &&
+                marker.itemData.name &&
+                (marker.itemData.name.toLowerCase().includes(normalizedName) ||
+                  normalizedName.includes(marker.itemData.name.toLowerCase()))
+            );
+          }
+        }
+      }
+
+      if (foundMarker) {
+        console.log(`✅ Found marker for ${name} in ${type} collection`);
+
+        // Reset any previously highlighted markers
+        markersRef.current.forEach((marker) => {
+          if (marker.element) {
+            marker.element.classList.remove("highlighted", "bounce");
+
+            // Reset any custom styles
+            marker.element.style.zIndex = "";
+            marker.element.style.boxShadow = "";
+            marker.element.style.transform = "";
+            marker.element.style.border = "";
+          }
+        });
+
+        // Highlight the found marker
+        if (foundMarker.element) {
+          // Add highlighted class
+          foundMarker.element.classList.add("highlighted");
+
+          // Apply animation if specified
+          if (animation?.bounce) {
+            foundMarker.element.classList.add("bounce");
+          }
+
+          // Make the marker stand out
+          foundMarker.element.style.zIndex = 999;
+
+          // Add a glowing effect based on marker type
+          let glowColor = "rgba(59, 130, 246, 0.5)"; // Default blue for attractions
+
+          if (foundMarker.type === "restaurants") {
+            glowColor = "rgba(220, 38, 38, 0.5)"; // Red for restaurants
+          } else if (foundMarker.type === "hotels") {
+            glowColor = "rgba(168, 85, 247, 0.5)"; // Purple for hotels
+          }
+
+          foundMarker.element.style.boxShadow = `0 0 0 4px ${glowColor}, 0 0 10px rgba(0, 0, 0, 0.5)`;
+          foundMarker.element.style.border = "2px solid white";
+
+          // Fly to the marker with animation if requested
+          if (
+            animation?.panToMarker &&
+            foundMarker.itemData.lat &&
+            foundMarker.itemData.lng
+          ) {
+            mapRef.current.flyTo({
+              center: [foundMarker.itemData.lng, foundMarker.itemData.lat],
+              zoom: animation?.zoom
+                ? animation.zoomLevel || 15
+                : mapRef.current.getZoom(),
+              essential: true,
+              duration: animation?.duration || 1500,
+            });
+          }
+
+          // Open a popup with information about the location
+          if (foundMarker.popup) {
+            foundMarker.popup.addTo(mapRef.current);
+          }
+        }
+      } else {
+        console.warn(
+          `❌ Could not find marker for ${name} in ${type} collection`
+        );
+
+        // If we have coordinates but no marker, we can still fly to the location
+        if (coordinates && coordinates.lat && coordinates.lng) {
+          console.log(
+            `🌍 Flying to coordinates: [${coordinates.lng}, ${coordinates.lat}]`
+          );
+          mapRef.current.flyTo({
+            center: [coordinates.lng, coordinates.lat],
+            zoom: animation?.zoom
+              ? animation.zoomLevel || 15
+              : mapRef.current.getZoom(),
+            essential: true,
+            duration: animation?.duration || 1500,
+          });
+        } else {
+          // If we have a name but no marker or coordinates, try to geocode the name
+          console.log(`🔍 Trying to geocode location name: ${name}`);
+          fetchCoordinates2(name)
+            .then((coords) => {
+              if (coords && coords.lat && coords.lng) {
+                console.log(
+                  `🌍 Found coordinates for ${name}: [${coords.lng}, ${coords.lat}]`
+                );
+                mapRef.current.flyTo({
+                  center: [coords.lng, coords.lat],
+                  zoom: animation?.zoom
+                    ? animation.zoomLevel || 15
+                    : mapRef.current.getZoom(),
+                  essential: true,
+                  duration: animation?.duration || 1500,
+                });
+              }
+            })
+            .catch((error) => {
+              console.error(`Error geocoding ${name}:`, error);
+            });
+        }
+      }
+    },
+    [mapRef, markersRef, fetchCoordinates2]
+  );
+
   // Set up event listeners
   useEffect(() => {
     // Add event listeners
@@ -1403,13 +1432,51 @@ const ViewMap = ({ trip }) => {
     const handleTabChange = (event) => {
       const { tab } = event.detail || {};
       
-      if (tab === 'tripDetails') {
-        // Reset the map when switching to Trip Details tab
-        handleResetMap();
+      console.log(`Tab changed to: ${tab}`);
+      
+      // Always reset the map completely when switching tabs
+      handleResetMap();
+      
+      // Additional actions for specific tabs
+      if (tab === 'tripDetails' || tab === 'tripDetails-forced-cleanup') {
+        // Extra thorough cleanup for Trip Details tab
+        console.log("Extra cleanup for Trip Details tab");
+        
+        // Force clear all markers again after a short delay to ensure everything is removed
+        setTimeout(() => {
+          // Clear all markers again
+          clearMarkers();
+          
+          // Clear all routes again
+          handleClearRoutes();
+          
+          // Remove any remaining popups
+          const popups = document.querySelectorAll('.mapboxgl-popup');
+          popups.forEach(popup => {
+            popup.remove();
+          });
+          
+          // Remove any custom markers that might have been added
+          const customMarkers = document.querySelectorAll('.mapboxgl-marker');
+          customMarkers.forEach(marker => {
+            marker.remove();
+          });
+          
+          // Clear any map overlays or legends
+          const overlays = document.querySelectorAll('.map-overlay, .map-legend');
+          overlays.forEach(overlay => {
+            overlay.remove();
+          });
+          
+          // Reset any active layer indicators
+          setActiveLayer('');
+          
+          console.log("Forced additional cleanup completed for Trip Details tab");
+        }, 100);
       } else if (tab === 'itinerary') {
         // When switching to the itinerary tab, wait a moment then fit the map to show all routes
         setTimeout(() => {
-          handleFitBounds();
+          handleFitBounds({ detail: { padding: 50 } });
         }, 500);
       }
     };
@@ -1432,13 +1499,13 @@ const ViewMap = ({ trip }) => {
       window.removeEventListener('tabChange', handleTabChange);
     };
   }, [
-    handleDisplayRestaurants, 
-    handleDisplayHotels, 
-    handleDisplayAttractions, 
-    handleDisplayItineraryLocations, 
+    handleDisplayRestaurants,
+    handleDisplayHotels,
+    handleDisplayAttractions,
+    handleDisplayItineraryLocations,
     handleDisplayRoute,
     handleFlyToLocation,
-    handleHighlightMarker, 
+    handleHighlightMarker,
     clearMarkers,
     handleClearRoutes,
     handleResetMap,

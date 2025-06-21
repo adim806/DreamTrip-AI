@@ -13,6 +13,7 @@ import {
 import { NavBar } from "@/components/ui/tubelight-navbar";
 import ItineraryEditor from "@/components/ui/TripDetailsEditor";
 import { resetMap } from "@/utils/map/MapEventService";
+import { MAP_EVENTS } from "@/utils/map/MapEventService";
 
 const ViewTripData = () => {
   const { tripDetails, setTripDetails, setallTripData, allTripData } =
@@ -276,10 +277,37 @@ const ViewTripData = () => {
     setPreviousTab(activeTab);
     setActiveTab(item.id);
     
-    // Reset the map when switching to Trip Details tab
+    // Always reset the map when switching tabs to clear all markers and routes
+    resetMap();
+    console.log(`Map reset triggered when switching to ${tabs[item.id].name} tab`);
+    
+    // If switching to Trip Details tab, perform more thorough cleanup
     if (item.id === 2) {
+      console.log("Switching to Trip Details tab - performing thorough map cleanup");
+      
+      // First reset using the imported function
       resetMap();
-      console.log("Map reset triggered when switching to Trip Details tab");
+      
+      // Then dispatch direct events for the ViewMap component to handle
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RESET_MAP));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_MAP));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_ROUTES));
+      
+      // For extra certainty, add a delayed second reset after a short delay
+      setTimeout(() => {
+        console.log("Performing secondary map reset for Trip Details tab");
+        resetMap();
+        window.dispatchEvent(new CustomEvent(MAP_EVENTS.RESET_MAP));
+        window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_MAP));
+        window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_ROUTES));
+        
+        // Force removal of any remaining map elements via the tabChange event
+        window.dispatchEvent(new CustomEvent('tabChange', {
+          detail: {
+            tab: 'tripDetails-forced-cleanup'
+          }
+        }));
+      }, 200);
     }
   };
 

@@ -605,22 +605,110 @@ const TripPlanner = ({ trip }) => {
       if (result.success) {
         setGeneratedPlan(result.data);
         
-        // Instead of showing the result in this component, dispatch an event
-        // to notify parent components that a plan has been generated
-        console.log("TripPlanner: Dispatching tripPlanGenerated event");
-        const planGeneratedEvent = new CustomEvent('tripPlanGenerated', {
-          detail: {
-            plan: result.data,
-            tripDetails: {
-              destination: trip?.vacation_location || "Unknown destination",
-              duration: `${numDays} days`,
-              chatId: chatId
-            },
-            itineraryData: itinerary // Pass the itinerary data to be used for route creation
-          }
-        });
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center transition-opacity duration-500';
+        notification.style.opacity = '0';
+        notification.innerHTML = `
+          <div class="mr-3 bg-white/20 rounded-full p-2">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="font-bold">Trip Plan Generated!</p>
+            <p class="text-sm">Switching to itinerary view...</p>
+          </div>
+        `;
         
-        document.dispatchEvent(planGeneratedEvent);
+        document.body.appendChild(notification);
+        
+        // Fade in animation
+        setTimeout(() => {
+          notification.style.opacity = '1';
+        }, 10);
+        
+        // Automatically save the trip
+        try {
+          const savedTripResult = await tripPlanService.saveToMyTrips({
+            destination: trip?.vacation_location || "Unknown destination",
+            duration: `${numDays} days`,
+            chatId: chatId,
+            plan: result.data
+          });
+          
+          if (savedTripResult.success) {
+            console.log("TripPlanner: Trip saved successfully:", savedTripResult.id);
+            
+            // Show saved notification
+            const savedNotification = document.createElement('div');
+            savedNotification.className = 'fixed bottom-4 right-4 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center transition-opacity duration-500';
+            savedNotification.style.opacity = '0';
+            savedNotification.innerHTML = `
+              <div class="mr-3 bg-white/20 rounded-full p-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <div>
+                <p class="font-bold">Trip Saved!</p>
+                <p class="text-sm">View in My Trips section</p>
+              </div>
+            `;
+            
+            document.body.appendChild(savedNotification);
+            
+            // Fade in animation for saved notification
+            setTimeout(() => {
+              savedNotification.style.opacity = '1';
+            }, 10);
+            
+            // Fade out saved notification
+            setTimeout(() => {
+              savedNotification.style.opacity = '0';
+              setTimeout(() => {
+                if (document.body.contains(savedNotification)) {
+                  document.body.removeChild(savedNotification);
+                }
+              }, 500);
+            }, 5000);
+          } else {
+            console.error("TripPlanner: Failed to save trip:", savedTripResult.error);
+          }
+        } catch (saveError) {
+          console.error("TripPlanner: Error saving trip:", saveError);
+        }
+        
+        // Dispatch the event with slight delay for visual feedback
+        setTimeout(() => {
+          console.log("TripPlanner: Dispatching tripPlanGenerated event");
+          const planGeneratedEvent = new CustomEvent('tripPlanGenerated', {
+            detail: {
+              plan: result.data,
+              tripDetails: {
+                destination: trip?.vacation_location || "Unknown destination",
+                duration: `${numDays} days`,
+                chatId: chatId
+              },
+              itineraryData: itinerary // Pass the itinerary data to be used for route creation
+            }
+          });
+          
+          document.dispatchEvent(planGeneratedEvent);
+          
+          // Fade out notification
+          setTimeout(() => {
+            notification.style.opacity = '0';
+            setTimeout(() => {
+              if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+              }
+            }, 500);
+          }, 3000);
+          
+          // Update URL hash to switch to itinerary tab
+          window.location.hash = "itinerary";
+        }, 1000);
       } else {
         console.error("TripPlanner: Error generating plan:", result.error);
         setPlanError(result.error || "Failed to generate trip plan. Please try again.");
