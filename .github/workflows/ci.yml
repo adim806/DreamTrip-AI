@@ -26,9 +26,8 @@ jobs:
 
       - name: Run client linting
         working-directory: ./client
-        # העלאת המגבלה ל-500 warnings או הסרת המגבלה לחלוטין
-        run: npm run lint -- --max-warnings 500
-        # או: run: npm run lint -- --max-warnings 0 (אם אתה רוצה לחסום warnings לחלוטין)
+
+        run: npx eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 500
 
       - name: Run client unit tests
         working-directory: ./client
