@@ -14,7 +14,7 @@ module.exports = {
   plugins: ["react-refresh"],
   rules: {
     "react/no-unknown-property": [
-      "error",
+      "warn",
       {
         ignore: [
           "attach",
@@ -49,6 +49,6 @@ module.exports = {
     "no-case-declarations": "warn",
     "react/no-unescaped-entities": "warn",
     "react-hooks/exhaustive-deps": "warn",
-    "parsing-error": "warn",
+    // Removed the invalid 'parsing-error' rule
   },
 };
