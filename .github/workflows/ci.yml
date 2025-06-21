@@ -111,5 +111,5 @@ jobs:
         working-directory: ./client
         run: |
           npm run dev &
-          npx wait-on http://localhost:5173 --timeout 60000
+          sleep 10 
           npm run e2e
