@@ -59,6 +59,7 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -70,50 +71,45 @@ jobs:
           cache: "npm"
           cache-dependency-path: "client/package-lock.json"
 
-      - name: Install dependencies
+      - name: Create .env file
         working-directory: ./client
-        run: npm ci
+        run: |
+          cat << 'EOF' > .env
+          VITE_CLERK_PUBLISHABLE_KEY=pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
+          VITE_IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/ula6wme9r
+          VITE_IMAGE_KIT_PUBLIC_KEY=public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
+          VITE_GEMINI_PUBLIC_KEY=AIzaSyBJDuXqU-7bSiCfugNpqTThNYOd4AQ6GZ0
+          VITE_API_URL=http://localhost:3000
+          VITE_GOOGLE_PLACE_API_KEY=AIzaSyABVesZOlB_dAtxjo6COred7Z5PdjojL1k
+          VITE_MAPBOX_TOKEN=pk.eyJ1IjoiYWRpbTgwNiIsImEiOiJjbTNrMndrdXowN2IxMnFxejk2eWd3ZHk1In0.CQ3v2jo0DCBsgNgt3raS1g
+          VITE_OPENWEATHER_API_KEY=e240b46cf715142953c2d07d2476fa06
+          VITE_FOUR_SQUARE_API_KEY=fsq3k6aPMxVzonJJhdAClLku7ueAzXBZkRUKkkGdvNozHO8=
+          VITE_SERP_API_KEY=78fc430ff4534992862cc145c105b699cca824ed92a96fd6525a6aa450739fa2
+          VITE_GOOGLE_CLOUD_PROJECT_ID=dreamtrip-ai
+          VITE_AMADEUS_API_KEY=nZqeWx6AstFzOyjGUGtuQNi76JhVSvjB
+          VITE_AMADEUS_API_SECRET=XqfX7Op21zVvDYWs
+          EOF
+
+      - name: Install root dependencies
+        run: npm ci --force
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci --force
+
+      - name: Install client dependencies
+        working-directory: ./client
+        run: |
+          npm ci --force
+          npm install --save-dev wait-on --force
 
       - name: Build application
         working-directory: ./client
         run: npm run build
-        env:
-          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
-          VITE_IMAGE_KIT_ENDPOINT: https://ik.imagekit.io/ula6wme9r
-          VITE_IMAGE_KIT_PUBLIC_KEY: public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
-          VITE_GEMINI_PUBLIC_KEY: AIzaSyBJDuXqU-7bSiCfugNpqTThNYOd4AQ6GZ0
-          VITE_API_URL: http://localhost:3000
-          VITE_GOOGLE_PLACE_API_KEY: AIzaSyABVesZOlB_dAtxjo6COred7Z5PdjojL1k
-          VITE_MAPBOX_TOKEN: pk.eyJ1IjoiYWRpbTgwNiIsImEiOiJjbTNrMndrdXowN2IxMnFxejk2eWd3ZHk1In0.CQ3v2jo0DCBsgNgt3raS1g
-          VITE_OPENWEATHER_API_KEY: e240b46cf715142953c2d07d2476fa06
-          VITE_FOUR_SQUARE_API_KEY: fsq3k6aPMxVzonJJhdAClLku7ueAzXBZkRUKkkGdvNozHO8=
-          VITE_SERP_API_KEY: 78fc430ff4534992862cc145c105b699cca824ed92a96fd6525a6aa450739fa2
-          VITE_GOOGLE_CLOUD_PROJECT_ID: dreamtrip-ai
-          VITE_AMADEUS_API_KEY: nZqeWx6AstFzOyjGUGtuQNi76JhVSvjB
-          VITE_AMADEUS_API_SECRET: XqfX7Op21zVvDYWs
 
-      - name: Start development server
+      - name: Start development server and run tests
         working-directory: ./client
         run: |
           npm run dev &
-          npx wait-on http://localhost:5173
-        env:
-          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
-          VITE_IMAGE_KIT_ENDPOINT: https://ik.imagekit.io/ula6wme9r
-          VITE_IMAGE_KIT_PUBLIC_KEY: public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
-          VITE_GEMINI_PUBLIC_KEY: AIzaSyBJDuXqU-7bSiCfugNpqTThNYOd4AQ6GZ0
-          VITE_API_URL: http://localhost:3000
-          VITE_GOOGLE_PLACE_API_KEY: AIzaSyABVesZOlB_dAtxjo6COred7Z5PdjojL1k
-          VITE_MAPBOX_TOKEN: pk.eyJ1IjoiYWRpbTgwNiIsImEiOiJjbTNrMndrdXowN2IxMnFxejk2eWd3ZHk1In0.CQ3v2jo0DCBsgNgt3raS1g
-          VITE_OPENWEATHER_API_KEY: e240b46cf715142953c2d07d2476fa06
-          VITE_FOUR_SQUARE_API_KEY: fsq3k6aPMxVzonJJhdAClLku7ueAzXBZkRUKkkGdvNozHO8=
-          VITE_SERP_API_KEY: 78fc430ff4534992862cc145c105b699cca824ed92a96fd6525a6aa450739fa2
-          VITE_GOOGLE_CLOUD_PROJECT_ID: dreamtrip-ai
-          VITE_AMADEUS_API_KEY: nZqeWx6AstFzOyjGUGtuQNi76JhVSvjB
-          VITE_AMADEUS_API_SECRET: XqfX7Op21zVvDYWs
-
-      - name: Run E2E tests
-        working-directory: ./client
-        run: npm run e2e
-        env:
-          CYPRESS_baseUrl: http://localhost:5173
+          npx wait-on http://localhost:5173 --timeout 60000
+          npm run e2e
