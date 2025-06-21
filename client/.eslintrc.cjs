@@ -48,5 +48,6 @@ module.exports = {
     "no-case-declarations": "warn",
     "react/no-unescaped-entities": "warn",
     "react-hooks/exhaustive-deps": "warn",
+    "parsing-error": "warn",
   },
 };
