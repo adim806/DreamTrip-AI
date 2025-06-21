@@ -209,8 +209,6 @@ const GeneralInfo = ({ trip }) => {
       ];
     } catch (error) {
       console.error("Error fetching additional images:", error);
-      console.error("bro");
-
       return [
         `https://images.pexels.com/photos/442580/pexels-photo-442580.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
         `https://images.pexels.com/photos/538168/pexels-photo-538168.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
