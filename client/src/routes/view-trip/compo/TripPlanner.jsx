@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   DragDropContext,
-  Draggable,
+  StrictModeDraggable as Draggable,
 } from "@/components/ui/StrictModeDndWrapper";
 import { motion } from "framer-motion";
 import activitiesService from "@/utils/services/activitiesService";
@@ -47,6 +47,78 @@ const TripPlanner = ({ trip }) => {
   // Get chatId and userId
   const [userId, setUserId] = useState(null);
   const [chatId, setChatId] = useState(null);
+
+  // Clear all map markers when component mounts
+  useEffect(() => {
+    console.log("TripPlanner component mounted - clearing map markers");
+    
+    // Use the global cleanup function if available
+    if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+      console.log("Using global map cleanup function from TripPlanner");
+      window.__cleanMapCompletely();
+    }
+    
+    // Also dispatch map cleanup events directly
+    if (window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('mapbox:clear-map'));
+      window.dispatchEvent(new CustomEvent('map:reset-all'));
+      window.dispatchEvent(new CustomEvent('map:clear-routes'));
+      
+      // Dispatch a tab change event to ensure ViewMap handles it
+      window.dispatchEvent(new CustomEvent('tabChange', {
+        detail: { tab: 'tripDetails-forced-cleanup' }
+      }));
+    }
+    
+    // Direct DOM manipulation as a last resort
+    setTimeout(() => {
+      const mapElements = document.querySelectorAll('.mapboxgl-marker, .mapboxgl-popup');
+      if (mapElements.length > 0) {
+        console.log(`TripPlanner: Removing ${mapElements.length} map elements directly`);
+        mapElements.forEach(el => el.remove());
+      }
+    }, 300);
+    
+    // Return cleanup function
+    return () => {
+      console.log("TripPlanner component unmounting");
+    };
+  }, []);
+
+  // Listen for tab changes while component is mounted
+  useEffect(() => {
+    // Function to handle tab changes
+    const handleTabChange = (event) => {
+      const { tab } = event.detail || {};
+      
+      // If switching to tripDetails tab, clear the map
+      if (tab === 'tripDetails' || tab === 'tripDetails-forced-cleanup') {
+        console.log("Tab changed to tripDetails while component is mounted - clearing map");
+        
+        // Use the global cleanup function if available
+        if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+          window.__cleanMapCompletely();
+        }
+        
+        // Direct DOM manipulation as a last resort
+        setTimeout(() => {
+          const mapElements = document.querySelectorAll('.mapboxgl-marker, .mapboxgl-popup');
+          if (mapElements.length > 0) {
+            console.log(`TripPlanner (tab change): Removing ${mapElements.length} map elements directly`);
+            mapElements.forEach(el => el.remove());
+          }
+        }, 300);
+      }
+    };
+    
+    // Add event listener for tab changes
+    window.addEventListener('tabChange', handleTabChange);
+    
+    // Clean up event listener on unmount
+    return () => {
+      window.removeEventListener('tabChange', handleTabChange);
+    };
+  }, []);
 
   // Set up days structure
   useEffect(() => {
@@ -321,6 +393,12 @@ const TripPlanner = ({ trip }) => {
   const loadSavedItinerary = () => {
     if (!chatId) return;
 
+    // Clear the map before loading the itinerary
+    if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+      console.log("Clearing map before loading saved itinerary");
+      window.__cleanMapCompletely();
+    }
+
     const storageKey = `tripPlanner_itinerary_${chatId}`;
     const savedItinerary = localStorage.getItem(storageKey);
 
@@ -372,6 +450,26 @@ const TripPlanner = ({ trip }) => {
     if (!itinerary[day]) return;
     
     console.log(`Showing Day ${dayNumber} activities on map`);
+
+    // Clear the map before showing new activities
+    if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+      console.log("Clearing map before showing day activities");
+      window.__cleanMapCompletely();
+    } else {
+      // Fallback to event-based clearing
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RESET_MAP));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_MAP));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_ROUTES));
+      
+      // Direct DOM manipulation as a last resort
+      setTimeout(() => {
+        const mapElements = document.querySelectorAll('.mapboxgl-marker, .mapboxgl-popup');
+        if (mapElements.length > 0) {
+          console.log(`Removing ${mapElements.length} map elements before showing day activities`);
+          mapElements.forEach(el => el.remove());
+        }
+      }, 100);
+    }
 
     const dayActivities = {
       hotels: [],
@@ -586,6 +684,26 @@ const TripPlanner = ({ trip }) => {
     
     setIsGeneratingPlan(true);
     setPlanError(null);
+    
+    // Clear the map before generating plan
+    if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+      console.log("Clearing map before generating trip plan");
+      window.__cleanMapCompletely();
+    } else {
+      // Fallback to event-based clearing
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RESET_MAP));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_MAP));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_ROUTES));
+      
+      // Direct DOM manipulation as a last resort
+      setTimeout(() => {
+        const mapElements = document.querySelectorAll('.mapboxgl-marker, .mapboxgl-popup');
+        if (mapElements.length > 0) {
+          console.log(`Removing ${mapElements.length} map elements before generating trip plan`);
+          mapElements.forEach(el => el.remove());
+        }
+      }, 100);
+    }
     
     try {
       console.log("TripPlanner: Starting trip plan generation process...");

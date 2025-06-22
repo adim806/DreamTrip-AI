@@ -77,6 +77,273 @@ const getWeatherIcon = (weatherId) => {
   }
 };
 
+// Fetch images that are specifically relevant to the destination
+const fetchAdditionalImages = async (location) => {
+  try {
+    console.log(`Finding relevant images for: ${location}`);
+    
+    // Normalize location for better matching
+    const normalizedLocation = location.toLowerCase().trim();
+    
+    // First try exact match
+    let images = destinationImages[normalizedLocation];
+    
+    // If no exact match, try partial match
+    if (!images) {
+      // Sort destinations by length (longest first) to match most specific destination first
+      const destinations = Object.keys(destinationImages).sort((a, b) => b.length - a.length);
+      
+      for (const dest of destinations) {
+        if (normalizedLocation.includes(dest)) {
+          console.log(`Found partial match: "${dest}" in "${normalizedLocation}"`);
+          images = destinationImages[dest];
+          break;
+        }
+      }
+    }
+    
+    // If we have images for this destination, return them
+    if (images) {
+      console.log(`✓ Found specific images for ${location}`);
+      return images;
+    }
+    
+    // If no specific images found, try extracting the main city/country name
+    // This handles cases like "Cultural Trip to Rome" -> "Rome"
+    const locationWords = normalizedLocation.split(/\s+/);
+    for (const word of locationWords) {
+      if (word.length > 3 && destinationImages[word]) {
+        console.log(`Found match by word extraction: "${word}" from "${normalizedLocation}"`);
+        return destinationImages[word];
+      }
+    }
+    
+    console.log(`No specific images found for ${location}. Using geographic category fallback`);
+    
+    // Geographic region fallback - try to categorize the location
+    const regionMatches = {
+      europe: ['europe', 'european', 'eu', 'italia', 'spain', 'france', 'germany', 'uk', 'switzerland', 'austria', 'greece'],
+      asia: ['asia', 'asian', 'china', 'japan', 'korea', 'thailand', 'vietnam', 'india', 'singapore'],
+      middleEast: ['middle east', 'israel', 'jordan', 'egypt', 'dubai', 'uae', 'qatar', 'saudi'],
+      northAmerica: ['usa', 'canada', 'america', 'united states', 'mexico'],
+      beach: ['beach', 'island', 'coast', 'sea', 'ocean', 'tropical', 'hawaii', 'caribbean'],
+      mountain: ['mountain', 'alps', 'hike', 'hiking', 'snow', 'ski', 'skiing']
+    };
+    
+    for (const [region, keywords] of Object.entries(regionMatches)) {
+      if (keywords.some(keyword => normalizedLocation.includes(keyword))) {
+        console.log(`Using regional fallback for: ${region}`);
+        return destinationImages[region] || getDefaultImages();
+      }
+    }
+    
+    // If all else fails, return generic travel images
+    console.log(`Using default travel images for ${location}`);
+    return getDefaultImages();
+    
+  } catch (error) {
+    console.warn(`Error finding images: ${error.message}. Using fallback images.`);
+    return getDefaultImages();
+  }
+};
+
+// A comprehensive database of destination-specific high-quality images
+const destinationImages = {
+  // ===== ISRAEL DESTINATIONS =====
+  'tel aviv': [
+    'https://images.pexels.com/photos/14741600/pexels-photo-14741600.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/16764404/pexels-photo-16764404/free-photo-of-buildings-by-sea-against-clear-sky-in-tel-aviv-israel.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/14373440/pexels-photo-14373440.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/13458339/pexels-photo-13458339.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'jerusalem': [
+    'https://images.pexels.com/photos/3722818/pexels-photo-3722818.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/627823/pexels-photo-627823.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/14365752/pexels-photo-14365752.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2087223/pexels-photo-2087223.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'eilat': [
+    'https://images.pexels.com/photos/10429084/pexels-photo-10429084.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/12512750/pexels-photo-12512750.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/3614162/pexels-photo-3614162.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1320684/pexels-photo-1320684.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'dead sea': [
+    'https://images.pexels.com/photos/9662151/pexels-photo-9662151.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/3577385/pexels-photo-3577385.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/3217656/pexels-photo-3217656.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/4064432/pexels-photo-4064432.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'haifa': [
+    'https://images.pexels.com/photos/4846317/pexels-photo-4846317.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/5309634/pexels-photo-5309634.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/10372002/pexels-photo-10372002.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/5487586/pexels-photo-5487586.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'nazareth': [
+    'https://images.pexels.com/photos/10426164/pexels-photo-10426164.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/10428615/pexels-photo-10428615.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2104882/pexels-photo-2104882.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/757329/pexels-photo-757329.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'acre': [
+    'https://images.pexels.com/photos/6752460/pexels-photo-6752460.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/6752456/pexels-photo-6752456.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/6752458/pexels-photo-6752458.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/5309631/pexels-photo-5309631.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  
+  // ===== POPULAR EUROPEAN DESTINATIONS =====
+  'paris': [
+    'https://images.pexels.com/photos/699466/pexels-photo-699466.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/338515/pexels-photo-338515.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1125212/pexels-photo-1125212.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/705764/pexels-photo-705764.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'london': [
+    'https://images.pexels.com/photos/460672/pexels-photo-460672.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/672532/pexels-photo-672532.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/374815/pexels-photo-374815.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/34632/pexels-photo.jpg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'rome': [
+    'https://images.pexels.com/photos/847864/pexels-photo-847864.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1797158/pexels-photo-1797158.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1701595/pexels-photo-1701595.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/37487/pexels-photo-37487.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'barcelona': [
+    'https://images.pexels.com/photos/819764/pexels-photo-819764.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1388030/pexels-photo-1388030.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1686694/pexels-photo-1686694.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1591304/pexels-photo-1591304.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'amsterdam': [
+    'https://images.pexels.com/photos/967292/pexels-photo-967292.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/208701/pexels-photo-208701.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2031706/pexels-photo-2031706.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1414467/pexels-photo-1414467.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'berlin': [
+    'https://images.pexels.com/photos/1128426/pexels-photo-1128426.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1767434/pexels-photo-1767434.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1738997/pexels-photo-1738997.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/109629/pexels-photo-109629.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'prague': [
+    'https://images.pexels.com/photos/2346216/pexels-photo-2346216.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/3172830/pexels-photo-3172830.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2344627/pexels-photo-2344627.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/126292/pexels-photo-126292.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'vienna': [
+    'https://images.pexels.com/photos/3864681/pexels-photo-3864681.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/9482122/pexels-photo-9482122.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1958385/pexels-photo-1958385.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/4825701/pexels-photo-4825701.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'venice': [
+    'https://images.pexels.com/photos/1796730/pexels-photo-1796730.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1126378/pexels-photo-1126378.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2845013/pexels-photo-2845013.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/3566226/pexels-photo-3566226.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  
+  // ===== POPULAR ASIAN DESTINATIONS =====
+  'tokyo': [
+    'https://images.pexels.com/photos/2506923/pexels-photo-2506923.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2614818/pexels-photo-2614818.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2187605/pexels-photo-2187605.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2079450/pexels-photo-2079450.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'kyoto': [
+    'https://images.pexels.com/photos/1440476/pexels-photo-1440476.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1108701/pexels-photo-1108701.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/5063576/pexels-photo-5063576.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/402028/pexels-photo-402028.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'bangkok': [
+    'https://images.pexels.com/photos/1031659/pexels-photo-1031659.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1682748/pexels-photo-1682748.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1282253/pexels-photo-1282253.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/4652171/pexels-photo-4652171.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  
+  // ===== POPULAR AMERICAN DESTINATIONS =====
+  'new york': [
+    'https://images.pexels.com/photos/802024/pexels-photo-802024.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1486222/pexels-photo-1486222.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1879923/pexels-photo-1879923.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1239162/pexels-photo-1239162.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'san francisco': [
+    'https://images.pexels.com/photos/208745/pexels-photo-208745.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1141853/pexels-photo-1141853.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/3584437/pexels-photo-3584437.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/672916/pexels-photo-672916.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'chicago': [
+    'https://images.pexels.com/photos/1036657/pexels-photo-1036657.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1705254/pexels-photo-1705254.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2129814/pexels-photo-2129814.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1434580/pexels-photo-1434580.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'las vegas': [
+    'https://images.pexels.com/photos/415999/pexels-photo-415999.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2837909/pexels-photo-2837909.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2610756/pexels-photo-2610756.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2670273/pexels-photo-2670273.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  
+  // ===== REGIONAL IMAGE COLLECTIONS =====
+  'europe': [
+    'https://images.pexels.com/photos/3757144/pexels-photo-3757144.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2845013/pexels-photo-2845013.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/161853/eiffel-tower-paris-france-tower-161853.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1128414/pexels-photo-1128414.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'asia': [
+    'https://images.pexels.com/photos/2187605/pexels-photo-2187605.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1366957/pexels-photo-1366957.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2549018/pexels-photo-2549018.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1440476/pexels-photo-1440476.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'middleEast': [
+    'https://images.pexels.com/photos/3722818/pexels-photo-3722818.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/3214995/pexels-photo-3214995.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/4388165/pexels-photo-4388165.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/3225531/pexels-photo-3225531.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'northAmerica': [
+    'https://images.pexels.com/photos/1486222/pexels-photo-1486222.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1705254/pexels-photo-1705254.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/208745/pexels-photo-208745.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2224861/pexels-photo-2224861.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'beach': [
+    'https://images.pexels.com/photos/1450372/pexels-photo-1450372.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2087391/pexels-photo-2087391.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1802268/pexels-photo-1802268.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1591305/pexels-photo-1591305.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ],
+  'mountain': [
+    'https://images.pexels.com/photos/1237119/pexels-photo-1237119.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1325761/pexels-photo-1325761.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1531660/pexels-photo-1531660.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1714341/pexels-photo-1714341.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
+  ]
+};
+
+// Helper function for default images - beautiful travel scenes
+const getDefaultImages = () => {
+  return [
+    'https://images.pexels.com/photos/3155666/pexels-photo-3155666.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2082103/pexels-photo-2082103.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/2325446/pexels-photo-2325446.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    'https://images.pexels.com/photos/1592384/pexels-photo-1592384.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+  ];
+};
+
 const GeneralInfo = ({ trip }) => {
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -90,6 +357,96 @@ const GeneralInfo = ({ trip }) => {
     localStorage.getItem("userId") ||
     sessionStorage.getItem("userId");
   const chatId = trip?.chatId || localStorage.getItem("chatId");
+
+  // Clear all map markers when component mounts
+  useEffect(() => {
+    console.log("GeneralInfo component mounted - clearing map markers");
+    
+    // Use the global cleanup function if available
+    if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+      console.log("Using global map cleanup function from GeneralInfo");
+      window.__cleanMapCompletely();
+    }
+    
+    // Also dispatch map cleanup events directly
+    if (window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('mapbox:clear-map'));
+      window.dispatchEvent(new CustomEvent('map:reset-all'));
+      window.dispatchEvent(new CustomEvent('map:clear-routes'));
+      
+      // Dispatch a tab change event to ensure ViewMap handles it
+      window.dispatchEvent(new CustomEvent('tabChange', {
+        detail: { tab: 'generalInfo-forced-cleanup' }
+      }));
+    }
+    
+    // Direct DOM manipulation as a last resort
+    setTimeout(() => {
+      const mapElements = document.querySelectorAll('.mapboxgl-marker, .mapboxgl-popup');
+      if (mapElements.length > 0) {
+        console.log(`GeneralInfo: Removing ${mapElements.length} map elements directly`);
+        mapElements.forEach(el => el.remove());
+      }
+    }, 300);
+    
+    // Return cleanup function
+    return () => {
+      console.log("GeneralInfo component unmounting");
+    };
+  }, []);
+
+  // Listen for tab changes while component is mounted
+  useEffect(() => {
+    // Function to handle tab changes
+    const handleTabChange = (event) => {
+      const { tab } = event.detail || {};
+      
+      // If switching to generalInfo tab, clear the map
+      if (tab === 'generalInfo' || tab === 'generalInfo-forced-cleanup') {
+        console.log("Tab changed to generalInfo while component is mounted - clearing map");
+        
+        // Use the global cleanup function if available
+        if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+          window.__cleanMapCompletely();
+        }
+        
+        // Direct DOM manipulation as a last resort
+        setTimeout(() => {
+          const mapElements = document.querySelectorAll('.mapboxgl-marker, .mapboxgl-popup');
+          if (mapElements.length > 0) {
+            console.log(`GeneralInfo (tab change): Removing ${mapElements.length} map elements directly`);
+            mapElements.forEach(el => el.remove());
+          }
+          
+          // Update map to show destination if we have trip info
+          if (trip?.vacation_location) {
+            fetchCoordinates(trip.vacation_location).then(coordinates => {
+              if (coordinates && window.dispatchEvent) {
+                window.dispatchEvent(new CustomEvent('mapbox:fly-to-location', {
+                  detail: {
+                    location: { lng: coordinates[0], lat: coordinates[1] },
+                    options: {
+                      zoom: 10,
+                      duration: 2000,
+                      essential: true
+                    }
+                  }
+                }));
+              }
+            });
+          }
+        }, 300);
+      }
+    };
+    
+    // Add event listener for tab changes
+    window.addEventListener('tabChange', handleTabChange);
+    
+    // Clean up event listener on unmount
+    return () => {
+      window.removeEventListener('tabChange', handleTabChange);
+    };
+  }, [trip?.vacation_location]);
 
   const fetchCoordinates = async (locationName) => {
     try {
@@ -187,41 +544,16 @@ const GeneralInfo = ({ trip }) => {
     }
   };
 
-  // Fetch images from Unsplash via their API
-  const fetchAdditionalImages = async (location) => {
-    try {
-      // Use Pixabay API for more reliable image loading
-      const baseImageURL = `https://pixabay.com/api/?key=35616753-b8ecfc14482a997fa5818f926&q=${encodeURIComponent(
-        location
-      )}&image_type=photo&orientation=horizontal&per_page=4`;
-      const response = await axios.get(baseImageURL);
-
-      if (response.data.hits && response.data.hits.length > 0) {
-        return response.data.hits.map((hit) => hit.largeImageURL);
-      }
-
-      // Fallback to direct URLs if Pixabay fails or returns no results
-      return [
-        `https://images.pexels.com/photos/442580/pexels-photo-442580.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
-        `https://images.pexels.com/photos/538168/pexels-photo-538168.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
-        `https://images.pexels.com/photos/2450296/pexels-photo-2450296.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
-        `https://images.pexels.com/photos/5322398/pexels-photo-5322398.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
-      ];
-    } catch (error) {
-      console.error("Error fetching additional images:", error);
-      return [
-        `https://images.pexels.com/photos/442580/pexels-photo-442580.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
-        `https://images.pexels.com/photos/538168/pexels-photo-538168.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
-        `https://images.pexels.com/photos/2450296/pexels-photo-2450296.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
-        `https://images.pexels.com/photos/5322398/pexels-photo-5322398.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1`,
-      ];
-    }
-  };
-
   useEffect(() => {
     const fetchInfo = async () => {
       try {
         setLoading(true);
+        
+        // Clear the map again when fetching new info
+        if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+          window.__cleanMapCompletely();
+        }
+        
         const coordinates = await fetchCoordinates(trip?.vacation_location);
         if (!coordinates) {
           console.error("Coordinates not found");
@@ -240,6 +572,27 @@ const GeneralInfo = ({ trip }) => {
 
         setImageGallery(additionalImages);
         setWeather(weatherData);
+        
+        // Update the map to show the destination location
+        if (window.dispatchEvent && coordinates) {
+          console.log(`Updating map to show ${trip?.vacation_location} at coordinates [${coordinates[0]}, ${coordinates[1]}]`);
+          
+          // First ensure the map is clean
+          window.dispatchEvent(new CustomEvent('mapbox:clear-map'));
+          window.dispatchEvent(new CustomEvent('map:reset-all'));
+          
+          // Then fly to the destination
+          window.dispatchEvent(new CustomEvent('mapbox:fly-to-location', {
+            detail: {
+              location: { lng: coordinates[0], lat: coordinates[1] },
+              options: {
+                zoom: 10,
+                duration: 2000,
+                essential: true
+              }
+            }
+          }));
+        }
       } catch (error) {
         console.error("Error fetching general info:", error);
       } finally {

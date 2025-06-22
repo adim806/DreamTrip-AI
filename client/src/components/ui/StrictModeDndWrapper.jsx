@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 // This component is needed because react-beautiful-dnd doesn't work well with React StrictMode
 // This wrapper ensures components are only rendered once strict mode checks are complete
-export function StrictModeDroppable(props) {
+export function StrictModeDroppable({ children, ...props }) {
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
@@ -15,53 +15,55 @@ export function StrictModeDroppable(props) {
     };
   }, []);
 
-  // Use useMemo to wrap the Droppable component to avoid re-renders
-  const content = useMemo(() => {
-    // If not enabled yet, render placeholder
-    if (!enabled) {
-      return (
-        <div
-          data-rbd-droppable-id={props.droppableId || "placeholder"}
-          data-rbd-droppable-context-id="0"
-          style={{ minHeight: "100px" }}
-        >
-          <div></div>
-        </div>
-      );
-    }
-
-    // Explicitly extract and apply all props to avoid defaultProps issue
-    const {
-      children,
-      droppableId,
-      type = "DEFAULT",
-      direction = "vertical",
-      ignoreContainerClipping = false,
-      isCombineEnabled = false,
-      isDropDisabled = false,
-      mode = "standard",
-      ...otherProps
-    } = props;
-
-    // Return the Droppable with explicitly defined props
+  // If not enabled yet, render placeholder
+  if (!enabled) {
     return (
-      <Droppable
-        droppableId={droppableId}
-        type={type}
-        direction={direction}
-        ignoreContainerClipping={ignoreContainerClipping}
-        isCombineEnabled={isCombineEnabled}
-        isDropDisabled={isDropDisabled}
-        mode={mode}
-        {...otherProps}
+      <div
+        data-rbd-droppable-id={props.droppableId || "placeholder"}
+        data-rbd-droppable-context-id="0"
+        style={{ minHeight: "100px" }}
       >
-        {children}
-      </Droppable>
+        <div></div>
+      </div>
     );
-  }, [enabled, props]);
+  }
 
-  return content;
+  // Return the Droppable with all props
+  return <Droppable {...props}>{children}</Droppable>;
 }
 
-// Export the other components as well for convenience
-export { DragDropContext, Draggable };
+// Similar wrapper for Draggable to handle strict mode issues
+export function StrictModeDraggable({ children, ...props }) {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const animation = requestAnimationFrame(() => setEnabled(true));
+    return () => {
+      cancelAnimationFrame(animation);
+      setEnabled(false);
+    };
+  }, []);
+
+  // If not enabled yet, render placeholder
+  if (!enabled) {
+    return (
+      <div
+        data-rbd-draggable-id={props.draggableId || "placeholder"}
+        data-rbd-draggable-context-id="0"
+        style={{ visibility: "hidden" }}
+      >
+        {typeof children === 'function' ? children({
+          draggableProps: {},
+          dragHandleProps: null,
+          innerRef: () => {},
+        }) : <div></div>}
+      </div>
+    );
+  }
+
+  // Return the Draggable with all props
+  return <Draggable {...props}>{children}</Draggable>;
+}
+
+// Export DragDropContext directly
+export { DragDropContext };

@@ -71,8 +71,30 @@ const ViewMap = ({ trip }) => {
   // Make the clearMarkers function use useCallback to avoid dependency issues
   const clearMarkers = useCallback(() => {
     console.log(`Clearing ${markersRef.current.length} markers from the map`);
-    markersRef.current.forEach((marker) => marker.remove());
+    
+    // Remove markers using the Mapbox API method
+    markersRef.current.forEach((marker) => {
+      if (marker && typeof marker.remove === 'function') {
+        marker.remove();
+      }
+    });
+    
+    // Reset the markers array
     markersRef.current = [];
+    
+    // Extra cleanup: directly remove any markers that might have been missed
+    const domMarkers = document.querySelectorAll('.mapboxgl-marker');
+    if (domMarkers.length > 0) {
+      console.log(`Found ${domMarkers.length} additional markers in the DOM, removing them directly`);
+      domMarkers.forEach(marker => marker.remove());
+    }
+    
+    // Also remove any popups that might be associated with markers
+    const popups = document.querySelectorAll('.mapboxgl-popup');
+    if (popups.length > 0) {
+      console.log(`Removing ${popups.length} popups from the DOM`);
+      popups.forEach(popup => popup.remove());
+    }
   }, []);
 
   const add3DLayers = () => {
@@ -386,8 +408,31 @@ const ViewMap = ({ trip }) => {
     mapRef.current = map;
     map.on("load", () => {
       map.addControl(new mapboxgl.NavigationControl());
+      
+      // Create a global function to forcibly clean the map that can be called from anywhere
+      window.__cleanMapCompletely = () => {
+        console.log("Global map cleanup called");
+        clearMarkers();
+        handleClearRoutes();
+        handleResetMap();
+        
+        // Direct DOM manipulation as a last resort
+        const elements = document.querySelectorAll('.mapboxgl-marker, .mapboxgl-popup, .map-overlay, .map-legend');
+        elements.forEach(el => el.remove());
+      };
     });
+    
+    // Initial cleanup to ensure we start with a clean map
+    setTimeout(() => {
+      clearMarkers();
+      handleClearRoutes();
+    }, 100);
+    
     return () => {
+      // Clean up on unmount
+      if (window.__cleanMapCompletely) {
+        delete window.__cleanMapCompletely;
+      }
       map.remove();
       clearMarkers();
     };
@@ -1180,6 +1225,26 @@ const ViewMap = ({ trip }) => {
     // Reset any internal tracking variables
     markersRef.current = [];
     
+    // EXTRA AGGRESSIVE CLEANUP: Schedule additional cleanup passes
+    // This helps catch any markers that might be added asynchronously
+    [50, 200, 500].forEach(delay => {
+      setTimeout(() => {
+        // Double-check for any remaining markers and remove them
+        const remainingMarkers = document.querySelectorAll('.mapboxgl-marker');
+        if (remainingMarkers.length > 0) {
+          console.log(`Found ${remainingMarkers.length} markers in delayed cleanup, removing them`);
+          remainingMarkers.forEach(marker => marker.remove());
+        }
+        
+        // Double-check for any remaining popups
+        const remainingPopups = document.querySelectorAll('.mapboxgl-popup');
+        if (remainingPopups.length > 0) {
+          console.log(`Found ${remainingPopups.length} popups in delayed cleanup, removing them`);
+          remainingPopups.forEach(popup => popup.remove());
+        }
+      }, delay);
+    });
+    
     console.log("Map reset completed");
   }, [clearMarkers, handleClearRoutes]);
   
@@ -1438,9 +1503,9 @@ const ViewMap = ({ trip }) => {
       handleResetMap();
       
       // Additional actions for specific tabs
-      if (tab === 'tripDetails' || tab === 'tripDetails-forced-cleanup') {
-        // Extra thorough cleanup for Trip Details tab
-        console.log("Extra cleanup for Trip Details tab");
+      if (tab === 'tripDetails-forced-cleanup' || tab === 'generalInfo-forced-cleanup') {
+        // Extra thorough cleanup for Trip Details and General Info tabs
+        console.log(`Extra cleanup for ${tab}`);
         
         // Force clear all markers again after a short delay to ensure everything is removed
         setTimeout(() => {
@@ -1471,13 +1536,49 @@ const ViewMap = ({ trip }) => {
           // Reset any active layer indicators
           setActiveLayer('');
           
-          console.log("Forced additional cleanup completed for Trip Details tab");
+          console.log(`Forced additional cleanup completed for ${tab}`);
+          
+          // For generalInfo, reset the map view to the destination
+          if (tab === 'generalInfo-forced-cleanup' && trip?.vacation_location) {
+            setTimeout(() => {
+              updateDestination();
+            }, 300);
+          }
         }, 100);
+        
+        // Add a second cleanup pass with a longer delay
+        setTimeout(() => {
+          console.log("Running second cleanup pass");
+          clearMarkers();
+          
+          // Direct DOM manipulation as a last resort
+          const remainingMarkers = document.querySelectorAll('.mapboxgl-marker');
+          if (remainingMarkers.length > 0) {
+            console.log(`Second cleanup pass: removing ${remainingMarkers.length} markers`);
+            remainingMarkers.forEach(marker => marker.remove());
+          }
+        }, 800);
+      } else if (tab === 'generalInfo') {
+        // For regular generalInfo tab changes, ensure we reset the map view
+        clearMarkers();
+        handleClearRoutes();
+        
+        // Reset the map view to the destination
+        if (trip?.vacation_location) {
+          setTimeout(() => {
+            updateDestination();
+          }, 300);
+        }
       } else if (tab === 'itinerary') {
         // When switching to the itinerary tab, wait a moment then fit the map to show all routes
         setTimeout(() => {
           handleFitBounds({ detail: { padding: 50 } });
         }, 500);
+      } else if (tab === 'hotels' || tab === 'restaurants' || tab === 'attractions') {
+        // For these tabs, ensure we start with a clean map
+        setTimeout(() => {
+          clearMarkers();
+        }, 50);
       }
     };
     
@@ -1518,8 +1619,37 @@ const ViewMap = ({ trip }) => {
 
   // כאשר activeLayer משתנה – מציגים סימונים בהתאם
   useEffect(() => {
-    // Clear all markers when switching tabs
+    // Clear all markers when switching tabs or layers
+    console.log(`Active layer changed to: ${activeLayer}`);
     clearMarkers();
+
+    // If activeLayer is empty or generalInfo, don't display any markers
+    if (!activeLayer || activeLayer === 'generalInfo' || activeLayer === 'tripDetails') {
+      console.log("No markers to display for this layer");
+      
+      // Extra cleanup for these specific tabs
+      const cleanupForEmptyLayers = () => {
+        // Remove any markers that might still be present
+        const domMarkers = document.querySelectorAll('.mapboxgl-marker');
+        if (domMarkers.length > 0) {
+          console.log(`Found ${domMarkers.length} markers to remove for empty layer`);
+          domMarkers.forEach(marker => marker.remove());
+        }
+        
+        // Remove any popups
+        const popups = document.querySelectorAll('.mapboxgl-popup');
+        if (popups.length > 0) {
+          console.log(`Found ${popups.length} popups to remove for empty layer`);
+          popups.forEach(popup => popup.remove());
+        }
+      };
+      
+      // Run cleanup immediately and after a short delay
+      cleanupForEmptyLayers();
+      setTimeout(cleanupForEmptyLayers, 300);
+      
+      return;
+    }
 
     if (activeLayer && activeLayer.startsWith("hotels")) {
       const updateAndDisplayHotels = async () => {
