@@ -27,6 +27,38 @@ const TripPlannerResult = ({ plan, tripDetails, onClose }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
+  // Clear all map markers when component mounts
+  useEffect(() => {
+    console.log("TripPlannerResult component mounted - clearing map markers");
+    
+    // Use the global cleanup function if available
+    if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+      console.log("Using global map cleanup function from TripPlannerResult");
+      window.__cleanMapCompletely();
+    }
+    
+    // Also dispatch map cleanup events directly
+    if (window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('mapbox:clear-map'));
+      window.dispatchEvent(new CustomEvent('map:reset-all'));
+      window.dispatchEvent(new CustomEvent('map:clear-routes'));
+    }
+    
+    // Direct DOM manipulation as a last resort
+    setTimeout(() => {
+      const mapElements = document.querySelectorAll('.mapboxgl-marker, .mapboxgl-popup');
+      if (mapElements.length > 0) {
+        console.log(`TripPlannerResult: Removing ${mapElements.length} map elements directly`);
+        mapElements.forEach(el => el.remove());
+      }
+    }, 300);
+    
+    // Return cleanup function
+    return () => {
+      console.log("TripPlannerResult component unmounting");
+    };
+  }, []);
+
   // If no plan is provided, try to load from storage
   useEffect(() => {
     if (!plan && tripDetails?.chatId) {

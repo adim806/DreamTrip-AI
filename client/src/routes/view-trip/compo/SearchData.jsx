@@ -96,13 +96,27 @@ const SearchData = ({ trip }) => {
 
   // Handle tab change
   const handleTabChange = (value) => {
+    // First, clear the map regardless of which tab we're switching to
+    console.log(`Switching from ${activeTab} tab to ${value} tab - clearing map`);
+    
+    // Use the global cleanup function if available
+    if (window.__cleanMapCompletely && typeof window.__cleanMapCompletely === 'function') {
+      console.log("Using global map cleanup function");
+      window.__cleanMapCompletely();
+    }
+    
+    // Reset the map to clear all markers, routes, and popups
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RESET_MAP));
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_MAP));
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_ROUTES));
+    
     // Set active tab and update hash
     setActiveTab(value);
     window.location.hash = value;
     
-    // Special handling for Trip Details tab (עריכת היומן)
-    if (value === 'tripDetails') {
-      console.log("Switching to Trip Details tab - using direct map access");
+    // Special handling for Trip Details tab (עריכת היומן) and General Info tab
+    if (value === 'tripDetails' || value === 'generalInfo') {
+      console.log(`Switching to ${value} tab - using direct map access for aggressive cleanup`);
       
       // Reset active layer immediately to prevent new markers
       setActiveLayer('');
@@ -148,21 +162,23 @@ const SearchData = ({ trip }) => {
       
       // Tell ViewMap it's a forced cleanup
       window.dispatchEvent(new CustomEvent('tabChange', {
-        detail: { tab: 'tripDetails-forced-cleanup' }
+        detail: { tab: `${value}-forced-cleanup` }
       }));
       
       // AGGRESSIVE APPROACH: Create a recurring interval to keep removing markers
       // This ensures any asynchronously added markers are also removed
       const cleanupInterval = setInterval(() => {
-        if (activeTab === 'tripDetails') {
-          const mapMarkers = document.querySelectorAll('.mapboxgl-marker');
-          if (mapMarkers.length > 0) {
-            console.log(`Interval cleanup: removing ${mapMarkers.length} markers`);
-            mapMarkers.forEach(marker => marker.remove());
-          }
-        } else {
-          // Stop interval if we're no longer on tripDetails tab
-          clearInterval(cleanupInterval);
+        const mapMarkers = document.querySelectorAll('.mapboxgl-marker');
+        if (mapMarkers.length > 0) {
+          console.log(`Interval cleanup: removing ${mapMarkers.length} markers`);
+          mapMarkers.forEach(marker => marker.remove());
+        }
+        
+        // Also check for popups
+        const popups = document.querySelectorAll('.mapboxgl-popup');
+        if (popups.length > 0) {
+          console.log(`Interval cleanup: removing ${popups.length} popups`);
+          popups.forEach(popup => popup.remove());
         }
       }, 200);
       
@@ -196,16 +212,64 @@ const SearchData = ({ trip }) => {
           }
         }, 3000);
       }
-    } 
+      
+      // NEW: Add a MutationObserver to watch for any new markers that might be added
+      // This is the most aggressive approach to ensure no markers remain
+      try {
+        // Create a mutation observer to watch for any new markers
+        const mapObserver = new MutationObserver((mutations) => {
+          for (const mutation of mutations) {
+            if (mutation.addedNodes.length > 0) {
+              // Check if any of the added nodes are markers or contain markers
+              mutation.addedNodes.forEach(node => {
+                // If the node is an element and is a marker or contains markers
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                  if (node.classList && node.classList.contains('mapboxgl-marker')) {
+                    console.log('MutationObserver: Removing newly added marker');
+                    node.remove();
+                  }
+                  
+                  // Also check for markers inside the added node
+                  const markersInNode = node.querySelectorAll ? node.querySelectorAll('.mapboxgl-marker') : [];
+                  if (markersInNode.length > 0) {
+                    console.log(`MutationObserver: Removing ${markersInNode.length} markers inside added node`);
+                    markersInNode.forEach(marker => marker.remove());
+                  }
+                }
+              });
+            }
+          }
+        });
+        
+        // Start observing the map container for added nodes
+        const mapContainer = document.querySelector('.map-container');
+        if (mapContainer) {
+          mapObserver.observe(mapContainer, { childList: true, subtree: true });
+          
+          // Stop observing after 5 seconds to avoid performance issues
+          setTimeout(() => {
+            mapObserver.disconnect();
+            console.log('MutationObserver disconnected after timeout');
+          }, 5000);
+        }
+      } catch (error) {
+        console.error('Error setting up MutationObserver:', error);
+      }
+      
+      // For generalInfo, reset the map view to the destination after cleanup
+      if (value === 'generalInfo' && trip?.vacation_location) {
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent(MAP_EVENTS.FLY_TO_LOCATION, {
+            detail: { locationName: trip.vacation_location }
+          }));
+        }, 600);
+      }
+    }
     else {
       // Remove marker blocker if it exists
       if (document.getElementById('marker-blocker')) {
         document.getElementById('marker-blocker').remove();
       }
-      
-      // For other tabs, clear existing markers first
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.CLEAR_MAP));
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RESET_MAP));
       
       // Update the active layer to trigger displaying the correct markers
       setActiveLayer(value);

@@ -9,10 +9,44 @@ import ChatPage from "./routes/chatPage/ChatPage";
 import SigninPage from "./routes/signinPage/SigninPage";
 import SignUpPage from "./routes/signUpPage/SignUpPage";
 import MyTripsPage from "./routes/myTrips/MyTripsPage";
+import AboutPage from "./routes/aboutPage/AboutPage";
 import RootLayout from "./layouts/rootLayout/RootLayout";
 import DashboardLayout from "./layouts/dashboardLayout/DashboardLayout";
 import "./index.css";
 import ViewTripData from "./routes/createTrip/ViewTripData";
+
+/**
+ * Error Boundary component to catch any React errors in the component tree
+ */
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("React ErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <h2>Something went wrong.</h2>
+          <button onClick={() => this.setState({ hasError: false })}>
+            Try again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 /**
  * Main entry point for the React application using Vite and React Router DOM.
@@ -81,14 +115,21 @@ const router = createBrowserRouter([
             path: "/mytrips",
             element: <MyTripsPage />,
           },
+          {
+            path: "/about",
+            element: <AboutPage />,
+          },
         ],
       },
     ],
   },
 ]);
 
+// StrictMode is disabled to prevent warnings with react-beautiful-dnd
+// react-beautiful-dnd is not fully compatible with React 18's StrictMode
+// This avoids the "defaultProps will be removed from memo components" warning
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
+  <ErrorBoundary>
     <RouterProvider router={router} />
-  </React.StrictMode>
+  </ErrorBoundary>
 );
