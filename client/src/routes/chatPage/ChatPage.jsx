@@ -55,15 +55,18 @@ const ItineraryActions = React.memo(({ message }) => {
   // State to track if we've navigated to edit
   const [navigatedToEdit, setNavigatedToEdit] = useState(false);
 
-  // Check if this message is an itinerary
+  // Check if this message is an itinerary with more flexible detection
   const isItinerary =
     message.isItinerary ||
     (message.message &&
       (message.message.includes("Day 1:") ||
+        message.message.includes("Day 1 ") ||
         message.message.includes("## Day 1") ||
         message.message.includes("# Travel Itinerary") ||
-        message.message.includes("**Destination:**") ||
-        (message.message.includes("📍[") && message.message.includes("🍽️["))));
+        message.message.includes("# Luxury") || // Common for luxury itinerary titles
+        (message.message.includes("**Destination:**") && message.message.includes("Day")) ||
+        (message.message.includes("📍[") && message.message.includes("🍽️[")) ||
+        (message.message.includes("📍 [") && message.message.includes("🍽️ ["))));
 
   // Automatically display itinerary locations on the map when detected
   useEffect(() => {
@@ -2041,8 +2044,23 @@ const ChatPage = () => {
     dayContent,
     destination,
     messageId,
-    keepExisting = true
+    keepExisting = true, // Default to true to keep locations on the map
+    dayNumber = null // Track which day these locations belong to
   ) => {
+    // Track displayed locations by day for better organization
+    if (!window.__displayedLocationsByDay) {
+      window.__displayedLocationsByDay = {};
+    }
+    
+    // Also maintain a flat list of all locations for deduplication
+    if (!window.__allDisplayedLocations) {
+      window.__allDisplayedLocations = {
+        hotels: [],
+        restaurants: [],
+        attractions: []
+      };
+    }
+    
     try {
       // Import needed functions
       const { displayItineraryLocations } = await import(
@@ -2050,18 +2068,49 @@ const ChatPage = () => {
       );
 
       // Display only the locations mentioned in this day's content
-      // The true parameter ensures we don't clear previous markers
+      // Always pass true to ensure we don't clear previous markers
       const locations = await displayItineraryLocations(
         dayContent,
         destination,
-        keepExisting
+        true, // Force keepExisting to true
+        dayNumber // Pass the day number to help with marker organization
       );
+      
+      // Add to tracking by day
+      if (locations && dayNumber !== null) {
+        window.__displayedLocationsByDay[dayNumber] = {
+          hotels: locations.hotels,
+          restaurants: locations.restaurants,
+          attractions: locations.attractions,
+          addedToMap: true
+        };
+      }
+      
+      // Add to global tracking for deduplication
+      if (locations) {
+        // Update our tracking of all displayed locations
+        window.__allDisplayedLocations.hotels = [
+          ...window.__allDisplayedLocations.hotels,
+          ...locations.hotels.filter(h => !window.__allDisplayedLocations.hotels.some(existing => existing.name === h.name))
+        ];
+        window.__allDisplayedLocations.restaurants = [
+          ...window.__allDisplayedLocations.restaurants,
+          ...locations.restaurants.filter(r => !window.__allDisplayedLocations.restaurants.some(existing => existing.name === r.name))
+        ];
+        window.__allDisplayedLocations.attractions = [
+          ...window.__allDisplayedLocations.attractions,
+          ...locations.attractions.filter(a => !window.__allDisplayedLocations.attractions.some(existing => existing.name === a.name))
+        ];
+      }
 
-      console.log(
-        `Displayed ${
-          Object.values(locations).flat().length
-        } locations for current day`
-      );
+      // Only log in development to reduce console noise
+      if (import.meta.env.DEV) {
+        console.debug(
+          `Displayed ${
+            Object.values(locations).flat().length
+          } locations for day ${dayNumber || 'unknown'}`
+        );
+      }
 
       // After locations are displayed, add click handlers
       setTimeout(() => {
@@ -2173,7 +2222,9 @@ const ChatPage = () => {
         const formattedFullText = formatDayContent(message.message);
         onUpdate(formattedFullText, 100);
         setAnimationProgress(100);
-        console.log("Itinerary animation complete");
+        if (import.meta.env.DEV) {
+          console.debug("Itinerary animation complete");
+        }
 
         // Add click handlers to all location markers
         setTimeout(() => {
@@ -2189,8 +2240,16 @@ const ChatPage = () => {
 
   // Enhanced function to start animating an itinerary message
   const startItineraryAnimation = (message) => {
-    if (!message || !message.message) return;
+    if (!message || !message.message) {
+      console.error("[startItineraryAnimation] Called with invalid message:", message);
+      return;
+    }
 
+    // Only log in development mode
+    if (import.meta.env.DEV) {
+      console.debug("[startItineraryAnimation] Starting animation for message:", message.id);
+    }
+    
     // Set the current message as animating - these are state variables in the ChatPage component
     setAnimatingMessageId(message.id);
     setAnimationProgress(0);
@@ -2207,11 +2266,14 @@ const ChatPage = () => {
       destination = tripDetails.vacation_location;
     }
 
-    // Clear the map initially for a fresh start
-    // Import and use the clearMap function
-    import("../../utils/map/MapEventService").then(({ clearMap }) => {
-      clearMap();
-    });
+    // Import map functions but don't clear map, as we want to keep markers during animations
+    // We'll only reset the tracking of displayed locations
+    window.__displayedLocationsByDay = {}; // Reset day tracking
+    window.__allDisplayedLocations = {
+      hotels: [],
+      restaurants: [],
+      attractions: []
+    };
 
     // Parse the itinerary into days/sections
     const { days, hasDayMarkers } = extractDaysFromItinerary(message.message);
@@ -2221,6 +2283,18 @@ const ChatPage = () => {
       setAnimationProgress(100);
       return;
     }
+    
+    // Get the actual number of days from trip details
+    const actualNumDays = tripDetails?.duration ? parseInt(tripDetails.duration) : days.length;
+    
+    // Log for debugging only in development mode
+    if (import.meta.env.DEV) {
+      console.debug(`[startItineraryAnimation] Trip duration from details: ${actualNumDays} days, Found days in itinerary: ${days.length}`);
+    }
+    
+    // If the number of days in the itinerary doesn't match the actual trip duration,
+    // limit the days we'll animate to the actual number to avoid showing nonexistent days
+    const daysToAnimate = Math.min(days.length, actualNumDays);
 
     // For proper itineraries, we want to extract the intro part before the first day
     let introText = "";
@@ -2359,10 +2433,12 @@ const ChatPage = () => {
           await new Promise((resolve) => setTimeout(resolve, charInterval));
         }
 
-        console.log("Intro animation complete, starting days");
+        if (import.meta.env.DEV) {
+          console.debug("Intro animation complete, starting days");
+        }
 
         // After intro is complete, start animating days one by one
-        await animateDaysSequentially(introText, days, destination, message.id);
+        await animateDaysSequentially(introText, days, destination, message.id, daysToAnimate);
       };
 
       // Function to animate days one by one, ensuring synchronization with map
@@ -2370,12 +2446,13 @@ const ChatPage = () => {
         introSoFar,
         days,
         destination,
-        messageId
+        messageId,
+        numDaysToAnimate = days.length
       ) => {
         let fullText = introSoFar;
 
-        // For each day
-        for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
+        // For each day - only iterate through the actual days in the trip (limited to daysToAnimate)
+        for (let dayIndex = 0; dayIndex < daysToAnimate; dayIndex++) {
           // Update current animating day
           setCurrentAnimatingDay(dayIndex);
 
@@ -2383,7 +2460,9 @@ const ChatPage = () => {
           const dayContent = day.content;
 
           // Extract just this day's content for the map
-          console.log(`Animating Day ${dayIndex + 1}`);
+          if (import.meta.env.DEV) {
+            console.debug(`Animating Day ${dayIndex + 1} of ${daysToAnimate}`);
+          }
 
           // First, show the day header instantly
           const dayHeaderMatch = dayContent.match(/### Day \d+:/);
@@ -2399,11 +2478,14 @@ const ChatPage = () => {
           }
 
           // Create a promise for map markers to track when they're displayed
+          // Always set keepExisting to true to ensure markers stay on the map throughout the animation
+          // Pass the day index+1 as the day number to track which day these markers belong to
           const markersPromise = displayDayLocationsOnMap(
             dayContent,
             destination,
             messageId,
-            true // Keep previous markers
+            true, // Always keep previous markers
+            dayIndex + 1 // Pass the day number (1-based) for organization
           );
 
           // Now animate the day content character by character
@@ -2440,17 +2522,37 @@ const ChatPage = () => {
             );
             if (currentDayElement) {
               currentDayElement.classList.add("current-day");
+              
+              // Also scroll this day into view to ensure user can see it
+              currentDayElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }
           }, 100);
 
-          // Add a pause between days
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+                      // Add a pause between days - shorter pause for a smoother experience
+            await new Promise((resolve) => setTimeout(resolve, 800));
         }
 
-        // Animation complete - set to 100%
-        onUpdate(formatDayContent(message.message), 100);
-        setAnimationProgress(100);
-        console.log("Itinerary animation complete");
+              // Animation complete - need to ensure we only show the actual days from trip duration
+         const { days: allDays } = extractDaysFromItinerary(message.message);
+         const tripDuration = tripDetails?.duration ? parseInt(tripDetails.duration) : allDays.length;
+         
+         // If we need to limit the displayed days
+         if (tripDuration < allDays.length) {
+           // Build limited content with only the actual days
+           let limitedContent = introSoFar;
+           for (let i = 0; i < tripDuration && i < allDays.length; i++) {
+             limitedContent += `<div class="day-content" data-day="${i + 1}">${allDays[i].content}</div>`;
+           }
+           onUpdate(limitedContent, 100);
+         } else {
+           // Show the full formatted content
+           onUpdate(formatDayContent(message.message), 100);
+         }
+         
+         setAnimationProgress(100);
+         if (import.meta.env.DEV) {
+           console.debug("Itinerary animation complete");
+         }
       };
 
       // Start the animation process
@@ -2476,7 +2578,7 @@ const ChatPage = () => {
   useEffect(() => {
     if (!messagesForDisplay.length) return;
 
-    // Check if there's a new itinerary message
+    // Check if there's a new itinerary message with expanded detection patterns
     const latestMessage = messagesForDisplay[messagesForDisplay.length - 1];
     if (
       latestMessage &&
@@ -2484,13 +2586,18 @@ const ChatPage = () => {
       (latestMessage.isItinerary ||
         (latestMessage.message &&
           (latestMessage.message.includes("Day 1:") ||
+            latestMessage.message.includes("Day 1 ") ||
             latestMessage.message.includes("## Day 1") ||
+            latestMessage.message.includes("# Luxury") ||
             latestMessage.message.includes("# Travel Itinerary") ||
-            latestMessage.message.includes("**Destination:**") ||
-            (latestMessage.message.includes("📍[") &&
-              latestMessage.message.includes("🍽️[")))))
+            (latestMessage.message.includes("**Destination:**") && latestMessage.message.includes("Day")) ||
+            (latestMessage.message.includes("📍[") && latestMessage.message.includes("🍽️[")) ||
+            (latestMessage.message.includes("📍 [") && latestMessage.message.includes("🍽️ [")))))
     ) {
       // Start animating this message
+      if (import.meta.env.DEV) {
+        console.debug("[ChatPage] Detected itinerary message, starting animation:", latestMessage.id);
+      }
       startItineraryAnimation(latestMessage);
     }
   }, [messagesForDisplay, animatingMessageId]);
@@ -2502,13 +2609,29 @@ const ChatPage = () => {
       message.isItinerary ||
       (message.message &&
         (message.message.includes("Day 1:") ||
+          message.message.includes("Day 1 ") ||
           message.message.includes("## Day 1") ||
+          message.message.includes("# Luxury") ||
           message.message.includes("# Travel Itinerary") ||
-          message.message.includes("**Destination:**") ||
-          (message.message.includes("📍[") &&
-            message.message.includes("🍽️["))));
+          (message.message.includes("**Destination:**") && message.message.includes("Day")) ||
+          (message.message.includes("📍[") && message.message.includes("🍽️[")) ||
+          (message.message.includes("📍 [") && message.message.includes("🍽️ ["))));
+    
+         // Only log once during development, not in production
+     if (import.meta.env.DEV && 
+         message.message && 
+         !window.__loggedItineraryMessages?.has(message.id) &&
+         (message.message.includes("Day 1") || message.message.includes("**Destination:**"))) {
+       // Track logged messages to prevent duplicates
+       if (!window.__loggedItineraryMessages) window.__loggedItineraryMessages = new Set();
+       window.__loggedItineraryMessages.add(message.id);
+       
+       // Log only in development
+       console.debug("[renderMessage] Found itinerary:", 
+                  {id: message.id, isItinerary: true});
+     }
 
-    // If this is an itinerary and it's currently being animated
+      // If this is an itinerary and it's currently being animated
     if (isItinerary && animatingMessageId === message.id && message.message) {
       // Parse the itinerary structure
       const { days, hasDayMarkers } = extractDaysFromItinerary(message.message);
@@ -2546,13 +2669,16 @@ const ChatPage = () => {
 
           // Add days content based on current day
           if (currentAnimatingDay >= 0 && days.length > 0) {
+            // Add all complete days, but only up to the actual trip duration
+            const daysToShow = Math.min(days.length, tripDetails?.duration ? parseInt(tripDetails.duration) : days.length);
+            
             // Add all complete days
-            for (let i = 0; i < currentAnimatingDay && i < days.length; i++) {
+            for (let i = 0; i < currentAnimatingDay && i < daysToShow; i++) {
               visibleText += days[i].content;
             }
 
             // Add partial current day if we're in the middle of one
-            if (currentAnimatingDay < days.length) {
+            if (currentAnimatingDay < daysToShow) {
               const currentDay = days[currentAnimatingDay];
               // Calculate day progress based on overall animation progress
               const overallDayProgress = (animationProgress - 20) / 80; // Convert to 0-1 for days portion

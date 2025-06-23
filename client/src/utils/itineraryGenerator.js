@@ -4308,6 +4308,7 @@ export const formatItineraryForDisplay = (structuredItinerary) => {
   }
 
   try {
+    console.log("[formatItineraryForDisplay] Starting format conversion");
     // Check if this is the new format or legacy format
     const isNewFormat = isNewItineraryFormat(structuredItinerary);
 
@@ -4318,9 +4319,10 @@ export const formatItineraryForDisplay = (structuredItinerary) => {
     const title = structuredItinerary.title || "Travel Itinerary";
     const destination =
       structuredItinerary.destination || "Unknown Destination";
-    formattedText += `## ${title}\n\n`;
+    formattedText += `# ${title}\n\n`;
 
-    // Add trip overview in a more elegant format
+    // IMPORTANT: Add destination with exact format for detection
+    // Add an extra space to ensure "Day 1:" format is consistent later
     formattedText += `**Destination:** ${destination}\n`;
 
     // Add dates if available
@@ -4453,8 +4455,9 @@ export const formatItineraryForDisplay = (structuredItinerary) => {
     if (isNewFormat) {
       // Process new format with sections
       structuredItinerary.days.forEach((day) => {
-        // Add day header with horizontal line for visual separation - REDUCED FROM ## to ### for smaller headings
-        formattedText += `### Day ${day.dayNumber}: ${day.title}\n\n`;
+        // Use Day X: format with colon for better detection
+        // Critical for animation detection to use Day X: format exactly
+        formattedText += `Day ${day.dayNumber}: ${day.title}\n\n`;
 
         // Add day theme if available
         if (day.theme) {
@@ -4463,8 +4466,8 @@ export const formatItineraryForDisplay = (structuredItinerary) => {
 
         // Process each section of the day
         day.sections.forEach((section) => {
-          // Add section header with time information - REDUCED FROM ### to #### for better hierarchy
-          formattedText += `#### ${section.timeOfDay} (${section.time})\n\n`;
+          // Add section header with time information
+          formattedText += `## ${section.timeOfDay} (${section.time})\n\n`;
 
           // Process activities if present
           if (section.activities && section.activities.length > 0) {
@@ -5144,9 +5147,27 @@ export const formatItineraryForDisplay = (structuredItinerary) => {
     formattedText +=
       "\n*Click on any location marked with an emoji to see it on the map*\n";
 
+    // Add debug logging about the output
+    console.log("[formatItineraryForDisplay] Completed format conversion");
+    console.log("[formatItineraryForDisplay] Markers check:", {
+      destinationPresent: formattedText.includes("**Destination:**"),
+      day1Present:
+        formattedText.includes("Day 1:") || formattedText.includes("Day 1 "),
+      day1WithColon: formattedText.includes("Day 1:"),
+      day1WithSpace: formattedText.includes("Day 1 "),
+      attractionMarkers: formattedText.includes("📍 ["),
+      restaurantMarkers: formattedText.includes("🍽️ ["),
+    });
+
+    // Print the first 200 chars of output for validation
+    console.log(
+      "[formatItineraryForDisplay] Output preview:",
+      formattedText.substring(0, 200) + "..."
+    );
+
     return formattedText;
   } catch (error) {
     console.error("Error formatting itinerary for display:", error);
-    return `Error formatting itinerary: ${error.message}. Please check the JSON structure.`;
+    return "Error formatting itinerary for display.";
   }
 };
