@@ -56,7 +56,7 @@ export function StrictModeDraggable({ children, ...props }) {
           draggableProps: {},
           dragHandleProps: null,
           innerRef: () => {},
-        }) : <div></div>}
+        }, { isDragging: false }) : <div></div>}
       </div>
     );
   }
