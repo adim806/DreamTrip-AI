@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy:
-    # Only run if the PR was merged (not just closed without merging) dammmit
+    # Only run if the PR was merged (not just closed without merging)
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
@@ -56,32 +56,9 @@ jobs:
             git checkout main
             git pull
 
-            # Create .env file with necessary environment variables
-            echo "📄 Creating .env file for client..."
-            cat << EOF > ./client/.env
-            VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-            VITE_IMAGE_KIT_ENDPOINT=${{ secrets.VITE_IMAGE_KIT_ENDPOINT }}
-            VITE_IMAGE_KIT_PUBLIC_KEY=${{ secrets.VITE_IMAGE_KIT_PUBLIC_KEY }}
-            VITE_GEMINI_PUBLIC_KEY=${{ secrets.VITE_GEMINI_PUBLIC_KEY }}
-            VITE_API_URL=${{ secrets.VITE_API_URL_PROD }}
-            VITE_GOOGLE_PLACE_API_KEY=${{ secrets.VITE_GOOGLE_PLACE_API_KEY }}
-            VITE_MAPBOX_TOKEN=${{ secrets.VITE_MAPBOX_TOKEN }}
-            VITE_OPENWEATHER_API_KEY=${{ secrets.VITE_OPENWEATHER_API_KEY }}
-            VITE_FOUR_SQUARE_API_KEY=${{ secrets.VITE_FOUR_SQUARE_API_KEY }}
-            VITE_SERP_API_KEY=${{ secrets.VITE_SERP_API_KEY }}
-            VITE_GOOGLE_CLOUD_PROJECT_ID=${{ secrets.VITE_GOOGLE_CLOUD_PROJECT_ID }}
-            VITE_AMADEUS_API_KEY=${{ secrets.VITE_AMADEUS_API_KEY }}
-            VITE_AMADEUS_API_SECRET=${{ secrets.VITE_AMADEUS_API_SECRET }}
-            EOF
-
-            # Create .env file for backend
-            echo "📄 Creating .env file for backend..."
-            cat << EOF > ./backend/.env
-            MONGODB_URI=${{ secrets.MONGODB_URI_PROD }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
-            PORT=3000
-            EOF
+            # Install root dependencies
+            echo "📦 Installing root dependencies..."
+            npm install
 
             # Install backend dependencies and start backend with PM2
             echo "📦 Installing backend dependencies..."
