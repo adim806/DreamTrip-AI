@@ -1,0 +1,115 @@
+name: CD Workflow
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+jobs:
+  deploy:
+    # Only run if the PR was merged (not just closed without merging)
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the latest code from the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Connect to remote server via SSH and run deployment commands
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            # Update package lists and install curl (if not already installed)
+            echo "🔧 Updating system and installing curl..."
+            sudo apt-get update -y && sudo apt-get install -y curl
+
+            # Install 'n' to manage Node.js versions globally
+            echo "📦 Installing n (Node version manager)..."
+            sudo npm install -g n
+
+            # Install Node.js version 18 (matching CI workflow)
+            echo "⬆️ Installing Node.js 18..."
+            sudo n 18
+
+            # Verify the installed Node.js version
+            echo "✅ Verifying Node.js version..."
+            node -v
+            npm -v
+
+            # Install PM2 globally to manage Node processes
+            echo "🔨 Installing PM2 globally..."
+            sudo npm install -g pm2
+
+            # Navigate to your project directory – update the path accordingly
+            echo "🚀 Navigating to project directory..."
+            cd ~/DreamTrip-AI
+
+            # Checkout the main branch and pull the latest changes
+            echo "📂 Checking out main branch and pulling latest changes..."
+            git checkout main
+            git pull
+
+            # Create .env file with necessary environment variables
+            echo "📄 Creating .env file for client..."
+            cat << EOF > ./client/.env
+            VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+            VITE_IMAGE_KIT_ENDPOINT=${{ secrets.VITE_IMAGE_KIT_ENDPOINT }}
+            VITE_IMAGE_KIT_PUBLIC_KEY=${{ secrets.VITE_IMAGE_KIT_PUBLIC_KEY }}
+            VITE_GEMINI_PUBLIC_KEY=${{ secrets.VITE_GEMINI_PUBLIC_KEY }}
+            VITE_API_URL=${{ secrets.VITE_API_URL_PROD }}
+            VITE_GOOGLE_PLACE_API_KEY=${{ secrets.VITE_GOOGLE_PLACE_API_KEY }}
+            VITE_MAPBOX_TOKEN=${{ secrets.VITE_MAPBOX_TOKEN }}
+            VITE_OPENWEATHER_API_KEY=${{ secrets.VITE_OPENWEATHER_API_KEY }}
+            VITE_FOUR_SQUARE_API_KEY=${{ secrets.VITE_FOUR_SQUARE_API_KEY }}
+            VITE_SERP_API_KEY=${{ secrets.VITE_SERP_API_KEY }}
+            VITE_GOOGLE_CLOUD_PROJECT_ID=${{ secrets.VITE_GOOGLE_CLOUD_PROJECT_ID }}
+            VITE_AMADEUS_API_KEY=${{ secrets.VITE_AMADEUS_API_KEY }}
+            VITE_AMADEUS_API_SECRET=${{ secrets.VITE_AMADEUS_API_SECRET }}
+            EOF
+
+            # Create .env file for backend
+            echo "📄 Creating .env file for backend..."
+            cat << EOF > ./backend/.env
+            MONGODB_URI=${{ secrets.MONGODB_URI_PROD }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
+            PORT=3000
+            EOF
+
+            # Install backend dependencies and start backend with PM2
+            echo "📦 Installing backend dependencies..."
+            cd backend
+            npm install
+
+            # Remove any existing backend process to avoid 'Script already launched' error
+            echo "🧹 Deleting any existing backend PM2 process..."
+            pm2 delete backend || true
+
+            echo "🟢 Starting backend with PM2..."
+            pm2 start index.js --name backend
+
+            # Install client dependencies, build and start client with PM2
+            echo "📦 Installing client dependencies..."
+            cd ../client
+            npm install
+            npm run build
+
+            # Remove any existing frontend process before starting a new one
+            echo "🧹 Deleting any existing client PM2 process..."
+            pm2 delete client || true
+
+            echo "🟢 Serving client build with PM2..."
+            pm2 start "serve -s dist -l 5173" --name client
+
+            # Save PM2 configuration so processes restart on server reboot
+            echo "💾 Saving PM2 configuration..."
+            pm2 save
+
+            echo "✅ Deployment complete!"

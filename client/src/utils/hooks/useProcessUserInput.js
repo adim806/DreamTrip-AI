@@ -2956,6 +2956,74 @@ export function useProcessUserInput(chatData) {
     }
   }, [safeTransitionState]);
 
+  // Add a watcher for state transitions to DISPLAYING_ITINERARY to ensure the itinerary is shown
+  useEffect(() => {
+    // Only proceed if we're in the displaying_itinerary state and have allTripData
+    if (
+      conversationState === CONVERSATION_STATES.DISPLAYING_ITINERARY &&
+      allTripData?.itinerary
+    ) {
+      console.log(
+        "[ModularProcessing] Transitioning to display itinerary state, ensuring itinerary is shown in chat"
+      );
+
+      // Check if the itinerary is already in the pending messages
+      const itineraryAlreadyDisplayed = pendingMessages.some(
+        (msg) =>
+          msg.message &&
+          (msg.message.includes("Day 1:") ||
+            msg.message.includes("Day 1 ") ||
+            msg.message.includes("# Luxury") ||
+            msg.message.includes("**Destination:**") ||
+            (msg.message.includes("📍[") && msg.message.includes("🍽️[")) ||
+            (msg.message.includes("📍 [") && msg.message.includes("🍽️ [")))
+      );
+
+      // Only add the itinerary if it's not already displayed
+      if (!itineraryAlreadyDisplayed) {
+        console.log(
+          "[ModularProcessing] Itinerary not found in messages, adding it to the chat"
+        );
+
+        // Replace loading message if it exists
+        if (window.__itineraryLoadingId) {
+          replaceLoadingMessage(window.__itineraryLoadingId, {
+            role: "model",
+            message: allTripData.itinerary,
+            id: `itinerary-${Date.now()}`,
+            isItinerary: true,
+          });
+
+          // Clear the loading ID reference
+          delete window.__itineraryLoadingId;
+        } else {
+          // If no loading message to replace, add as a new message
+          setPendingMessages((prev) => [
+            ...prev,
+            {
+              role: "model",
+              message: allTripData.itinerary,
+              id: `itinerary-${Date.now()}`,
+              isItinerary: true,
+            },
+          ]);
+        }
+
+        console.log("[ModularProcessing] Added itinerary to chat");
+      } else {
+        console.log(
+          "[ModularProcessing] Itinerary already displayed in chat, no action needed"
+        );
+      }
+    }
+  }, [
+    conversationState,
+    allTripData,
+    pendingMessages,
+    setPendingMessages,
+    replaceLoadingMessage,
+  ]);
+
   // Return the complete hook interface (maintaining backward compatibility)
   return {
     // Message handling (from modular system)

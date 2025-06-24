@@ -751,15 +751,19 @@ function normalizeLocationName(name) {
 export const displayItineraryLocations = async (
   itineraryText,
   destination,
-  incrementalMode = false
+  incrementalMode = true, // Changed default to true so locations always stay on the map
+  dayNumber = null // Optional day number to associate with these locations
 ) => {
   if (!itineraryText) return { hotels: [], restaurants: [], attractions: [] };
 
-  console.log(
-    `Extracting locations from itinerary text${
-      incrementalMode ? " (incremental mode)" : ""
-    }`
-  );
+  // Only log in development mode to reduce console noise
+  if (import.meta.env.DEV) {
+    console.debug(
+      `Extracting locations from itinerary text${
+        incrementalMode ? " (incremental mode)" : ""
+      }`
+    );
+  }
 
   // Store animation session information in window object if not exists
   if (!window.__itineraryAnimationSession) {
@@ -810,6 +814,9 @@ export const displayItineraryLocations = async (
     newLocations.hotels.forEach((hotel) => {
       if (!isLocationAlreadyAdded(hotel, "hotel")) {
         hotel.isNew = true; // Mark as new for animation
+        if (dayNumber !== null) {
+          hotel.dayNumber = dayNumber; // Associate with day number
+        }
         mergedHotels.push(hotel);
       }
     });
@@ -818,6 +825,9 @@ export const displayItineraryLocations = async (
     newLocations.restaurants.forEach((restaurant) => {
       if (!isLocationAlreadyAdded(restaurant, "restaurant")) {
         restaurant.isNew = true; // Mark as new for animation
+        if (dayNumber !== null) {
+          restaurant.dayNumber = dayNumber; // Associate with day number
+        }
         mergedRestaurants.push(restaurant);
       }
     });
@@ -826,6 +836,9 @@ export const displayItineraryLocations = async (
     newLocations.attractions.forEach((attraction) => {
       if (!isLocationAlreadyAdded(attraction, "attraction")) {
         attraction.isNew = true; // Mark as new for animation
+        if (dayNumber !== null) {
+          attraction.dayNumber = dayNumber; // Associate with day number
+        }
         mergedAttractions.push(attraction);
       }
     });
@@ -839,10 +852,12 @@ export const displayItineraryLocations = async (
 
     mergedLocations = session.locations;
 
-    console.log(`Incremental mode: Total locations after merging: 
-      ${mergedHotels.length} hotels, 
-      ${mergedRestaurants.length} restaurants, 
-      ${mergedAttractions.length} attractions`);
+    if (import.meta.env.DEV) {
+      console.debug(`Incremental mode: Total locations after merging: 
+        ${mergedHotels.length} hotels, 
+        ${mergedRestaurants.length} restaurants, 
+        ${mergedAttractions.length} attractions`);
+    }
   } else {
     // For non-incremental mode or first run, just use the new locations
     mergedLocations = newLocations;
@@ -885,6 +900,7 @@ export const displayItineraryLocations = async (
       timestamp: window.__itineraryAnimationSession.timestamp,
       animateNewMarkers: incrementalMode, // Only animate new markers in incremental mode
       highlightNewMarkers: incrementalMode, // Highlight newly added markers
+      dayNumber: dayNumber, // Pass the day number for marker organization
     },
   });
 

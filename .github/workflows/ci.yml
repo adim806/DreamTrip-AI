@@ -74,20 +74,20 @@ jobs:
       - name: Create .env file
         working-directory: ./client
         run: |
-          cat << 'EOF' > .env
-          VITE_CLERK_PUBLISHABLE_KEY=pk_test_ZnVua3ktZ29iYmxlci0zMS5jbGVyay5hY2NvdW50cy5kZXYk
-          VITE_IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/ula6wme9r
-          VITE_IMAGE_KIT_PUBLIC_KEY=public_FsV5vybnkOY0YhDMsT/8MTXGfDk=
-          VITE_GEMINI_PUBLIC_KEY=AIzaSyBJDuXqU-7bSiCfugNpqTThNYOd4AQ6GZ0
-          VITE_API_URL=http://localhost:3000
-          VITE_GOOGLE_PLACE_API_KEY=AIzaSyABVesZOlB_dAtxjo6COred7Z5PdjojL1k
-          VITE_MAPBOX_TOKEN=pk.eyJ1IjoiYWRpbTgwNiIsImEiOiJjbTNrMndrdXowN2IxMnFxejk2eWd3ZHk1In0.CQ3v2jo0DCBsgNgt3raS1g
-          VITE_OPENWEATHER_API_KEY=e240b46cf715142953c2d07d2476fa06
-          VITE_FOUR_SQUARE_API_KEY=fsq3k6aPMxVzonJJhdAClLku7ueAzXBZkRUKkkGdvNozHO8=
-          VITE_SERP_API_KEY=78fc430ff4534992862cc145c105b699cca824ed92a96fd6525a6aa450739fa2
-          VITE_GOOGLE_CLOUD_PROJECT_ID=dreamtrip-ai
-          VITE_AMADEUS_API_KEY=nZqeWx6AstFzOyjGUGtuQNi76JhVSvjB
-          VITE_AMADEUS_API_SECRET=XqfX7Op21zVvDYWs
+          cat << EOF > .env
+          VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_IMAGE_KIT_ENDPOINT=${{ secrets.VITE_IMAGE_KIT_ENDPOINT }}
+          VITE_IMAGE_KIT_PUBLIC_KEY=${{ secrets.VITE_IMAGE_KIT_PUBLIC_KEY }}
+          VITE_GEMINI_PUBLIC_KEY=${{ secrets.VITE_GEMINI_PUBLIC_KEY }}
+          VITE_API_URL=${{ secrets.VITE_API_URL }}
+          VITE_GOOGLE_PLACE_API_KEY=${{ secrets.VITE_GOOGLE_PLACE_API_KEY }}
+          VITE_MAPBOX_TOKEN=${{ secrets.VITE_MAPBOX_TOKEN }}
+          VITE_OPENWEATHER_API_KEY=${{ secrets.VITE_OPENWEATHER_API_KEY }}
+          VITE_FOUR_SQUARE_API_KEY=${{ secrets.VITE_FOUR_SQUARE_API_KEY }}
+          VITE_SERP_API_KEY=${{ secrets.VITE_SERP_API_KEY }}
+          VITE_GOOGLE_CLOUD_PROJECT_ID=${{ secrets.VITE_GOOGLE_CLOUD_PROJECT_ID }}
+          VITE_AMADEUS_API_KEY=${{ secrets.VITE_AMADEUS_API_KEY }}
+          VITE_AMADEUS_API_SECRET=${{ secrets.VITE_AMADEUS_API_SECRET }}
           EOF
 
       - name: Install root dependencies
