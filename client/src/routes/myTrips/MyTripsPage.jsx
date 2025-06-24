@@ -78,14 +78,14 @@ const MyTripsPage = () => {
             }
             return res;
           }).then(res => res.json()),
-          
+
           // טעינת מסלולים שמורים
           tripPlanService.getMyTrips()
         ]);
 
         console.log("נטענו יומני מסע:", itinerariesResponse);
         console.log("נטענו מסלולים שמורים:", savedTripsData);
-        
+
         setItineraries(itinerariesResponse || []);
         setSavedTrips(savedTripsData || []);
       } catch (err) {
@@ -124,7 +124,7 @@ const MyTripsPage = () => {
   // פונקציה למחיקת מסלול שמור
   const deleteSavedTrip = async (tripId, event) => {
     event.stopPropagation();
-    
+
     if (window.confirm("האם אתה בטוח שברצונך למחוק את המסלול השמור?")) {
       try {
         await tripPlanService.deleteFromMyTrips(tripId);
@@ -139,23 +139,23 @@ const MyTripsPage = () => {
   // סינון המסלולים לפי טאב פעיל וחיפוש
   const filteredTrips = () => {
     let filtered;
-    
+
     if (activeTab === "all") {
-      filtered = [...savedTrips, ...itineraries.map(item => ({...item, isItinerary: true}))];
+      filtered = [...savedTrips, ...itineraries.map(item => ({ ...item, isItinerary: true }))];
     } else if (activeTab === "saved") {
       filtered = [...savedTrips];
     } else {
-      filtered = [...itineraries.map(item => ({...item, isItinerary: true}))];
+      filtered = [...itineraries.map(item => ({ ...item, isItinerary: true }))];
     }
-    
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      return filtered.filter(trip => 
+      return filtered.filter(trip =>
         (trip.destination || trip.metadata?.destination || "").toLowerCase().includes(term) ||
         (trip.plan || "").toLowerCase().includes(term)
       );
     }
-    
+
     return filtered;
   };
 
@@ -224,14 +224,14 @@ const MyTripsPage = () => {
   // אם נבחר מסלול שמור להצגה
   if (selectedTrip) {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="saved-trip-view flex flex-col h-full overflow-hidden bg-[#171923] text-white"
       >
         <header className="p-6 pb-0 mb-4 flex items-center">
-          <button 
+          <button
             onClick={() => setSelectedTrip(null)}
             className="flex items-center text-blue-400 hover:text-blue-300 transition-colors mr-4 bg-blue-500/10 hover:bg-blue-500/20 p-2 rounded-full"
           >
@@ -245,11 +245,11 @@ const MyTripsPage = () => {
             </h1>
             <div className="flex items-center text-gray-400 flex-wrap gap-2">
               <div className="bg-blue-500/10 px-3 py-1 rounded-full flex items-center gap-1">
-                <RiTimeLine className="text-blue-400" /> 
+                <RiTimeLine className="text-blue-400" />
                 <span>{selectedTrip.duration} ימים</span>
               </div>
               <div className="bg-indigo-500/10 px-3 py-1 rounded-full flex items-center gap-1">
-                <RiCalendarLine className="text-indigo-400" /> 
+                <RiCalendarLine className="text-indigo-400" />
                 <span>נשמר ב-{formatDate(selectedTrip.createdAt)}</span>
               </div>
             </div>
@@ -258,8 +258,8 @@ const MyTripsPage = () => {
 
         <div className="trip-details-container px-6 flex-grow overflow-hidden flex flex-col md:flex-row gap-6">
           {/* Main content */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
             className="trip-content flex-grow overflow-y-auto bg-gradient-to-br from-blue-900/10 to-indigo-900/10 border border-blue-500/20 rounded-xl p-6"
@@ -268,14 +268,14 @@ const MyTripsPage = () => {
               <h2 className="text-2xl font-bold text-blue-200 mb-2">מסלול טיול</h2>
               <p className="text-gray-300">{selectedTrip.description || "מסלול טיול מותאם אישית עבורך"}</p>
             </div>
-            
+
             <div className="markdown-content prose prose-invert max-w-none prose-headings:text-blue-300 prose-p:text-gray-300 prose-strong:text-blue-200 prose-li:text-gray-300">
               {selectedTrip.plan.split('\n').map((line, i) => {
                 // הדגשת כותרות
                 if (line.startsWith('# ')) {
                   return (
-                    <motion.h1 
-                      key={i} 
+                    <motion.h1
+                      key={i}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.01 }}
@@ -286,11 +286,11 @@ const MyTripsPage = () => {
                     </motion.h1>
                   );
                 }
-                
+
                 if (line.startsWith('## ')) {
                   return (
-                    <motion.h2 
-                      key={i} 
+                    <motion.h2
+                      key={i}
                       initial={{ opacity: 0, x: -5 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.01 }}
@@ -301,11 +301,11 @@ const MyTripsPage = () => {
                     </motion.h2>
                   );
                 }
-                
+
                 if (line.startsWith('### ')) {
                   return (
-                    <motion.h3 
-                      key={i} 
+                    <motion.h3
+                      key={i}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.01 }}
@@ -315,12 +315,12 @@ const MyTripsPage = () => {
                     </motion.h3>
                   );
                 }
-                
+
                 // רשימות - זיהוי אטרקציות/מסעדות/מלונות
                 if (line.match(/^\s*[*-]\s/)) {
                   let icon = <span className="text-blue-400 mr-2">•</span>;
                   const cleanText = line.replace(/^\s*[*-]\s/, '');
-                  
+
                   if (cleanText.includes("מלון") || cleanText.includes("לינה") || cleanText.includes("Hotel")) {
                     icon = <RiHotelLine className="text-indigo-400 mr-2" />;
                   } else if (cleanText.includes("מסעדת") || cleanText.includes("ארוחת") || cleanText.includes("מסעדה") || cleanText.includes("Restaurant")) {
@@ -328,10 +328,10 @@ const MyTripsPage = () => {
                   } else if (cleanText.includes("אטרקציה") || cleanText.includes("ביקור") || cleanText.includes("סיור") || cleanText.includes("מוזיאון")) {
                     icon = <RiMapPinLine className="text-green-400 mr-2" />;
                   }
-                  
+
                   return (
-                    <motion.div 
-                      key={i} 
+                    <motion.div
+                      key={i}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.01 }}
@@ -342,15 +342,15 @@ const MyTripsPage = () => {
                     </motion.div>
                   );
                 }
-                
+
                 // פסקאות רגילות
                 if (line.trim() === '') {
                   return <div key={i} className="h-4"></div>;
                 }
-                
+
                 return (
-                  <motion.p 
-                    key={i} 
+                  <motion.p
+                    key={i}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: i * 0.01 }}
@@ -362,9 +362,9 @@ const MyTripsPage = () => {
               })}
             </div>
           </motion.div>
-          
+
           {/* Sidebar info panel */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className="trip-sidebar min-w-[280px] md:max-w-[320px] hidden md:flex flex-col gap-4"
@@ -397,7 +397,7 @@ const MyTripsPage = () => {
                 </div>
               </div>
             </div>
-            
+
             {selectedTrip.budget && (
               <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 rounded-xl p-4 border border-blue-500/20">
                 <h3 className="text-lg font-medium text-blue-300 mb-3 flex items-center gap-1.5">
@@ -406,7 +406,7 @@ const MyTripsPage = () => {
                 <p className="text-base text-white">{selectedTrip.budget}</p>
               </div>
             )}
-            
+
             <div className="mt-auto p-4 bg-gradient-to-br from-blue-900/20 to-indigo-900/20 rounded-xl border border-blue-500/20">
               <button
                 onClick={() => navigate("/chat/new")}
@@ -460,30 +460,30 @@ const MyTripsPage = () => {
         <p className="text-gray-400">
           כל יומני הטיול והמסלולים שיצרת עם DreamTrip AI
         </p>
-        
+
         {!hasNoContent && (
           <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
             <div className="flex items-center gap-1 rounded-lg bg-blue-900/10 p-1 border border-blue-500/20">
-              <button 
-                onClick={() => setActiveTab("all")} 
+              <button
+                onClick={() => setActiveTab("all")}
                 className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "all" ? "bg-blue-600 text-white font-medium" : "text-gray-300 hover:bg-blue-500/10"}`}
               >
                 הכל
               </button>
-              <button 
-                onClick={() => setActiveTab("saved")} 
+              <button
+                onClick={() => setActiveTab("saved")}
                 className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "saved" ? "bg-blue-600 text-white font-medium" : "text-gray-300 hover:bg-blue-500/10"}`}
               >
                 מסלולים שמורים
               </button>
-              <button 
-                onClick={() => setActiveTab("itineraries")} 
+              <button
+                onClick={() => setActiveTab("itineraries")}
                 className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "itineraries" ? "bg-blue-600 text-white font-medium" : "text-gray-300 hover:bg-blue-500/10"}`}
               >
                 יומני מסע
               </button>
             </div>
-            
+
             <div className="relative">
               <input
                 type="text"
@@ -526,7 +526,7 @@ const MyTripsPage = () => {
         </div>
       ) : (
         <AnimatePresence mode="wait">
-          <motion.div 
+          <motion.div
             key={activeTab + searchTerm}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -646,7 +646,7 @@ const MyTripsPage = () => {
                         >
                           <RiDeleteBinLine size={18} />
                         </button>
-                        
+
                         <button
                           onClick={() => viewSavedTrip(trip.id)}
                           className="flex items-center text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors"
@@ -660,13 +660,13 @@ const MyTripsPage = () => {
                 }
               })}
             </motion.div>
-            
+
             {filteredTrips().length === 0 && (
               <div className="flex flex-col items-center justify-center h-[30vh] mt-6 bg-gradient-to-br from-blue-900/10 to-indigo-900/10 rounded-xl border border-blue-500/20 p-6">
                 <RiFilterLine size={40} className="text-blue-400 mb-4" />
                 <p className="text-gray-300 text-center">לא נמצאו תוצאות תואמות לחיפוש שלך</p>
-                <button 
-                  onClick={() => {setSearchTerm(""); setActiveTab("all");}}
+                <button
+                  onClick={() => { setSearchTerm(""); setActiveTab("all"); }}
                   className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
                   נקה סינון
