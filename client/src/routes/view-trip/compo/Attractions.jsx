@@ -52,9 +52,38 @@ const fetchAttractionsData = async (vacation_location) => {
     link: `https://www.google.com/maps/search/?api=1&query=${attraction.geometry.location.lat},${attraction.geometry.location.lng}`,
     lat: attraction.geometry.location.lat,
     lng: attraction.geometry.location.lng,
+    user_ratings_total: attraction.user_ratings_total || 0,
+    types: attraction.types || [],
+    opening_hours: attraction.opening_hours || null,
   }));
 
   return attractionsDataa;
+};
+
+// Function to fetch attraction details including reviews
+const fetchAttractionDetails = async (placeId) => {
+  if (!placeId) return null;
+  
+  try {
+    // Use CORS proxy to avoid CORS issues
+    const corsProxy = "https://corsproxy.io/?";
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=reviews,opening_hours,website,formatted_phone_number&key=${
+      import.meta.env.VITE_GOOGLE_PLACE_API_KEY
+    }`;
+    
+    const response = await axios.get(
+      `${corsProxy}${encodeURIComponent(detailsUrl)}`
+    );
+    
+    if (!response.data.result) {
+      throw new Error("לא נמצאו פרטים לאטרקציה זו.");
+    }
+    
+    return response.data.result;
+  } catch (error) {
+    console.error("Error fetching attraction details:", error);
+    throw error;
+  }
 };
 
 const Attractions = ({ trip }) => {
@@ -68,6 +97,9 @@ const Attractions = ({ trip }) => {
 
   const [savedActivities, setSavedActivities] = useState([]);
   const [savingInProgress, setSavingInProgress] = useState({});
+  const [showReviews, setShowReviews] = useState(null);
+  const [attractionDetails, setAttractionDetails] = useState({});
+  const [loadingReviews, setLoadingReviews] = useState({});
   const queryClient = useQueryClient();
 
   // Get current userId and chatId
@@ -106,6 +138,39 @@ const Attractions = ({ trip }) => {
       setActiveLayer("attractions_" + Date.now());
     }
   }, [data, setAttractionsData, setActiveLayer]);
+
+  // Function to handle showing reviews
+  const handleShowReviews = async (e, attractionId) => {
+    e.stopPropagation(); // Prevent attraction selection when clicking the button
+    
+    // Toggle reviews visibility
+    if (showReviews === attractionId) {
+      setShowReviews(null);
+      return;
+    }
+    
+    setShowReviews(attractionId);
+    
+    // Check if we already have the details for this attraction
+    if (!attractionDetails[attractionId]) {
+      try {
+        setLoadingReviews({...loadingReviews, [attractionId]: true});
+        
+        // Fetch attraction details including reviews
+        const details = await fetchAttractionDetails(attractionId);
+        
+        // Store the details
+        setAttractionDetails(prev => ({
+          ...prev,
+          [attractionId]: details
+        }));
+      } catch (error) {
+        console.error(`Error fetching reviews for attraction ${attractionId}:`, error);
+      } finally {
+        setLoadingReviews({...loadingReviews, [attractionId]: false});
+      }
+    }
+  };
 
   // Fetch saved activities when component mounts or chatId changes
   useEffect(() => {
@@ -213,60 +278,160 @@ const Attractions = ({ trip }) => {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <h2 className="text-2xl font-semibold text-center mb-6">
-        Recommended Attractions in: {trip.vacation_location}
+      <h2 className="text-2xl font-semibold text-center mb-6 text-blue-100" dir="rtl">
+        אטרקציות מומלצות ב{trip.vacation_location}
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {attractionsList.map((attraction) => (
           <div
             key={attraction.id}
             onClick={() => setSelectedAttraction(attraction)}
-            className={`bg-white rounded-lg shadow-lg overflow-hidden transform transition duration-300 hover:scale-105 cursor-pointer ${
+            className={`bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl overflow-hidden transform transition-all duration-300 hover:scale-102 hover:shadow-xl cursor-pointer flex flex-col ${
               selectedAttraction?.id === attraction.id
-                ? "border-4 border-blue-500"
-                : ""
+                ? "ring-2 ring-blue-400 shadow-blue-400/30 shadow-lg"
+                : "shadow-md shadow-black/20"
             }`}
           >
+            {/* Top image with overlay gradient and floating elements */}
             <div className="relative">
               <img
                 src={attraction.thumbnail}
                 alt={attraction.name}
-                className="w-full h-48 object-cover"
+                className="w-full h-48 object-cover object-center"
+                loading="lazy"
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+              
+              {/* Rating pill - top left */}
+              <div className="absolute top-3 left-3 bg-blue-600/90 text-white text-sm font-medium px-2 py-0.5 rounded-full flex items-center">
+                <span className="mr-1">{attraction.rating}</span>
+                <span className="text-yellow-300">⭐</span>
+              </div>
+              
+              {/* Save button - top right */}
               <button
-                className="absolute top-3 right-3 z-10"
+                className="absolute top-3 right-3 z-10 p-1.5 bg-black/30 backdrop-blur-sm rounded-full transition-transform hover:scale-110"
                 onClick={(e) => handleSaveActivity(e, attraction)}
                 disabled={savingInProgress[attraction.id]}
               >
                 <HeartIcon
                   filled={isAttractionSaved(attraction.id)}
-                  className={`w-7 h-7 ${
-                    isAttractionSaved(attraction.id)
-                      ? "text-red-500"
-                      : "text-white"
+                  className={`w-6 h-6 ${
+                    isAttractionSaved(attraction.id) ? "text-red-500" : "text-white"
                   }`}
                 />
               </button>
             </div>
-            <div className="p-4">
-              <h3 className="text-xl font-bold mb-2">{attraction.name}</h3>
-              <p className="text-gray-700">
-                <strong>דירוג:</strong> {attraction.rating} ⭐
-              </p>
-              <p className="text-gray-700">
-                <strong>מחיר:</strong> {attraction.price}
-              </p>
-              <p className="text-gray-600">
-                <strong>כתובת:</strong> {attraction.address}
-              </p>
-              <a
-                href={attraction.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-center bg-blue-500 text-white font-semibold py-2 mt-4 rounded-lg hover:bg-blue-700 transition"
-              >
-                לפרטים נוספים
-              </a>
+            
+            {/* Attraction details section */}
+            <div className="p-4 flex-1 flex flex-col">
+              {/* Fixed-height name container with absolute positioning for divider */}
+              <div className="h-[60px] relative mb-5">
+                {/* Name with overflow handling */}
+                <div className="h-full overflow-hidden">
+                  <h3 className="text-base font-medium text-white text-left leading-relaxed line-clamp-2" dir="rtl">{attraction.name}</h3>
+                </div>
+                {/* Absolutely positioned divider */}
+                <div className="absolute bottom-0 left-0 right-0 border-b border-blue-800/50"></div>
+              </div>
+              
+              {/* Attraction details content - with flex-1 to push button to bottom */}
+              <div className="flex flex-col space-y-2.5 flex-1">
+                {/* Address with icon */}
+                <div className="flex items-start justify-end">
+                  <span className="text-gray-300 text-sm text-left leading-relaxed" dir="rtl">{attraction.address}</span>
+                  <span className="ml-2 mt-1 text-blue-400">📍</span>
+                </div>
+                
+                {/* Number of ratings */}
+                <div className="flex items-center justify-end">
+                  <span className="text-gray-400 text-sm">
+                    {attraction.user_ratings_total || "לא ידוע"} דירוגים
+                  </span>
+                  <span className="ml-2 text-yellow-400">⭐</span>
+                </div>
+                
+                {/* Open now status if available */}
+                {attraction.opening_hours && (
+                  <div className="flex items-center justify-end">
+                    <span className={`text-sm ${attraction.opening_hours.open_now ? 'text-green-400' : 'text-red-400'}`}>
+                      {attraction.opening_hours.open_now ? 'פתוח עכשיו' : 'סגור עכשיו'}
+                    </span>
+                    <span className="ml-2 text-blue-400">🕒</span>
+                  </div>
+                )}
+                
+                {/* Attraction type if available */}
+                {attraction.types && attraction.types.length > 0 && (
+                  <div className="flex items-center justify-end">
+                    <span className="text-green-400 text-sm text-right" dir="rtl">
+                      {attraction.types[0].replace(/_/g, ' ')}
+                    </span>
+                    <span className="ml-2 text-green-500 flex-shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                      </svg>
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Action buttons - always at bottom */}
+              <div className="mt-auto">
+                <div className="flex gap-2 mb-2">
+                  {/* Reviews button */}
+                  <button 
+                    onClick={(e) => handleShowReviews(e, attraction.id)}
+                    className={`flex-1 text-center text-white text-sm py-2 px-3 rounded-md transition-colors ${
+                      showReviews === attraction.id ? 'bg-purple-700 hover:bg-purple-800' : 'bg-purple-600 hover:bg-purple-700'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center">
+                      <span className="mr-1">⭐</span>
+                      <span>ביקורות</span>
+                    </span>
+                  </button>
+                  
+                  {/* Details button */}
+                  <a
+                    href={attraction.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 px-3 rounded-md transition-colors"
+                    dir="rtl"
+                  >
+                    לפרטים נוספים
+                  </a>
+                </div>
+                
+                {/* Reviews section */}
+                {showReviews === attraction.id && (
+                  <div className="mt-2 bg-slate-700/50 rounded-md p-2 max-h-40 overflow-y-auto text-right" dir="rtl">
+                    <h4 className="text-sm font-medium text-blue-200 mb-2">ביקורות אחרונות</h4>
+                    
+                    {loadingReviews[attraction.id] ? (
+                      <div className="flex justify-center items-center py-3">
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-400"></div>
+                        <span className="ml-2 text-sm text-blue-300">טוען ביקורות...</span>
+                      </div>
+                    ) : attractionDetails[attraction.id]?.reviews?.length > 0 ? (
+                      attractionDetails[attraction.id].reviews.map((review, index) => (
+                        <div key={index} className="mb-2 pb-2 border-b border-slate-600/50 last:border-0 last:mb-0 last:pb-0">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-yellow-300">{review.rating} ⭐</span>
+                            <span className="text-xs text-blue-300">{review.author_name}</span>
+                          </div>
+                          <p className="text-xs text-gray-300 mt-1 line-clamp-2">{review.text}</p>
+                          <p className="text-xs text-gray-400 mt-1">{review.relative_time_description}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-400 text-center py-2">לא נמצאו ביקורות לאטרקציה זו.</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ))}
