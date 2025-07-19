@@ -255,11 +255,25 @@ const tripPlanService = {
       // Prepare the data for the API
       const apiData = {
         plan: tripData.plan,
-        tripDetails: tripData.tripDetails,
+        tripDetails: {
+          ...tripData.tripDetails,
+          destination: tripData.destination || tripData.tripDetails?.destination || "Unknown destination",
+          duration: tripData.duration || tripData.tripDetails?.duration || "Unknown duration"
+        },
         chatId: tripData.chatId,
         itineraryData: tripData.itineraryData || {},
         userId: userId, // Include userId for authentication fallback
+        destination: tripData.destination || tripData.tripDetails?.destination || "Unknown destination",
+        duration: tripData.duration || tripData.tripDetails?.duration || "Unknown duration",
+        metadata: tripData.metadata || {},
+        structuredPlan: tripData.structuredPlan || {}
       };
+
+      console.log("TripPlanService: API Data for saving trip:", {
+        destination: apiData.destination,
+        duration: apiData.duration,
+        chatId: apiData.chatId
+      });
 
       // Make the API call
       const response = await axios.post(`${API_URL}/api/trips/save`, apiData, {
@@ -341,12 +355,30 @@ const tripPlanService = {
     try {
       // Try to get from backend first
       try {
-        const response = await axios.get(`${API_URL}/api/trips/saved`, {
+        // Use the new combined endpoint to get both saved trips and itineraries
+        const response = await axios.get(`${API_URL}/api/user/all-trips`, {
           withCredentials: true,
         });
 
         console.log("TripPlanService: Successfully fetched trips from backend");
-        return response.data;
+        
+        // Combine savedTrips and itineraries into one array
+        const allTrips = [
+          ...response.data.savedTrips,
+          ...response.data.itineraries.map(itinerary => ({
+            ...itinerary,
+            plan: itinerary.content,
+            structuredPlan: itinerary.structuredItinerary,
+            // Add additional fields needed for display
+            preview: {
+              description: extractPreviewFromContent(itinerary.content),
+              image: getDestinationImageForTrip(itinerary.destination)
+            },
+            activityCounts: estimateActivityCounts(itinerary)
+          }))
+        ];
+        
+        return allTrips;
       } catch (apiError) {
         console.error(
           "TripPlanService: Error fetching trips from backend:",
@@ -454,6 +486,152 @@ const tripPlanService = {
       return null;
     }
   },
+};
+
+/**
+ * Extract a preview description from itinerary content
+ * @param {string} content - The itinerary content
+ * @returns {string} - A preview description
+ */
+const extractPreviewFromContent = (content) => {
+  if (!content) return "Travel itinerary";
+  
+  try {
+    // Try to extract a summary if available
+    const summaryMatch = content.match(/\*\*Summary:\*\*\s+([^\n]+)/);
+    if (summaryMatch && summaryMatch[1]) {
+      return summaryMatch[1].trim();
+    }
+    
+    // Otherwise, get the first paragraph that's not a heading
+    const paragraphs = content.split('\n\n');
+    for (const paragraph of paragraphs) {
+      if (!paragraph.startsWith('#') && paragraph.length > 30) {
+        return paragraph.substring(0, 200) + (paragraph.length > 200 ? '...' : '');
+      }
+    }
+    
+    // If all else fails, return the first 200 characters
+    return content.substring(0, 200) + (content.length > 200 ? '...' : '');
+  } catch (error) {
+    console.error("Error extracting preview description:", error);
+    return "A personalized travel itinerary";
+  }
+};
+
+/**
+ * Get an image URL for a destination
+ * @param {string} destination - The destination name
+ * @returns {string} - An image URL
+ */
+const getDestinationImageForTrip = (destination) => {
+  if (!destination) return "https://images.unsplash.com/photo-1488085061387-422e29b40080?q=80&w=1200&auto=format&fit=crop";
+  
+  // Simple mapping of destinations to images
+  const destinationImages = {
+    "paris": "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1200&auto=format&fit=crop",
+    "rome": "https://images.unsplash.com/photo-1552832230-c0197dd311b5?q=80&w=1200&auto=format&fit=crop",
+    "london": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=1200&auto=format&fit=crop",
+    "barcelona": "https://images.unsplash.com/photo-1583422409516-2895a77efded?q=80&w=1200&auto=format&fit=crop",
+    "new york": "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1200&auto=format&fit=crop",
+    "tokyo": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1200&auto=format&fit=crop",
+    "bangkok": "https://images.unsplash.com/photo-1563492065599-3520f775eeed?q=80&w=1200&auto=format&fit=crop",
+    "singapore": "https://images.unsplash.com/photo-1565967511849-76a60a516170?q=80&w=1200&auto=format&fit=crop",
+    "dubai": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=1200&auto=format&fit=crop",
+    "tel aviv": "https://images.unsplash.com/photo-1544971587-b842c27f8e14?q=80&w=1200&auto=format&fit=crop",
+    "jerusalem": "https://images.unsplash.com/photo-1529106492281-b02200cec7ec?q=80&w=1200&auto=format&fit=crop"
+  };
+  
+  // Try to find a match
+  const lowerDest = destination.toLowerCase();
+  for (const [key, url] of Object.entries(destinationImages)) {
+    if (lowerDest.includes(key)) {
+      return url;
+    }
+  }
+  
+  // Default image if no match
+  return "https://images.unsplash.com/photo-1488085061387-422e29b40080?q=80&w=1200&auto=format&fit=crop";
+};
+
+/**
+ * Estimate activity counts from itinerary content
+ * @param {Object} itinerary - The itinerary object
+ * @returns {Object} - Activity counts
+ */
+const estimateActivityCounts = (itinerary) => {
+  const counts = {
+    total: 0,
+    attractions: 0,
+    restaurants: 0,
+    hotels: 0
+  };
+  
+  try {
+    // Try to use structured itinerary if available
+    if (itinerary.structuredItinerary?.days && Array.isArray(itinerary.structuredItinerary.days)) {
+      itinerary.structuredItinerary.days.forEach(day => {
+        // Count activities in sections
+        if (day.sections && Array.isArray(day.sections)) {
+          day.sections.forEach(section => {
+            if (section.activities && Array.isArray(section.activities)) {
+              counts.total += section.activities.length;
+              counts.attractions += section.activities.length;
+            }
+            
+            if (section.restaurant) {
+              counts.total += 1;
+              counts.restaurants += 1;
+            }
+            
+            if (section.options && Array.isArray(section.options)) {
+              counts.total += section.options.length;
+              counts.attractions += section.options.length;
+            }
+          });
+        }
+        
+        // Count activities in legacy format
+        if (day.activities) {
+          Object.entries(day.activities).forEach(([timeSlot, activities]) => {
+            if (Array.isArray(activities) && activities.length > 0) {
+              counts.total += activities.length;
+              
+              if (timeSlot === 'lunch' || timeSlot === 'dinner') {
+                counts.restaurants += activities.length;
+              } else {
+                counts.attractions += activities.length;
+              }
+            }
+          });
+        }
+      });
+      
+      return counts;
+    }
+    
+    // If no structured data, estimate from content
+    const content = itinerary.content || "";
+    
+    // Count days
+    const dayMatches = content.match(/### Day \d+:|## Day \d+:|# Day \d+:/g);
+    const dayCount = dayMatches ? dayMatches.length : 0;
+    
+    // Count attractions, restaurants and hotels
+    const attractionMatches = content.match(/attraction|museum|park|visit|tour|explore/gi);
+    const restaurantMatches = content.match(/restaurant|dining|lunch|dinner|breakfast|café|cafe|eat/gi);
+    const hotelMatches = content.match(/hotel|accommodation|stay|lodge|resort/gi);
+    
+    counts.attractions = attractionMatches ? attractionMatches.length : dayCount * 2;
+    counts.restaurants = restaurantMatches ? restaurantMatches.length : dayCount;
+    counts.hotels = hotelMatches ? hotelMatches.length : Math.max(1, dayCount - 1);
+    counts.total = counts.attractions + counts.restaurants + counts.hotels;
+    
+    return counts;
+  } catch (error) {
+    console.error("Error estimating activity counts:", error);
+    return { total: 5, attractions: 3, restaurants: 1, hotels: 1 };
+  }
 };
 
 export default tripPlanService;

@@ -536,6 +536,15 @@ const ItineraryActions = React.memo(({ message }) => {
         );
       }
 
+      // Count activities for better display in MyTripsPage
+      const activityCounts = countActivitiesInItinerary(safeStructuredItinerary);
+
+      // Create a preview object for the trip list view
+      const preview = {
+        description: extractPreviewDescription(formattedItinerary),
+        image: getDestinationImage(safeStructuredItinerary.destination)
+      };
+
       // Save the itinerary with the message content and structured format
       const result = await saveItinerary(chatId, {
         itinerary: formattedItinerary, // Use formatted text for display
@@ -552,6 +561,44 @@ const ItineraryActions = React.memo(({ message }) => {
           savedAt: new Date().toISOString(),
         },
       });
+
+      // Also save to the savedTrips collection for display in MyTripsPage
+      try {
+        // Import tripPlanService
+        const tripPlanService = (await import("../../utils/services/tripPlanService")).default;
+        
+        const savedTripResult = await tripPlanService.saveToMyTrips({
+          plan: formattedItinerary,
+          chatId: chatId,
+          tripDetails: tripDetails,
+          destination: safeStructuredItinerary.destination || tripDetails?.vacation_location,
+          duration: safeStructuredItinerary.duration || tripDetails?.duration,
+          structuredPlan: safeStructuredItinerary,
+          metadata: {
+            format,
+            savedManually: true,
+            savedAt: new Date().toISOString(),
+          },
+          preview,
+          activityCounts
+        });
+        
+        console.log("Saved trip to savedTrips collection:", savedTripResult);
+        
+        // Dispatch event to notify MyTripsPage about the new trip
+        const tripPlanGeneratedEvent = new CustomEvent('tripPlanGenerated', {
+          detail: {
+            savedTripId: result.itineraryId,
+            destination: safeStructuredItinerary.destination || tripDetails?.vacation_location,
+            duration: safeStructuredItinerary.duration || tripDetails?.duration,
+            timestamp: Date.now()
+          }
+        });
+        document.dispatchEvent(tripPlanGeneratedEvent);
+      } catch (savedTripError) {
+        console.error("Error saving to savedTrips collection:", savedTripError);
+        // Continue even if this fails, as we already saved to the itinerary collection
+      }
 
       if (result.success) {
         setSavedStatus({
@@ -574,6 +621,148 @@ const ItineraryActions = React.memo(({ message }) => {
         error: error.message,
       });
     }
+  };
+  
+  // Helper function to count activities in an itinerary
+  const countActivitiesInItinerary = (structuredItinerary) => {
+    let counts = {
+      total: 0,
+      attractions: 0,
+      restaurants: 0,
+      hotels: 0
+    };
+    
+    try {
+      if (!structuredItinerary?.days || !Array.isArray(structuredItinerary.days)) {
+        return counts;
+      }
+      
+      // Process each day
+      structuredItinerary.days.forEach(day => {
+        // Count activities in sections (new format)
+        if (day.sections && Array.isArray(day.sections)) {
+          day.sections.forEach(section => {
+            // Count regular activities
+            if (section.activities && Array.isArray(section.activities)) {
+              counts.total += section.activities.length;
+              counts.attractions += section.activities.length;
+            }
+            
+            // Count restaurants
+            if (section.restaurant) {
+              counts.total += 1;
+              counts.restaurants += 1;
+            }
+            
+            // Count evening options
+            if (section.options && Array.isArray(section.options)) {
+              counts.total += section.options.length;
+              // Assume evening options are attractions
+              counts.attractions += section.options.length;
+            }
+          });
+        }
+        
+        // Count activities in legacy format
+        if (day.activities) {
+          // Count morning activities
+          if (day.activities.morning && Array.isArray(day.activities.morning)) {
+            counts.total += day.activities.morning.length;
+            counts.attractions += day.activities.morning.length;
+          }
+          
+          // Count lunch (restaurant)
+          if (day.activities.lunch && Array.isArray(day.activities.lunch) && day.activities.lunch.length > 0) {
+            counts.total += day.activities.lunch.length;
+            counts.restaurants += day.activities.lunch.length;
+          }
+          
+          // Count afternoon activities
+          if (day.activities.afternoon && Array.isArray(day.activities.afternoon)) {
+            counts.total += day.activities.afternoon.length;
+            counts.attractions += day.activities.afternoon.length;
+          }
+          
+          // Count evening activities
+          if (day.activities.evening && Array.isArray(day.activities.evening)) {
+            counts.total += day.activities.evening.length;
+            counts.attractions += day.activities.evening.length;
+          }
+          
+          // Count dinner (restaurant)
+          if (day.activities.dinner && Array.isArray(day.activities.dinner) && day.activities.dinner.length > 0) {
+            counts.total += day.activities.dinner.length;
+            counts.restaurants += day.activities.dinner.length;
+          }
+        }
+        
+        // Check for hotels in the text
+        if (day.overview && day.overview.toLowerCase().includes("hotel")) {
+          counts.total += 1;
+          counts.hotels += 1;
+        }
+      });
+    } catch (error) {
+      console.error("Error counting activities:", error);
+    }
+    
+    return counts;
+  };
+  
+  // Helper function to extract a preview description from the itinerary
+  const extractPreviewDescription = (itineraryText) => {
+    try {
+      // Try to extract a summary if available
+      const summaryMatch = itineraryText.match(/\*\*Summary:\*\*\s+([^\n]+)/);
+      if (summaryMatch && summaryMatch[1]) {
+        return summaryMatch[1].trim();
+      }
+      
+      // Otherwise, get the first paragraph that's not a heading
+      const paragraphs = itineraryText.split('\n\n');
+      for (const paragraph of paragraphs) {
+        if (!paragraph.startsWith('#') && paragraph.length > 30) {
+          return paragraph.substring(0, 200) + (paragraph.length > 200 ? '...' : '');
+        }
+      }
+      
+      // If all else fails, return the first 200 characters
+      return itineraryText.substring(0, 200) + (itineraryText.length > 200 ? '...' : '');
+    } catch (error) {
+      console.error("Error extracting preview description:", error);
+      return "A personalized travel itinerary";
+    }
+  };
+  
+  // Helper function to get an image URL for a destination
+  const getDestinationImage = (destination) => {
+    if (!destination) return "https://images.unsplash.com/photo-1488085061387-422e29b40080?q=80&w=1200&auto=format&fit=crop";
+    
+    // Simple mapping of destinations to images
+    const destinationImages = {
+      "paris": "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1200&auto=format&fit=crop",
+      "rome": "https://images.unsplash.com/photo-1552832230-c0197dd311b5?q=80&w=1200&auto=format&fit=crop",
+      "london": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=1200&auto=format&fit=crop",
+      "barcelona": "https://images.unsplash.com/photo-1583422409516-2895a77efded?q=80&w=1200&auto=format&fit=crop",
+      "new york": "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1200&auto=format&fit=crop",
+      "tokyo": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1200&auto=format&fit=crop",
+      "bangkok": "https://images.unsplash.com/photo-1563492065599-3520f775eeed?q=80&w=1200&auto=format&fit=crop",
+      "singapore": "https://images.unsplash.com/photo-1565967511849-76a60a516170?q=80&w=1200&auto=format&fit=crop",
+      "dubai": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=1200&auto=format&fit=crop",
+      "tel aviv": "https://images.unsplash.com/photo-1544971587-b842c27f8e14?q=80&w=1200&auto=format&fit=crop",
+      "jerusalem": "https://images.unsplash.com/photo-1529106492281-b02200cec7ec?q=80&w=1200&auto=format&fit=crop"
+    };
+    
+    // Try to find a match
+    const lowerDest = destination.toLowerCase();
+    for (const [key, url] of Object.entries(destinationImages)) {
+      if (lowerDest.includes(key)) {
+        return url;
+      }
+    }
+    
+    // Default image if no match
+    return "https://images.unsplash.com/photo-1488085061387-422e29b40080?q=80&w=1200&auto=format&fit=crop";
   };
 
   // Navigate to edit itinerary

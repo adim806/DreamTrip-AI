@@ -49,18 +49,18 @@ const fetchHotelsData = async (vacation_location) => {
     allHotels.slice(0, 20).map(async (hotel) => {
       // Basic hotel info
       const hotelData = {
-        id: hotel.place_id,
-        name: hotel.name,
-        rating: hotel.rating || "לא זמין",
-        address: hotel.vicinity || "לא ידוע",
-        thumbnail: hotel.photos
-          ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${
-              hotel.photos[0].photo_reference
-            }&key=${import.meta.env.VITE_GOOGLE_PLACE_API_KEY}`
-          : "https://via.placeholder.com/300",
-        link: `https://www.google.com/maps/search/?api=1&query=${hotel.geometry.location.lat},${hotel.geometry.location.lng}`,
-        lat: hotel.geometry.location.lat,
-        lng: hotel.geometry.location.lng,
+    id: hotel.place_id,
+    name: hotel.name,
+    rating: hotel.rating || "לא זמין",
+    address: hotel.vicinity || "לא ידוע",
+    thumbnail: hotel.photos
+      ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${
+          hotel.photos[0].photo_reference
+        }&key=${import.meta.env.VITE_GOOGLE_PLACE_API_KEY}`
+      : "https://via.placeholder.com/300",
+    link: `https://www.google.com/maps/search/?api=1&query=${hotel.geometry.location.lat},${hotel.geometry.location.lng}`,
+    lat: hotel.geometry.location.lat,
+    lng: hotel.geometry.location.lng,
       };
 
       // Try to get more detailed price information
@@ -371,10 +371,10 @@ const Hotels = ({ trip }) => {
               {/* Action button - always at bottom */}
               <div className="mt-auto">
                 <div className="flex gap-2 mb-2">
-                  <a
+              <a
                     href={hotel.website || hotel.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                target="_blank"
+                rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     className="block text-center bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 px-3 rounded-md transition-colors flex-1"
                     dir="rtl"

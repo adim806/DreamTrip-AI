@@ -707,14 +707,90 @@ const TripPlanner = ({ trip }) => {
     
     try {
       console.log("TripPlanner: Starting trip plan generation process...");
+      
+      // Count activities by type for better trip summary
+      const activityCounts = {
+        hotels: 0,
+        restaurants: 0,
+        attractions: 0,
+        total: 0
+      };
+      
+      // Count activities by type and collect activity details
+      const daysActivities = {};
+      Object.entries(itinerary).forEach(([day, dayData]) => {
+        const dayNumber = parseInt(day.replace('day', ''));
+        daysActivities[day] = { morning: [], afternoon: [], evening: [] };
+        
+        ['morning', 'afternoon', 'evening'].forEach(timeOfDay => {
+          if (dayData[timeOfDay]) {
+            dayData[timeOfDay].forEach(activity => {
+              activityCounts.total++;
+              if (activity.type === 'hotel') activityCounts.hotels++;
+              else if (activity.type === 'restaurant') activityCounts.restaurants++;
+              else activityCounts.attractions++;
+              
+              // Add activity to structured day data
+              daysActivities[day][timeOfDay].push({
+                name: activity.name,
+                address: activity.address,
+                type: activity.type || 'attraction',
+                description: activity.description || ''
+              });
+            });
+          }
+        });
+      });
+      
+      // Get trip dates if available
+      const tripDates = trip?.dates || {};
+      
+      // נסה לחלץ את יעד הטיול מהפעילויות אם לא מוגדר
+      let extractedDestination = trip?.vacation_location || trip?.destination || "";
+      if (!extractedDestination && activities.length > 0) {
+        // נסה למצוא את העיר/מדינה שחוזרת על עצמה בכתובות של הפעילויות
+        const addressParts = activities
+          .filter(a => a.activityData && a.activityData.address)
+          .map(a => {
+            const address = a.activityData.address;
+            const parts = address.split(',').map(p => p.trim());
+            return parts[parts.length - 1]; // בדרך כלל המדינה/עיר היא החלק האחרון בכתובת
+          });
+        
+        if (addressParts.length > 0) {
+          // מצא את החלק שחוזר על עצמו הכי הרבה פעמים
+          const counts = {};
+          let maxCount = 0;
+          let mostCommon = "";
+          
+          for (const part of addressParts) {
+            if (part && part.length > 2) { // התעלם מחלקים קצרים מדי
+              counts[part] = (counts[part] || 0) + 1;
+              if (counts[part] > maxCount) {
+                maxCount = counts[part];
+                mostCommon = part;
+              }
+            }
+          }
+          
+          if (mostCommon) {
+            extractedDestination = mostCommon;
+            console.log(`TripPlanner: Extracted destination from activities: ${extractedDestination}`);
+          }
+        }
+      }
+      
       const tripDetails = {
-        destination: trip?.vacation_location || "Unknown destination",
-        duration: `${numDays} days`,
-        chatId: chatId
+        destination: extractedDestination,
+        duration: `${numDays} ימים`,
+        chatId: chatId,
+        dates: tripDates,
+        userId: userId,
+        activityCounts: activityCounts
       };
       
       console.log("TripPlanner: Sending request to generate plan with details:", tripDetails);
-      console.log(`TripPlanner: Itinerary contains data for ${Object.keys(itinerary).length} days`);
+      console.log(`TripPlanner: Itinerary contains data for ${Object.keys(itinerary).length} days with ${activityCounts.total} activities`);
       
       const result = await tripPlanService.generateCustomPlan(itinerary, tripDetails);
       
@@ -746,17 +822,133 @@ const TripPlanner = ({ trip }) => {
           notification.style.opacity = '1';
         }, 10);
         
+        // Extract structured data from the generated plan
+        const planText = result.data;
+        
+        // Extract summary (first paragraph after title)
+        let summary = "";
+        const summaryMatch = planText.match(/^# .*?\n\n(.*?)(\n\n|\n##)/s);
+        if (summaryMatch && summaryMatch[1]) {
+          summary = summaryMatch[1].trim();
+        }
+        
+        // Extract highlights (bullet points in the first section)
+        let highlights = [];
+        const highlightsMatch = planText.match(/\n[*-] (.*?)(?=\n[^*-]|\n\n|$)/g);
+        if (highlightsMatch) {
+          highlights = highlightsMatch.map(h => h.replace(/\n[*-] /, '').trim());
+        }
+        
+        // Extract days information
+        const days = [];
+        const dayMatches = planText.matchAll(/## (יום \d+|Day \d+)[^\n]*\n\n(.*?)(?=\n## |\n# |\n\n\n|$)/gs);
+        
+        for (const match of Array.from(dayMatches)) {
+          const dayTitle = match[1];
+          const dayContent = match[2];
+          const dayNumber = parseInt(dayTitle.match(/\d+/)[0]);
+          
+          // Extract activities by time of day
+          const morningMatch = dayContent.match(/### בוקר|### Morning[^\n]*\n\n(.*?)(?=\n### |\n## |\n# |\n\n\n|$)/s);
+          const afternoonMatch = dayContent.match(/### צהריים|### Afternoon[^\n]*\n\n(.*?)(?=\n### |\n## |\n# |\n\n\n|$)/s);
+          const eveningMatch = dayContent.match(/### ערב|### Evening[^\n]*\n\n(.*?)(?=\n### |\n## |\n# |\n\n\n|$)/s);
+          
+          const extractActivities = (content) => {
+            if (!content) return [];
+            const activities = [];
+            const activityMatches = content.matchAll(/[*-] (.*?)(?=\n[*-]|\n\n|$)/gs);
+            for (const actMatch of Array.from(activityMatches)) {
+              activities.push(actMatch[1].trim());
+            }
+            return activities;
+          };
+          
+          days.push({
+            dayNumber,
+            title: dayTitle,
+            activities: {
+              morning: morningMatch ? extractActivities(morningMatch[1]) : [],
+              afternoon: afternoonMatch ? extractActivities(afternoonMatch[1]) : [],
+              evening: eveningMatch ? extractActivities(eveningMatch[1]) : []
+            },
+            // Add original itinerary data for this day
+            originalActivities: daysActivities[`day${dayNumber}`] || { morning: [], afternoon: [], evening: [] }
+          });
+        }
+        
+        // Extract tips section
+        let tips = [];
+        const tipsMatch = planText.match(/## טיפים|## Tips[^\n]*\n\n(.*?)(?=\n## |\n# |\n\n\n|$)/s);
+        if (tipsMatch) {
+          const tipMatches = tipsMatch[1].matchAll(/[*-] (.*?)(?=\n[*-]|\n\n|$)/gs);
+          tips = Array.from(tipMatches).map(m => m[1].trim());
+        }
+        
+        // Create a structured representation of the plan
+        const structuredPlan = {
+          title: extractedDestination 
+            ? `Trip Plan for ${extractedDestination}` 
+            : "Your Trip Plan",
+          destination: extractedDestination,
+          summary: summary,
+          highlights: highlights.slice(0, 5), // Take up to 5 highlights
+          days: days,
+          additionalInfo: {
+            tips: tips,
+            activityCounts: activityCounts
+          }
+        };
+        
+        // Prepare preview image URL if available
+        let previewImage = "";
+        if (trip?.images && trip.images.length > 0) {
+          previewImage = trip.images[0];
+        } else if (trip?.thumbnail) {
+          previewImage = trip.thumbnail;
+        }
+
+        // Generate a cover description for MyTrips display
+        const coverDescription = summary.length > 150 ? summary.substring(0, 150) + "..." : summary;
+        
+        // Enhanced trip data for saving with better structure for MyTripsPage
+        const enhancedTripData = {
+          destination: extractedDestination,
+          duration: `${numDays} ימים`,
+          chatId: chatId,
+          userId: userId,
+          createdAt: new Date().toISOString(),
+          plan: planText,
+          structuredPlan: structuredPlan,
+          activityCounts: activityCounts,
+          dates: tripDates,
+          itineraryData: itinerary, // Store original itinerary data
+          preview: {
+            image: previewImage,
+            description: coverDescription,
+            highlightActivities: highlights.slice(0, 3) // Top 3 highlights for preview
+          },
+          metadata: {
+            destination: extractedDestination,
+            duration: `${numDays} ימים`,
+            dates: tripDates,
+            totalActivities: activityCounts.total
+          }
+        };
+        
+        console.log("TripPlanner: Saving trip with destination:", enhancedTripData.destination);
+        console.log("TripPlanner: Trip duration:", enhancedTripData.duration);
+        
         // Automatically save the trip
         try {
-          const savedTripResult = await tripPlanService.saveToMyTrips({
-            destination: trip?.vacation_location || "Unknown destination",
-            duration: `${numDays} days`,
-            chatId: chatId,
-            plan: result.data
-          });
+          const savedTripResult = await tripPlanService.saveToMyTrips(enhancedTripData);
           
-          if (savedTripResult.success) {
-            console.log("TripPlanner: Trip saved successfully:", savedTripResult.id);
+          if (savedTripResult) {
+            console.log("TripPlanner: Trip saved successfully");
+            
+            // Store the trip ID for future reference
+            if (savedTripResult.tripId) {
+              localStorage.setItem(`trip_plan_${chatId}`, savedTripResult.tripId);
+            }
             
             // Show saved notification
             const savedNotification = document.createElement('div');
@@ -791,7 +983,7 @@ const TripPlanner = ({ trip }) => {
               }, 500);
             }, 5000);
           } else {
-            console.error("TripPlanner: Failed to save trip:", savedTripResult.error);
+            console.error("TripPlanner: Failed to save trip");
           }
         } catch (saveError) {
           console.error("TripPlanner: Error saving trip:", saveError);
@@ -803,12 +995,10 @@ const TripPlanner = ({ trip }) => {
           const planGeneratedEvent = new CustomEvent('tripPlanGenerated', {
             detail: {
               plan: result.data,
-              tripDetails: {
-                destination: trip?.vacation_location || "Unknown destination",
-                duration: `${numDays} days`,
-                chatId: chatId
-              },
-              itineraryData: itinerary // Pass the itinerary data to be used for route creation
+              tripDetails: tripDetails,
+              structuredPlan: structuredPlan,
+              itineraryData: itinerary, // Pass the itinerary data to be used for route creation
+              savedTripId: localStorage.getItem(`trip_plan_${chatId}`) // Include the saved trip ID
             }
           });
           

@@ -10,6 +10,7 @@ import SigninPage from "./routes/signinPage/SigninPage";
 import SignUpPage from "./routes/signUpPage/SignUpPage";
 import MyTripsPage from "./routes/myTrips/MyTripsPage";
 import AboutPage from "./routes/aboutPage/AboutPage";
+import ExplorePage from "./routes/explorePage/ExplorePage";
 import RootLayout from "./layouts/rootLayout/RootLayout";
 import DashboardLayout from "./layouts/dashboardLayout/DashboardLayout";
 import "./index.css";
@@ -118,6 +119,10 @@ const router = createBrowserRouter([
           {
             path: "/about",
             element: <AboutPage />,
+          },
+          {
+            path: "/explore",
+            element: <ExplorePage />,
           },
         ],
       },

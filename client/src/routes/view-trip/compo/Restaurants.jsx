@@ -401,10 +401,10 @@ const Restaurants = ({ trip }) => {
                   </button>
                   
                   {/* Details button */}
-                  <a
-                    href={restaurant.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
+              <a
+                href={restaurant.link}
+                target="_blank"
+                rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     className="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 px-3 rounded-md transition-colors"
                     dir="rtl"

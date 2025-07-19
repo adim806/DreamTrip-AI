@@ -48,6 +48,30 @@ const savedTripSchema = new mongoose.Schema({
     type: Object,
     default: {},
   },
+  
+  // Structured plan data (for better display)
+  structuredPlan: {
+    type: Object,
+    default: {},
+  },
+  
+  // Additional metadata
+  metadata: {
+    type: Object,
+    default: {},
+  },
+  
+  // Preview information
+  preview: {
+    type: Object,
+    default: {},
+  },
+  
+  // Activity counts
+  activityCounts: {
+    type: Object,
+    default: {},
+  },
 
   // Creation and update timestamps
   createdAt: {
