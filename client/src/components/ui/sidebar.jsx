@@ -307,6 +307,17 @@ export function SidebarNavigation() {
                       pathname === "/dashboard" && "bg-primary/15 text-primary font-semibold shadow-sm",
                       isCollapsed ? "justify-center" : "justify-start"
                     )}
+                    onClick={(e) => {
+                      // If already on dashboard, just refresh
+                      if (pathname === "/dashboard") {
+                        window.location.reload();
+                      } else {
+                        // Otherwise, navigate and then refresh after a short delay
+                        setTimeout(() => {
+                          window.location.reload();
+                        }, 100);
+                      }
+                    }}
                   >
                     <PlusCircle className={cn("h-5 w-5 min-w-[20px]", !isCollapsed && "text-blue-500")} />
                     {!isCollapsed && (

@@ -52,9 +52,37 @@ const fetchRestaurantsData = async (vacation_location) => {
     link: `https://www.google.com/maps/search/?api=1&query=${restaurant.geometry.location.lat},${restaurant.geometry.location.lng}`,
     lat: restaurant.geometry.location.lat,
     lng: restaurant.geometry.location.lng,
+    user_ratings_total: restaurant.user_ratings_total || 0,
+    types: restaurant.types || [],
   }));
 
   return restaurantsData;
+};
+
+// Function to fetch restaurant details including reviews
+const fetchRestaurantDetails = async (placeId) => {
+  if (!placeId) return null;
+  
+  try {
+    // Use CORS proxy to avoid CORS issues
+    const corsProxy = "https://corsproxy.io/?";
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=reviews,opening_hours,website,formatted_phone_number&key=${
+      import.meta.env.VITE_GOOGLE_PLACE_API_KEY
+    }`;
+    
+    const response = await axios.get(
+      `${corsProxy}${encodeURIComponent(detailsUrl)}`
+    );
+    
+    if (!response.data.result) {
+      throw new Error("לא נמצאו פרטים למסעדה זו.");
+    }
+    
+    return response.data.result;
+  } catch (error) {
+    console.error("Error fetching restaurant details:", error);
+    throw error;
+  }
 };
 
 const Restaurants = ({ trip }) => {
@@ -69,6 +97,9 @@ const Restaurants = ({ trip }) => {
 
   const [savedActivities, setSavedActivities] = useState([]);
   const [savingInProgress, setSavingInProgress] = useState({});
+  const [showReviews, setShowReviews] = useState(null);
+  const [restaurantDetails, setRestaurantDetails] = useState({});
+  const [loadingReviews, setLoadingReviews] = useState({});
   const queryClient = useQueryClient();
 
   // Get current userId and chatId
@@ -141,6 +172,39 @@ const Restaurants = ({ trip }) => {
 
     fetchSavedActivities();
   }, [chatId]);
+
+  // Function to handle showing reviews
+  const handleShowReviews = async (e, restaurantId) => {
+    e.stopPropagation(); // Prevent restaurant selection when clicking the button
+    
+    // Toggle reviews visibility
+    if (showReviews === restaurantId) {
+      setShowReviews(null);
+      return;
+    }
+    
+    setShowReviews(restaurantId);
+    
+    // Check if we already have the details for this restaurant
+    if (!restaurantDetails[restaurantId]) {
+      try {
+        setLoadingReviews({...loadingReviews, [restaurantId]: true});
+        
+        // Fetch restaurant details including reviews
+        const details = await fetchRestaurantDetails(restaurantId);
+        
+        // Store the details
+        setRestaurantDetails(prev => ({
+          ...prev,
+          [restaurantId]: details
+        }));
+      } catch (error) {
+        console.error(`Error fetching reviews for restaurant ${restaurantId}:`, error);
+      } finally {
+        setLoadingReviews({...loadingReviews, [restaurantId]: false});
+      }
+    }
+  };
 
   // Function to toggle saving an activity
   const handleSaveActivity = async (e, restaurant) => {
@@ -232,60 +296,150 @@ const Restaurants = ({ trip }) => {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <h2 className="text-2xl font-semibold text-center mb-6">
-        Recommended Restaurants in: {trip.vacation_location}
+      <h2 className="text-2xl font-semibold text-center mb-6 text-blue-100" dir="rtl">
+        מסעדות מומלצות ב{trip.vacation_location}
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {restaurantsList.map((restaurant) => (
           <div
             key={restaurant.id}
             onClick={() => setSelectedRestaurant(restaurant)}
-            className={`bg-white rounded-lg shadow-lg overflow-hidden transform transition duration-300 hover:scale-105 cursor-pointer ${
+            className={`bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl overflow-hidden transform transition-all duration-300 hover:scale-102 hover:shadow-xl cursor-pointer flex flex-col ${
               selectedRestaurant?.id === restaurant.id
-                ? "border-4 border-blue-500"
-                : ""
+                ? "ring-2 ring-blue-400 shadow-blue-400/30 shadow-lg"
+                : "shadow-md shadow-black/20"
             }`}
           >
+            {/* Top image with overlay gradient and floating elements */}
             <div className="relative">
               <img
                 src={restaurant.thumbnail}
                 alt={restaurant.name}
-                className="w-full h-48 object-cover"
+                className="w-full h-48 object-cover object-center"
+                loading="lazy"
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+              
+              {/* Rating pill - top left */}
+              <div className="absolute top-3 left-3 bg-blue-600/90 text-white text-sm font-medium px-2 py-0.5 rounded-full flex items-center">
+                <span className="mr-1">{restaurant.rating}</span>
+                <span className="text-yellow-300">⭐</span>
+              </div>
+              
+              {/* Save button - top right */}
               <button
-                className="absolute top-3 right-3 z-10"
+                className="absolute top-3 right-3 z-10 p-1.5 bg-black/30 backdrop-blur-sm rounded-full transition-transform hover:scale-110"
                 onClick={(e) => handleSaveActivity(e, restaurant)}
                 disabled={savingInProgress[restaurant.id]}
               >
                 <HeartIcon
                   filled={isRestaurantSaved(restaurant.id)}
-                  className={`w-7 h-7 ${
-                    isRestaurantSaved(restaurant.id)
-                      ? "text-red-500"
-                      : "text-white"
+                  className={`w-6 h-6 ${
+                    isRestaurantSaved(restaurant.id) ? "text-red-500" : "text-white"
                   }`}
                 />
               </button>
             </div>
-            <div className="p-4">
-              <h3 className="text-xl font-bold mb-2">{restaurant.name}</h3>
-              <p className="text-gray-700">
-                <strong>דירוג:</strong> {restaurant.rating} ⭐
-              </p>
-              <p className="text-gray-700">
-                <strong>מחיר:</strong> {restaurant.price}
-              </p>
-              <p className="text-gray-600">
-                <strong>כתובת:</strong> {restaurant.address}
-              </p>
-              <a
-                href={restaurant.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-center bg-blue-500 text-white font-semibold py-2 mt-4 rounded-lg hover:bg-blue-700 transition"
-              >
-                🔗 לפרטים נוספים
-              </a>
+            
+            {/* Restaurant details section */}
+            <div className="p-4 flex-1 flex flex-col">
+              {/* Fixed-height name container with absolute positioning for divider */}
+              <div className="h-[60px] relative mb-5">
+                {/* Name with overflow handling */}
+                <div className="h-full overflow-hidden">
+                  <h3 className="text-base font-medium text-white text-left leading-relaxed line-clamp-2" dir="rtl">{restaurant.name}</h3>
+                </div>
+                {/* Absolutely positioned divider */}
+                <div className="absolute bottom-0 left-0 right-0 border-b border-blue-800/50"></div>
+              </div>
+              
+              {/* Restaurant details content - with flex-1 to push button to bottom */}
+              <div className="flex flex-col space-y-2.5 flex-1">
+                {/* Address with icon */}
+                <div className="flex items-start justify-end">
+                  <span className="text-gray-300 text-sm text-left leading-relaxed" dir="rtl">{restaurant.address}</span>
+                  <span className="ml-2 mt-1 text-blue-400">📍</span>
+                </div>
+                
+                {/* Number of ratings */}
+                <div className="flex items-center justify-end">
+                  <span className="text-gray-400 text-sm">
+                    {restaurant.user_ratings_total || "לא ידוע"} דירוגים
+                  </span>
+                  <span className="ml-2 text-yellow-400">⭐</span>
+                </div>
+                
+                {/* Restaurant type/cuisine if available */}
+                {restaurant.types && restaurant.types.length > 0 && (
+                  <div className="flex items-center justify-end">
+                    <span className="text-green-400 text-sm text-right" dir="rtl">
+                      {restaurant.types[0].replace(/_/g, ' ')}
+                    </span>
+                    <span className="ml-2 text-green-500 flex-shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                      </svg>
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Action buttons - always at bottom */}
+              <div className="mt-auto">
+                <div className="flex gap-2 mb-2">
+                  {/* Reviews button */}
+                  <button 
+                    onClick={(e) => handleShowReviews(e, restaurant.id)}
+                    className={`flex-1 text-center text-white text-sm py-2 px-3 rounded-md transition-colors ${
+                      showReviews === restaurant.id ? 'bg-purple-700 hover:bg-purple-800' : 'bg-purple-600 hover:bg-purple-700'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center">
+                      <span className="mr-1">⭐</span>
+                      <span>ביקורות</span>
+                    </span>
+                  </button>
+                  
+                  {/* Details button */}
+                  <a
+                    href={restaurant.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 px-3 rounded-md transition-colors"
+                    dir="rtl"
+                  >
+                    לפרטים נוספים
+                  </a>
+                </div>
+                
+                {/* Reviews section */}
+                {showReviews === restaurant.id && (
+                  <div className="mt-2 bg-slate-700/50 rounded-md p-2 max-h-40 overflow-y-auto text-right" dir="rtl">
+                    <h4 className="text-sm font-medium text-blue-200 mb-2">ביקורות אחרונות</h4>
+                    
+                    {loadingReviews[restaurant.id] ? (
+                      <div className="flex justify-center items-center py-3">
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-400"></div>
+                        <span className="ml-2 text-sm text-blue-300">טוען ביקורות...</span>
+                      </div>
+                    ) : restaurantDetails[restaurant.id]?.reviews?.length > 0 ? (
+                      restaurantDetails[restaurant.id].reviews.map((review, index) => (
+                        <div key={index} className="mb-2 pb-2 border-b border-slate-600/50 last:border-0 last:mb-0 last:pb-0">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-yellow-300">{review.rating} ⭐</span>
+                            <span className="text-xs text-blue-300">{review.author_name}</span>
+                          </div>
+                          <p className="text-xs text-gray-300 mt-1 line-clamp-2">{review.text}</p>
+                          <p className="text-xs text-gray-400 mt-1">{review.relative_time_description}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-400 text-center py-2">לא נמצאו ביקורות למסעדה זו.</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ))}
