@@ -468,6 +468,8 @@ const tripPlanService = {
         );
 
         console.log("TripPlanService: Successfully fetched trip from backend");
+        console.log("TripPlanService: Trip has rawContent:", !!response.data.rawContent);
+        console.log("TripPlanService: Trip content keys:", Object.keys(response.data));
         return response.data;
       } catch (apiError) {
         console.error(

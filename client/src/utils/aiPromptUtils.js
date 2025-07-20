@@ -163,8 +163,8 @@ export const getInitialSystemInstruction = () => {
     
     "expected_fields": {
       "Weather-Request": {
-        "required": ["city", "country", "time"],
-        "optional": ["date", "timeContext"]
+        "required": ["city","time"],
+        "optional": ["date", "timeContext","country"]
       },
       "Find-Hotel": {
         "required": ["city"],
@@ -255,7 +255,7 @@ export const getInitialSystemInstruction = () => {
     - For hotel searches (Find-Hotel intent): ensure next_state="FETCHING_EXTERNAL_DATA" and next_action="fetch_external_data"
     - When all required fields are present, ALWAYS set status="Complete", requires_external_data=true, and shouldDelayFetch=false
     - For Find-Hotel intent, required fields are: city
-    - For Weather-Request intent, required fields are: city, country, time
+    - For Weather-Request intent, required fields are: city, time
     - DO NOT set status="Incomplete" if all required fields are present
     - If fields are missing, set next_state="ASK_MISSING_FIELDS" to collect missing information
     
@@ -270,7 +270,6 @@ export const getInitialSystemInstruction = () => {
     
     #### Weather-Request:
     - REQUIRED: "city" (string) - The city name only, without country
-    - REQUIRED: "country" (string) - The country name only
     - REQUIRED: "time" (string) - When to check weather ("now", "today", "tomorrow", or date)
     - NEVER combine city and country in a single field
     - For queries like "weather in Tel Aviv, Israel", extract as:
@@ -290,9 +289,8 @@ export const getInitialSystemInstruction = () => {
       * Extract: city="Tel Aviv", country="Israel", time="now", timeContext="now"
       * Set: status="Complete", next_state="FETCHING_EXTERNAL_DATA", next_action="fetch_external_data"
     - "Weather tomorrow in Paris"
-      * Extract: city="Paris", country missing, time="tomorrow", timeContext="tomorrow"
-      * Set: status="Incomplete", next_state="ASK_MISSING_FIELDS", missingFields=["country"]
-      * Include a natural followUpQuestion like "In which country is Paris located? I want to make sure I get the right weather information."
+      * Extract: city="Paris",country="France", time="tomorrow", timeContext="tomorrow"
+      * Set: status="Complete", next_state="FETCHING_EXTERNAL_DATA", next_action="fetch_external_data"
     
     #### Find-Hotel:
     - REQUIRED: "city" (string) - The city name only

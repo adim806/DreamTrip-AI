@@ -390,7 +390,81 @@ export const processAdviceIntent = async ({
           result.nextState = "ITINERARY_ADVICE_MODE";
           result.nextAction = "DISPLAY_EXTERNAL_DATA_RESPONSE";
 
-          // Format the response based on the intent and data
+          // Initialize RAG processor if enabled
+          if (enableRAG && GEMINI_API_KEY) {
+            try {
+              console.log("Initializing RAG processor for enhanced response generation");
+              await ragProcessor.initialize(GEMINI_API_KEY);
+              
+              // Process external data through RAG for enhanced natural language response
+              if (ragProcessor.initialized) {
+                console.log(`Processing ${intent} data through RAG processor`);
+                const ragResponse = await ragProcessor.processExternalData(
+                  intent,
+                  externalData,
+                  userMessage || "",
+                  { tripContext }
+                );
+                
+                if (ragResponse) {
+                  console.log("Successfully generated RAG response");
+                  result.response = ragResponse;
+                  
+                  // Store the RAG-enhanced response in the data object
+                  if (data) {
+                    data.formattedResponse = ragResponse;
+                    data.response = ragResponse;
+                    
+                    // Set intent-specific data
+                    if (intent === "Weather-Request") {
+                      data.formattedWeatherResponse = ragResponse;
+                    } else if (intent === "Find-Restaurants") {
+                      data.formattedRestaurantsResponse = ragResponse;
+                    } else if (intent === "Find-Hotel") {
+                      data.formattedHotelsResponse = ragResponse;
+                    } else if (intent === "Find-Attractions") {
+                      data.formattedAttractionsResponse = ragResponse;
+                    }
+                  }
+                  
+                  // Store the formatted response in global space
+                  if (typeof window !== "undefined") {
+                    if (intent === "Weather-Request") {
+                      window.__weatherResponseData = ragResponse;
+                      window.__forceWeatherResponse = true;
+                    } else if (intent === "Find-Restaurants") {
+                      window.__restaurantsResponseData = ragResponse;
+                      window.__forceRestaurantsResponse = true;
+                    } else if (intent === "Find-Hotel") {
+                      window.__hotelsResponseData = ragResponse;
+                      window.__forceHotelsResponse = true;
+                    } else if (intent === "Find-Attractions") {
+                      window.__attractionsResponseData = ragResponse;
+                      window.__forceAttractionsResponse = true;
+                    } else {
+                      window.__externalDataResponse = ragResponse;
+                      window.__forceExternalDataDisplay = true;
+                    }
+                  }
+                  
+                  // Process data for map visualization
+                  try {
+                    console.log(`Processing external data for map visualization: intent=${intent}`);
+                    await processExternalData(intent, externalData);
+                  } catch (error) {
+                    console.error("Error processing external data for map:", error);
+                  }
+                  
+                  return result;
+                }
+              }
+            } catch (ragError) {
+              console.error("Error using RAG processor:", ragError);
+              // Fall back to standard formatting if RAG fails
+            }
+          }
+
+          // Fall back to standard formatting if RAG is disabled or fails
           const formattedResponse = formatAdviceResponse(intent, externalData);
           result.response = formattedResponse;
 

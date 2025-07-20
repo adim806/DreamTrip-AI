@@ -28,6 +28,7 @@ const MyTripsPage = () => {
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showRawContent, setShowRawContent] = useState(false);
   const { userId, isLoaded, isSignedIn, getToken } = useAuth();
   const navigate = useNavigate();
 
@@ -85,6 +86,35 @@ const MyTripsPage = () => {
       "berlin": "https://images.unsplash.com/photo-1528728329032-2972f65dfb3f?q=80&w=1200&auto=format&fit=crop",
       "prague": "https://images.unsplash.com/photo-1592906209472-a36b1f3782ef?q=80&w=1200&auto=format&fit=crop",
       "vienna": "https://images.unsplash.com/photo-1516550893885-985c994344a2?q=80&w=1200&auto=format&fit=crop",
+      "budapest": "https://images.unsplash.com/photo-1551867633-194f125bddfa?q=80&w=1200&auto=format&fit=crop",
+      "athens": "https://images.unsplash.com/photo-1558435508-f040c5f83a47?q=80&w=1200&auto=format&fit=crop",
+      "madrid": "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?q=80&w=1200&auto=format&fit=crop",
+      "lisbon": "https://images.unsplash.com/photo-1558370781-d6196949e317?q=80&w=1200&auto=format&fit=crop",
+      "florence": "https://images.unsplash.com/photo-1543429257-3eb0b65d9e38?q=80&w=1200&auto=format&fit=crop",
+      "venice": "https://images.unsplash.com/photo-1514890547357-a9ee288728e0?q=80&w=1200&auto=format&fit=crop",
+      "santorini": "https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?q=80&w=1200&auto=format&fit=crop",
+      "zurich": "https://images.unsplash.com/photo-1515488764276-beab7607c1e6?q=80&w=1200&auto=format&fit=crop",
+      "munich": "https://images.unsplash.com/photo-1595867818082-083862f3d630?q=80&w=1200&auto=format&fit=crop",
+      "copenhagen": "https://images.unsplash.com/photo-1513622470522-26c3c8a854bc?q=80&w=1200&auto=format&fit=crop",
+      "stockholm": "https://images.unsplash.com/photo-1588653818221-2651ec1a6423?q=80&w=1200&auto=format&fit=crop",
+      "oslo": "https://images.unsplash.com/photo-1608304908553-88a225f9a8c6?q=80&w=1200&auto=format&fit=crop",
+      
+      // ערים באסיה
+      "tokyo": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1200&auto=format&fit=crop",
+      "kyoto": "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1200&auto=format&fit=crop",
+      "osaka": "https://images.unsplash.com/photo-1590559899731-a382839e5549?q=80&w=1200&auto=format&fit=crop",
+      "seoul": "https://images.unsplash.com/photo-1538485399081-7c9f2d4b5bc1?q=80&w=1200&auto=format&fit=crop",
+      "busan": "https://images.unsplash.com/photo-1617541086271-4d43983398e3?q=80&w=1200&auto=format&fit=crop",
+      "bangkok": "https://images.unsplash.com/photo-1563492065599-3520f775eeed?q=80&w=1200&auto=format&fit=crop",
+      "singapore": "https://images.unsplash.com/photo-1565967511849-76a60a516170?q=80&w=1200&auto=format&fit=crop",
+      "hong kong": "https://images.unsplash.com/photo-1506970845246-18f21d533b20?q=80&w=1200&auto=format&fit=crop",
+      "beijing": "https://images.unsplash.com/photo-1599571234909-29ed5d1321d6?q=80&w=1200&auto=format&fit=crop",
+      "shanghai": "https://images.unsplash.com/photo-1538428494232-9c0d8a3ab403?q=80&w=1200&auto=format&fit=crop",
+      "taipei": "https://images.unsplash.com/photo-1598935898639-81daa59cf7c8?q=80&w=1200&auto=format&fit=crop",
+      "hanoi": "https://images.unsplash.com/photo-1583417319070-4a69db38a482?q=80&w=1200&auto=format&fit=crop",
+      "ho chi minh": "https://images.unsplash.com/photo-1583417319070-4a69db38a482?q=80&w=1200&auto=format&fit=crop",
+      "kuala lumpur": "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?q=80&w=1200&auto=format&fit=crop",
+      "bali": "https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1200&auto=format&fit=crop",
       
       // ערים בארה"ב
       "new york": "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1200&auto=format&fit=crop",
@@ -92,13 +122,13 @@ const MyTripsPage = () => {
       "san francisco": "https://images.unsplash.com/photo-1521464302861-ce943915d1c3?q=80&w=1200&auto=format&fit=crop",
       "las vegas": "https://images.unsplash.com/photo-1605833556294-ea5c7a74f57d?q=80&w=1200&auto=format&fit=crop",
       "miami": "https://images.unsplash.com/photo-1535498730771-e735b998cd64?q=80&w=1200&auto=format&fit=crop",
-      
-      // יעדים באסיה
-      "tokyo": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1200&auto=format&fit=crop",
-      "bangkok": "https://images.unsplash.com/photo-1563492065599-3520f775eeed?q=80&w=1200&auto=format&fit=crop",
-      "singapore": "https://images.unsplash.com/photo-1565967511849-76a60a516170?q=80&w=1200&auto=format&fit=crop",
-      "hong kong": "https://images.unsplash.com/photo-1506970845246-18f21d533b20?q=80&w=1200&auto=format&fit=crop",
-      "seoul": "https://images.unsplash.com/photo-1538485399081-7c9f2d4b5bc1?q=80&w=1200&auto=format&fit=crop",
+      "chicago": "https://images.unsplash.com/photo-1494522855154-9297ac14b55f?q=80&w=1200&auto=format&fit=crop",
+      "boston": "https://images.unsplash.com/photo-1501979376754-f817c5eb9be2?q=80&w=1200&auto=format&fit=crop",
+      "seattle": "https://images.unsplash.com/photo-1538097304804-2a1b932466a9?q=80&w=1200&auto=format&fit=crop",
+      "washington dc": "https://images.unsplash.com/photo-1617581629397-0c2b8c08e92d?q=80&w=1200&auto=format&fit=crop",
+      "new orleans": "https://images.unsplash.com/photo-1571893544028-06b07bf5a404?q=80&w=1200&auto=format&fit=crop",
+      "austin": "https://images.unsplash.com/photo-1530089711124-9ca31fb9e863?q=80&w=1200&auto=format&fit=crop",
+      "nashville": "https://images.unsplash.com/photo-1545419913-775e3e82c7db?q=80&w=1200&auto=format&fit=crop",
       
       // יעדים במזרח התיכון
       "dubai": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=1200&auto=format&fit=crop",
@@ -106,6 +136,10 @@ const MyTripsPage = () => {
       "tel aviv": "https://images.unsplash.com/photo-1544971587-b842c27f8e14?q=80&w=1200&auto=format&fit=crop",
       "jerusalem": "https://images.unsplash.com/photo-1529106492281-b02200cec7ec?q=80&w=1200&auto=format&fit=crop",
       "eilat": "https://images.unsplash.com/photo-1559628233-100c798642d4?q=80&w=1200&auto=format&fit=crop",
+      "amman": "https://images.unsplash.com/photo-1534571688991-2d4c8d3c3568?q=80&w=1200&auto=format&fit=crop",
+      "cairo": "https://images.unsplash.com/photo-1572252009286-268acec5ca0a?q=80&w=1200&auto=format&fit=crop",
+      "abu dhabi": "https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=1200&auto=format&fit=crop",
+      "doha": "https://images.unsplash.com/photo-1562693315-95c5714f67ef?q=80&w=1200&auto=format&fit=crop",
       
       // מדינות ואזורים
       "italy": "https://images.unsplash.com/photo-1516483638261-f4dbaf036963?q=80&w=1200&auto=format&fit=crop",
@@ -117,6 +151,22 @@ const MyTripsPage = () => {
       "israel": "https://images.unsplash.com/photo-1544971587-b842c27f8e14?q=80&w=1200&auto=format&fit=crop",
       "usa": "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=1200&auto=format&fit=crop",
       "uk": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=1200&auto=format&fit=crop",
+      "germany": "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=1200&auto=format&fit=crop",
+      "switzerland": "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?q=80&w=1200&auto=format&fit=crop",
+      "austria": "https://images.unsplash.com/photo-1609880132805-8c3cfdcfa244?q=80&w=1200&auto=format&fit=crop",
+      "netherlands": "https://images.unsplash.com/photo-1512470876302-972faa2aa9a4?q=80&w=1200&auto=format&fit=crop",
+      "portugal": "https://images.unsplash.com/photo-1555881400-74d7acaacd8b?q=80&w=1200&auto=format&fit=crop",
+      "czech republic": "https://images.unsplash.com/photo-1592906209472-a36b1f3782ef?q=80&w=1200&auto=format&fit=crop",
+      "hungary": "https://images.unsplash.com/photo-1551867633-194f125bddfa?q=80&w=1200&auto=format&fit=crop",
+      "korea": "https://images.unsplash.com/photo-1538485399081-7c9f2d4b5bc1?q=80&w=1200&auto=format&fit=crop",
+      "china": "https://images.unsplash.com/photo-1547981609-4b6bfe67ca0b?q=80&w=1200&auto=format&fit=crop",
+      "vietnam": "https://images.unsplash.com/photo-1583417319070-4a69db38a482?q=80&w=1200&auto=format&fit=crop",
+      "malaysia": "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?q=80&w=1200&auto=format&fit=crop",
+      "indonesia": "https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1200&auto=format&fit=crop",
+      "australia": "https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?q=80&w=1200&auto=format&fit=crop",
+      "new zealand": "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=1200&auto=format&fit=crop",
+      "canada": "https://images.unsplash.com/photo-1503614472-8c93d56e92ce?q=80&w=1200&auto=format&fit=crop",
+      "mexico": "https://images.unsplash.com/photo-1518638150340-f706e86654de?q=80&w=1200&auto=format&fit=crop",
       
       // סוגי טיולים
       "beach": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1200&auto=format&fit=crop",
@@ -190,7 +240,7 @@ const MyTripsPage = () => {
         setLoading(true);
         console.log("טוען יומני מסע ומסלולים שמורים...");
 
-        // טעינת מסלולים שמורים
+          // טעינת מסלולים שמורים
         const savedTripsData = await tripPlanService.getMyTrips();
         console.log("נטענו מסלולים:", savedTripsData);
 
@@ -226,6 +276,8 @@ const MyTripsPage = () => {
       setLoading(true);
       const tripData = await tripPlanService.getTripById(tripId);
       
+      console.log("Raw trip data:", tripData);
+      
       // עדכון היעד ומשך הטיול אם חסרים
       if (!tripData.destination || tripData.destination === "Unknown destination" || tripData.destination === "") {
         if (tripData.metadata?.destination && tripData.metadata.destination !== "Unknown destination" && tripData.metadata.destination !== "") {
@@ -244,11 +296,53 @@ const MyTripsPage = () => {
           tripData.duration = `${tripData.structuredPlan.days.length} ימים`;
         }
       }
+
+      
+      // בדיקה אם יש תוכן כלשהו
+      const hasContent = tripData.rawContent || tripData.plan || tripData.content;
+      
+      // אם אין תוכן כלל, ננסה ליצור אותו מהמבנה המובנה
+      if (!hasContent && tripData.structuredPlan && tripData.structuredPlan.days && tripData.structuredPlan.days.length > 0) {
+        console.log("No content found, creating from structured plan");
+        tripData.rawContent = createContentFromStructuredPlan(tripData.structuredPlan);
+      }
+      
+      // עיבוד ה-rawContent אם קיים
+      if (tripData.rawContent) {
+        console.log("Raw content found:", tripData.rawContent.substring(0, 200) + "...");
+        
+        // המרת ה-rawContent למבנה מסודר
+        tripData.processedContent = processRawContent(tripData.rawContent);
+        console.log("Processed content:", tripData.processedContent.substring(0, 200) + "...");
+        
+        // אם אין תוכן מובנה, ננסה ליצור אותו מה-rawContent
+        if (!tripData.structuredPlan || !tripData.structuredPlan.days || tripData.structuredPlan.days.length === 0) {
+          tripData.structuredPlan = extractStructuredPlanFromRawContent(tripData.rawContent);
+          console.log("Created structured plan:", tripData.structuredPlan);
+        }
+      } else {
+        console.log("No raw content found in trip data");
+        
+        // אם אין rawContent, ננסה להשתמש ב-plan או content
+        if (tripData.plan) {
+          console.log("Using plan as raw content");
+          tripData.rawContent = tripData.plan;
+          tripData.processedContent = processRawContent(tripData.plan);
+        } else if (tripData.content) {
+          console.log("Using content as raw content");
+          tripData.rawContent = tripData.content;
+          tripData.processedContent = processRawContent(tripData.content);
+        }
+      }
       
       console.log("Viewing trip with data:", {
         id: tripData.id,
         destination: tripData.destination,
-        duration: tripData.duration
+        duration: tripData.duration,
+        hasRawContent: !!tripData.rawContent,
+        hasProcessedContent: !!tripData.processedContent,
+        hasStructuredPlan: !!(tripData.structuredPlan && tripData.structuredPlan.days),
+        contentType: tripData.processedContent ? "processed" : tripData.rawContent ? "raw" : tripData.plan ? "plan" : tripData.content ? "content" : "none"
       });
       
       setSelectedTrip(tripData);
@@ -258,6 +352,531 @@ const MyTripsPage = () => {
       setLoading(false);
     }
   };
+  
+  // פונקציה ליצירת תוכן טקסטואלי ממבנה מובנה
+  const createContentFromStructuredPlan = (structuredPlan) => {
+    if (!structuredPlan || !structuredPlan.days || structuredPlan.days.length === 0) {
+      return null;
+    }
+    
+    let content = [];
+    
+    // כותרת ראשית
+    content.push(`# יומן מסע${structuredPlan.destination ? ` - ${structuredPlan.destination}` : ''}`);
+    content.push('');
+    
+    // מידע כללי
+    if (structuredPlan.destination) {
+      content.push(`**יעד:** ${structuredPlan.destination}`);
+    }
+    
+    if (structuredPlan.duration) {
+      content.push(`**משך:** ${structuredPlan.duration}`);
+    }
+    
+    if (structuredPlan.summary) {
+      content.push('');
+      content.push(structuredPlan.summary);
+    }
+    
+    content.push('');
+    
+    // הוספת הימים
+    structuredPlan.days.forEach(day => {
+      content.push(`## ${day.title || `יום ${day.dayNumber}`}`);
+      content.push('');
+      
+      // בוקר
+      if (day.activities?.morning && day.activities.morning.length > 0) {
+        content.push('### בוקר');
+        day.activities.morning.forEach(activity => {
+          content.push(`- ${activity}`);
+        });
+        content.push('');
+      }
+      
+      // צהריים
+      if (day.activities?.lunch && day.activities.lunch.length > 0) {
+        content.push('### ארוחת צהריים');
+        day.activities.lunch.forEach(activity => {
+          content.push(`- ${activity}`);
+        });
+        content.push('');
+      }
+      
+      // אחר הצהריים
+      if (day.activities?.afternoon && day.activities.afternoon.length > 0) {
+        content.push('### צהריים');
+        day.activities.afternoon.forEach(activity => {
+          content.push(`- ${activity}`);
+        });
+        content.push('');
+      }
+      
+      // ערב
+      if (day.activities?.evening && day.activities.evening.length > 0) {
+        content.push('### ערב');
+        day.activities.evening.forEach(activity => {
+          content.push(`- ${activity}`);
+        });
+        content.push('');
+      }
+      
+      // ארוחת ערב
+      if (day.activities?.dinner && day.activities.dinner.length > 0) {
+        content.push('### ארוחת ערב');
+        day.activities.dinner.forEach(activity => {
+          content.push(`- ${activity}`);
+        });
+        content.push('');
+      }
+    });
+    
+    // טיפים
+    if (structuredPlan.additionalInfo?.tips && structuredPlan.additionalInfo.tips.length > 0) {
+      content.push('## טיפים והמלצות');
+      content.push('');
+      structuredPlan.additionalInfo.tips.forEach(tip => {
+        content.push(`💡 טיפ: ${tip}`);
+        content.push('');
+      });
+    }
+    
+    return content.join('\n');
+  };
+
+  // פונקציה לעיבוד ה-rawContent
+  const processRawContent = (rawContent) => {
+    if (!rawContent) return null;
+    
+    // נסה לזהות את הפורמט של ה-rawContent
+    const isStructuredFormat = rawContent.includes("**Destination:**") || 
+                              rawContent.includes("**Dates:**") || 
+                              rawContent.includes("**Budget Level:**") ||
+                              rawContent.includes("## Morning") || 
+                              rawContent.includes("## Afternoon") || 
+                              rawContent.includes("## Evening") ||
+                              rawContent.includes("## בוקר") || 
+                              rawContent.includes("## צהריים") || 
+                              rawContent.includes("## ערב");
+    
+    if (isStructuredFormat) {
+      // אם זה בפורמט מובנה, נשאיר את זה כמו שהוא כדי שהפארסר שלנו יטפל בזה
+      return rawContent;
+    }
+    
+    // אם זה לא בפורמט מובנה, ננסה לארגן את זה בצורה טובה יותר
+    const lines = rawContent.split('\n');
+    let formattedContent = [];
+    let currentDay = null;
+    let dayCounter = 0;
+    
+    // חיפוש יעד וזמן
+    let destination = "";
+    let duration = "";
+    
+    // חיפוש כותרת ראשית
+    const titleLine = lines.find(line => 
+      line.includes("טיול") || 
+      line.includes("מסלול") || 
+      line.includes("יומן מסע") ||
+      line.includes("Trip to") ||
+      line.includes("Itinerary") ||
+      line.includes("Travel") ||
+      line.match(/[A-Za-z\s]+ Vacation/i) ||
+      line.match(/[A-Za-z\s]+ Tour/i) ||
+      line.match(/[A-Za-z\s]+ Journey/i)
+    );
+    
+    // חיפוש יעד
+    const destinationLine = lines.find(line => 
+      line.match(/יעד:?\s*(.+)/i) || 
+      line.match(/destination:?\s*(.+)/i) ||
+      line.match(/מיקום:?\s*(.+)/i) ||
+      line.match(/location:?\s*(.+)/i) ||
+      line.match(/טיול ב(.+)/i) ||
+      line.match(/טיול ל(.+)/i) ||
+      line.match(/Trip to (.+)/i)
+    );
+    
+    if (destinationLine) {
+      const destMatch = destinationLine.match(/(?:יעד|destination|מיקום|location):?\s*(.+)/i) || 
+                        destinationLine.match(/טיול ב(.+)/i) ||
+                        destinationLine.match(/טיול ל(.+)/i) ||
+                        destinationLine.match(/Trip to (.+)/i);
+      
+      if (destMatch) {
+        destination = destMatch[1].trim();
+      }
+    }
+    
+    // חיפוש משך
+    const durationLine = lines.find(line => 
+      line.match(/(?:משך|duration|אורך|length):?\s*(.+)/i) ||
+      line.match(/(\d+)\s+(?:ימים|days)/i) ||
+      line.match(/טיול (?:בן|של) (\d+) (?:ימים|days)/i)
+    );
+    
+    if (durationLine) {
+      const durMatch = durationLine.match(/(?:משך|duration|אורך|length):?\s*(.+)/i) ||
+                       durationLine.match(/(\d+)\s+(?:ימים|days)/i) ||
+                       durationLine.match(/טיול (?:בן|של) (\d+) (?:ימים|days)/i);
+      
+      if (durMatch) {
+        duration = durMatch[1].trim();
+      }
+    }
+    
+    // יצירת כותרת ראשית
+    if (titleLine) {
+      let title = titleLine.trim();
+      
+      // אם יש לנו יעד ומשך, ננסה להוסיף אותם לכותרת
+      if (destination && !title.includes(destination)) {
+        title = `${title} - ${destination}`;
+      }
+      
+      if (duration && !title.includes(duration)) {
+        title = `${title} (${duration})`;
+      }
+      
+      formattedContent.push(`# ${title}`);
+    } else {
+      // אם אין כותרת, ננסה ליצור אחת
+      let title = "יומן מסע";
+      
+      if (destination) {
+        title = `יומן מסע - ${destination}`;
+      }
+      
+      if (duration) {
+        title = `${title} (${duration})`;
+      }
+      
+      formattedContent.push(`# ${title}`);
+    }
+    
+    // הוספת מידע על היעד והמשך אם הם לא נכללו בכותרת
+    if (destination && !formattedContent[0].includes(destination)) {
+      formattedContent.push(`**יעד:** ${destination}`);
+    }
+    
+    if (duration && !formattedContent[0].includes(duration)) {
+      formattedContent.push(`**משך:** ${duration}`);
+    }
+    
+    formattedContent.push(''); // שורה ריקה לאחר הכותרת
+    
+    // עיבוד השורות
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // דילוג על שורות ריקות ושורות שכבר עיבדנו (כותרת, יעד, משך)
+      if (!line || 
+          line === titleLine || 
+          line === destinationLine || 
+          line === durationLine) {
+        continue;
+      }
+      
+      // זיהוי יום חדש
+      const dayMatch = line.match(/(?:יום|day)\s+(\d+)/i);
+      if (dayMatch || 
+          line.startsWith("יום:") || 
+          line.startsWith("Day:") ||
+          line.match(/^יום\s+[א-ת]'?$/i) || // יום א', יום ב' וכו'
+          line.match(/^Day\s+\d+:?/i)) {
+        dayCounter++;
+        currentDay = line;
+        formattedContent.push(`\n## ${currentDay}`);
+        continue;
+      }
+      
+      // זיהוי חלקי היום
+      if (line.match(/בוקר/i) || line.match(/morning/i)) {
+        formattedContent.push(`\n### בוקר`);
+        continue;
+      }
+      
+      if (line.match(/צהריים/i) || line.match(/afternoon/i)) {
+        formattedContent.push(`\n### צהריים`);
+        continue;
+      }
+      
+      if (line.match(/ערב/i) || line.match(/evening/i)) {
+        formattedContent.push(`\n### ערב`);
+        continue;
+      }
+      
+      if (line.match(/ארוחת צהריים/i) || line.match(/lunch/i)) {
+        formattedContent.push(`\n### ארוחת צהריים`);
+        continue;
+      }
+      
+      if (line.match(/ארוחת ערב/i) || line.match(/dinner/i)) {
+        formattedContent.push(`\n### ארוחת ערב`);
+        continue;
+      }
+      
+      // זיהוי פעילויות
+      if (line.match(/^[*-]/) || 
+          (i > 0 && lines[i-1].match(/בוקר|צהריים|ערב|morning|afternoon|evening|lunch|dinner/i)) ||
+          line.match(/^\d+[\.\)]/) || // רשימה ממוספרת
+          line.match(/^[A-Za-z\u0590-\u05FF][\.\)]/) // רשימה עם אותיות
+         ) {
+        // בדיקה אם זו פעילות או אטרקציה
+        if (line.includes("אטרקציה") || 
+            line.includes("ביקור") || 
+            line.includes("סיור") || 
+            line.includes("visit") || 
+            line.includes("tour") || 
+            line.includes("attraction") ||
+            line.includes("מוזיאון") ||
+            line.includes("museum") ||
+            line.includes("גן") ||
+            line.includes("park") ||
+            line.includes("אתר") ||
+            line.includes("site")) {
+          
+          // אם זה כבר מתחיל עם סימון רשימה, נשאיר כמו שהוא
+          if (line.match(/^[*-]/)) {
+            formattedContent.push(line);
+          } else {
+            formattedContent.push(`- ${line}`);
+          }
+        }
+        // בדיקה אם זו מסעדה או ארוחה
+        else if (line.includes("מסעדה") || 
+                line.includes("ארוחה") || 
+                line.includes("restaurant") || 
+                line.includes("meal") || 
+                line.includes("lunch") || 
+                line.includes("dinner") ||
+                line.includes("food") ||
+                line.includes("אוכל")) {
+          
+          if (line.match(/^[*-]/)) {
+            formattedContent.push(line);
+          } else {
+            formattedContent.push(`- ${line}`);
+          }
+        }
+        // בדיקה אם זה מלון או לינה
+        else if (line.includes("מלון") || 
+                line.includes("לינה") || 
+                line.includes("hotel") || 
+                line.includes("accommodation") || 
+                line.includes("stay") ||
+                line.includes("lodge") ||
+                line.includes("hostel") ||
+                line.includes("אכסניה") ||
+                line.includes("צימר")) {
+          
+          if (line.match(/^[*-]/)) {
+            formattedContent.push(line);
+          } else {
+            formattedContent.push(`- ${line}`);
+          }
+        }
+        // אחרת, זו סתם פעילות
+        else if (!line.match(/^[*-]/)) {
+          formattedContent.push(`- ${line}`);
+        } else {
+          formattedContent.push(line);
+        }
+        continue;
+      }
+      
+      // זיהוי טיפים
+      if (line.includes("טיפ") || 
+          line.includes("המלצה") || 
+          line.includes("tip") || 
+          line.includes("recommendation") ||
+          line.includes("הערה") ||
+          line.includes("note") ||
+          line.includes("חשוב לדעת") ||
+          line.includes("important to know")) {
+        
+        if (line.includes("💡") || line.includes("טיפ:") || line.includes("Tip:")) {
+          formattedContent.push(line);
+        } else {
+          formattedContent.push(`💡 טיפ: ${line}`);
+        }
+        continue;
+      }
+      
+      // שורות רגילות
+      formattedContent.push(line);
+    }
+    
+    // אם לא זיהינו ימים, ננסה ליצור מבנה של ימים
+    if (dayCounter === 0) {
+      const content = formattedContent.join('\n');
+      const newContent = [];
+      
+      // הוספת הכותרת הראשית
+      if (content.startsWith('# ')) {
+        const titleLines = content.split('\n').filter(line => line.startsWith('# ') || line.startsWith('**יעד') || line.startsWith('**משך'));
+        titleLines.forEach(line => newContent.push(line));
+      } else {
+        newContent.push("# יומן מסע");
+      }
+      
+      newContent.push(''); // שורה ריקה
+      
+      // חלוקה לפסקאות
+      const paragraphs = content.split('\n\n')
+        .filter(p => p.trim() && !p.startsWith('# ') && !p.startsWith('**יעד') && !p.startsWith('**משך'));
+      
+      // אם יש יותר מפסקה אחת, נניח שכל פסקה היא יום
+      if (paragraphs.length > 1) {
+        paragraphs.forEach((paragraph, index) => {
+          newContent.push(`\n## יום ${index + 1}`);
+          newContent.push(paragraph);
+        });
+      } else if (paragraphs.length === 1) {
+        // אם יש רק פסקה אחת, ננסה לחלק אותה לימים לפי שורות
+        const lines = paragraphs[0].split('\n').filter(line => line.trim());
+        
+        if (lines.length >= 3) {
+          // חלוקה לשלושה ימים
+          const daySize = Math.ceil(lines.length / 3);
+          
+          for (let i = 0; i < 3; i++) {
+            const dayLines = lines.slice(i * daySize, (i + 1) * daySize);
+            if (dayLines.length > 0) {
+              newContent.push(`\n## יום ${i + 1}`);
+              newContent.push(dayLines.join('\n'));
+            }
+          }
+        } else {
+          // אם אין מספיק שורות, פשוט נציג את הכל כיום אחד
+          newContent.push(`\n## יום 1`);
+          newContent.push(paragraphs[0]);
+        }
+      }
+      
+      return newContent.join('\n');
+    }
+    
+    return formattedContent.join('\n');
+  };
+  
+  // פונקציה ליצירת מבנה מסודר מה-rawContent
+  const extractStructuredPlanFromRawContent = (rawContent) => {
+    if (!rawContent) return null;
+    
+    const structuredPlan = {
+      days: []
+    };
+    
+    const lines = rawContent.split('\n');
+    let currentDay = null;
+    let currentSection = null;
+    let currentDayNumber = 0;
+    
+    // חיפוש יעד וזמן
+    const destinationMatch = rawContent.match(/(?:יעד|destination):\s*([^\n]+)/i);
+    if (destinationMatch) {
+      structuredPlan.destination = destinationMatch[1].trim();
+    }
+    
+    const durationMatch = rawContent.match(/(?:משך|duration):\s*([^\n]+)/i);
+    if (durationMatch) {
+      structuredPlan.duration = durationMatch[1].trim();
+    }
+    
+    // עיבוד השורות
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // דילוג על שורות ריקות
+      if (!line) continue;
+      
+      // זיהוי יום חדש
+      const dayMatch = line.match(/(?:יום|day)\s+(\d+)/i);
+      if (dayMatch || line.startsWith("יום:") || line.startsWith("Day:")) {
+        currentDayNumber++;
+        currentDay = {
+          dayNumber: currentDayNumber,
+          title: line,
+          activities: {
+            morning: [],
+            afternoon: [],
+            evening: [],
+            lunch: [],
+            dinner: []
+          }
+        };
+        structuredPlan.days.push(currentDay);
+        currentSection = null;
+        continue;
+      }
+      
+      // אם אין יום נוכחי, נדלג
+      if (!currentDay) continue;
+      
+      // זיהוי חלקי היום
+      if (line.match(/בוקר/i) || line.match(/morning/i)) {
+        currentSection = "morning";
+        continue;
+      }
+      
+      if (line.match(/צהריים/i) || line.match(/afternoon/i)) {
+        currentSection = "afternoon";
+        continue;
+      }
+      
+      if (line.match(/ערב/i) || line.match(/evening/i)) {
+        currentSection = "evening";
+        continue;
+      }
+      
+      if (line.match(/ארוחת צהריים/i) || line.match(/lunch/i)) {
+        currentSection = "lunch";
+        continue;
+      }
+      
+      if (line.match(/ארוחת ערב/i) || line.match(/dinner/i)) {
+        currentSection = "dinner";
+        continue;
+      }
+      
+      // אם יש סעיף נוכחי והשורה מתחילה ב- * או - או שהיא לא ריקה, נוסיף אותה לפעילויות
+      if (currentSection && line) {
+        const cleanLine = line.replace(/^[*-]\s*/, '');
+        if (cleanLine) {
+          currentDay.activities[currentSection].push(cleanLine);
+        }
+      }
+    }
+    
+    // אם לא זיהינו ימים, ננסה ליצור מבנה של יום אחד
+    if (structuredPlan.days.length === 0) {
+      const activities = [];
+      
+      // חיפוש פעילויות
+      const activityMatches = rawContent.match(/[*-]\s*([^\n]+)/g);
+      if (activityMatches) {
+        activityMatches.forEach(match => {
+          activities.push(match.replace(/^[*-]\s*/, ''));
+        });
+      }
+      
+      // יצירת יום אחד עם כל הפעילויות
+      structuredPlan.days.push({
+        dayNumber: 1,
+        title: "יום 1",
+        activities: {
+          morning: activities.slice(0, Math.ceil(activities.length / 3)),
+          afternoon: activities.slice(Math.ceil(activities.length / 3), Math.ceil(activities.length * 2 / 3)),
+          evening: activities.slice(Math.ceil(activities.length * 2 / 3))
+        }
+      });
+    }
+    
+    return structuredPlan;
+  };
 
   // פונקציה לצפייה ביומן מסע
   const viewItinerary = async (itinerary) => {
@@ -265,6 +884,8 @@ const MyTripsPage = () => {
       setLoading(true);
       // כאן אנחנו משתמשים בנתונים שכבר קיימים ברשימה
       // אם יש צורך בפרטים נוספים, אפשר לבקש אותם מהשרת
+      
+      console.log("Raw itinerary data:", itinerary);
       
       // עיבוד הנתונים כדי שיתאימו לפורמט של מסלול שמור
       const processedItinerary = {
@@ -276,7 +897,61 @@ const MyTripsPage = () => {
         structuredPlan: itinerary.structuredItinerary || itinerary.structuredPlan || {}
       };
       
-      console.log("Viewing itinerary:", processedItinerary);
+      // בדיקה אם יש תוכן כלשהו
+      const hasContent = itinerary.rawContent || itinerary.content || itinerary.plan;
+      
+      // אם אין תוכן כלל, ננסה ליצור אותו מהמבנה המובנה
+      if (!hasContent && 
+          (itinerary.structuredItinerary || itinerary.structuredPlan) && 
+          ((itinerary.structuredItinerary?.days && itinerary.structuredItinerary.days.length > 0) || 
+           (itinerary.structuredPlan?.days && itinerary.structuredPlan.days.length > 0))) {
+        console.log("No content found in itinerary, creating from structured plan");
+        processedItinerary.rawContent = createContentFromStructuredPlan(
+          itinerary.structuredItinerary || itinerary.structuredPlan
+        );
+      }
+      
+      // עיבוד ה-rawContent אם קיים
+      if (itinerary.rawContent) {
+        console.log("Raw content found in itinerary:", itinerary.rawContent.substring(0, 200) + "...");
+        
+        // המרת ה-rawContent למבנה מסודר
+        processedItinerary.processedContent = processRawContent(itinerary.rawContent);
+        console.log("Processed content for itinerary:", processedItinerary.processedContent.substring(0, 200) + "...");
+        
+        // אם אין תוכן מובנה, ננסה ליצור אותו מה-rawContent
+        if (!processedItinerary.structuredPlan || !processedItinerary.structuredPlan.days || processedItinerary.structuredPlan.days.length === 0) {
+          processedItinerary.structuredPlan = extractStructuredPlanFromRawContent(itinerary.rawContent);
+          console.log("Created structured plan for itinerary:", processedItinerary.structuredPlan);
+        }
+      } else {
+        console.log("No raw content found in itinerary");
+        
+        // אם אין rawContent, ננסה להשתמש ב-plan או content
+        if (itinerary.content) {
+          console.log("Using content as raw content for itinerary");
+          processedItinerary.rawContent = itinerary.content;
+          processedItinerary.processedContent = processRawContent(itinerary.content);
+        } else if (itinerary.plan) {
+          console.log("Using plan as raw content for itinerary");
+          processedItinerary.rawContent = itinerary.plan;
+          processedItinerary.processedContent = processRawContent(itinerary.plan);
+        } else if (processedItinerary.rawContent) {
+          // אם יצרנו rawContent מהמבנה המובנה
+          console.log("Using created raw content for itinerary");
+          processedItinerary.processedContent = processRawContent(processedItinerary.rawContent);
+        }
+      }
+      
+      console.log("Viewing itinerary:", {
+        id: processedItinerary._id || processedItinerary.id,
+        destination: processedItinerary.destination,
+        duration: processedItinerary.duration,
+        hasRawContent: !!processedItinerary.rawContent,
+        hasProcessedContent: !!processedItinerary.processedContent,
+        hasStructuredPlan: !!(processedItinerary.structuredPlan && processedItinerary.structuredPlan.days),
+        contentType: processedItinerary.processedContent ? "processed" : processedItinerary.rawContent ? "raw" : processedItinerary.plan ? "plan" : processedItinerary.content ? "content" : "none"
+      });
       
       setSelectedTrip(processedItinerary);
     } catch (error) {
@@ -497,7 +1172,13 @@ const MyTripsPage = () => {
   // אם נבחר מסלול שמור להצגה
   if (selectedTrip) {
     // Make sure the plan content is available
-    const planContent = selectedTrip.plan || selectedTrip.content || "";
+    const planContent = selectedTrip.processedContent || selectedTrip.plan || selectedTrip.content || selectedTrip.rawContent || "";
+    
+    console.log("Content type used for display:", 
+      selectedTrip.processedContent ? "processedContent" : 
+      selectedTrip.plan ? "plan" : 
+      selectedTrip.content ? "content" : 
+      selectedTrip.rawContent ? "rawContent" : "empty string");
     
     return (
       <motion.div
@@ -555,373 +1236,16 @@ const MyTripsPage = () => {
             transition={{ duration: 0.4 }}
             className="trip-content flex-grow overflow-y-auto bg-gradient-to-br from-blue-900/10 to-indigo-900/10 border border-blue-500/20 rounded-xl p-6"
           >
-            <div className="itinerary-header mb-6 pb-4 border-b border-blue-500/20">
-              <h2 className="text-2xl font-bold text-blue-200 mb-2">
-                {selectedTrip.isItinerary ? "יומן מסע" : "מסלול טיול"}
-              </h2>
-              <p className="text-gray-300">
-                {selectedTrip.structuredPlan?.summary || selectedTrip.structuredItinerary?.summary || selectedTrip.description || selectedTrip.content || "מסלול טיול מותאם אישית עבורך"}
-              </p>
-              
-              {/* Highlights section */}
-              {(selectedTrip.structuredPlan?.highlights || selectedTrip.structuredItinerary?.highlights) && (
-                <div className="highlights-section mt-4">
-                  <h3 className="text-lg font-medium text-blue-300 mb-2 flex items-center gap-1.5">
-                    <span className="text-yellow-400">✨</span> דגשים עיקריים
-                  </h3>
-                  <div className="highlights-list flex flex-wrap gap-2">
-                    {(selectedTrip.structuredPlan?.highlights || selectedTrip.structuredItinerary?.highlights || []).map((highlight, index) => (
-                      <div key={index} className="highlight-tag bg-blue-900/30 border border-blue-500/30 px-3 py-1.5 rounded-lg text-sm text-blue-200">
-                        {highlight}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+            {/* תצוגת ה-rawContent */}
+            <div className="raw-content-view bg-gray-900/50 p-6 rounded-lg mb-4 overflow-auto text-base">
+              <h3 className="text-xl font-bold text-blue-300 mb-4 flex items-center gap-2">
+                <RiRoadMapLine className="text-blue-400" />
+                {selectedTrip.destination || "יומן מסע"}
+              </h3>
+              <pre className="whitespace-pre-wrap text-gray-300 font-mono">
+                {selectedTrip.rawContent || selectedTrip.plan || selectedTrip.content || "אין תוכן זמין"}
+              </pre>
             </div>
-
-            {/* Use structured plan if available */}
-            {(selectedTrip.structuredPlan?.days || selectedTrip.structuredItinerary?.days) && 
-              (selectedTrip.structuredPlan?.days?.length > 0 || selectedTrip.structuredItinerary?.days?.length > 0) ? (
-              <div className="structured-itinerary">
-                {(selectedTrip.structuredPlan?.days || selectedTrip.structuredItinerary?.days || []).map((day, index) => (
-                  <motion.div 
-                    key={index}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="day-section mb-10 bg-gradient-to-br from-blue-900/5 to-indigo-900/5 rounded-xl p-6 border border-blue-500/10"
-                  >
-                    <h3 className="text-xl font-bold text-blue-300 flex items-center gap-2 mb-4 pb-3 border-b border-blue-500/20">
-                      <RiCalendarLine className="text-blue-400" />
-                      {day.title || `יום ${day.dayNumber}`}
-                    </h3>
-                    
-                    {/* Morning activities */}
-                    {day.activities?.morning && day.activities.morning.length > 0 && (
-                      <div className="time-section mb-6">
-                        <h4 className="text-lg font-medium text-yellow-300 mb-3 flex items-center gap-1.5 bg-gradient-to-r from-yellow-900/10 to-transparent p-2 rounded-lg">
-                          <span>☀️</span> בוקר
-                        </h4>
-                        <div className="activities-list space-y-3 pr-4">
-                          {day.activities.morning.map((activity, actIndex) => (
-                            <div 
-                              key={actIndex}
-                              className="activity-item flex items-start p-3 hover:bg-blue-500/10 rounded-md transition-colors border border-blue-500/10"
-                            >
-                              <div className="activity-icon mr-3 bg-yellow-500/20 p-2 rounded-full">
-                                {activity.includes("מלון") || activity.includes("לינה") ? (
-                                  <RiHotelLine className="text-yellow-400" />
-                                ) : activity.includes("מסעדת") || activity.includes("ארוחת") ? (
-                                  <RiRestaurantLine className="text-yellow-400" />
-                                ) : (
-                                  <RiMapPinLine className="text-yellow-400" />
-                                )}
-                              </div>
-                              <div className="activity-content">
-                                <p className="text-gray-300">{activity}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Afternoon activities */}
-                    {day.activities?.afternoon && day.activities.afternoon.length > 0 && (
-                      <div className="time-section mb-6">
-                        <h4 className="text-lg font-medium text-blue-300 mb-3 flex items-center gap-1.5 bg-gradient-to-r from-blue-900/10 to-transparent p-2 rounded-lg">
-                          <span>🌞</span> צהריים
-                        </h4>
-                        <div className="activities-list space-y-3 pr-4">
-                          {day.activities.afternoon.map((activity, actIndex) => (
-                            <div 
-                              key={actIndex}
-                              className="activity-item flex items-start p-3 hover:bg-blue-500/10 rounded-md transition-colors border border-blue-500/10"
-                            >
-                              <div className="activity-icon mr-3 bg-blue-500/20 p-2 rounded-full">
-                                {activity.includes("מלון") || activity.includes("לינה") ? (
-                                  <RiHotelLine className="text-blue-400" />
-                                ) : activity.includes("מסעדת") || activity.includes("ארוחת") ? (
-                                  <RiRestaurantLine className="text-blue-400" />
-                                ) : (
-                                  <RiMapPinLine className="text-blue-400" />
-                                )}
-                              </div>
-                              <div className="activity-content">
-                                <p className="text-gray-300">{activity}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Evening activities */}
-                    {day.activities?.evening && day.activities.evening.length > 0 && (
-                      <div className="time-section mb-6">
-                        <h4 className="text-lg font-medium text-purple-300 mb-3 flex items-center gap-1.5 bg-gradient-to-r from-purple-900/10 to-transparent p-2 rounded-lg">
-                          <span>🌙</span> ערב
-                        </h4>
-                        <div className="activities-list space-y-3 pr-4">
-                          {day.activities.evening.map((activity, actIndex) => (
-                            <div 
-                              key={actIndex}
-                              className="activity-item flex items-start p-3 hover:bg-purple-500/10 rounded-md transition-colors border border-purple-500/10"
-                            >
-                              <div className="activity-icon mr-3 bg-purple-500/20 p-2 rounded-full">
-                                {activity.includes("מלון") || activity.includes("לינה") ? (
-                                  <RiHotelLine className="text-purple-400" />
-                                ) : activity.includes("מסעדת") || activity.includes("ארוחת") ? (
-                                  <RiRestaurantLine className="text-purple-400" />
-                                ) : (
-                                  <RiMapPinLine className="text-purple-400" />
-                                )}
-                              </div>
-                              <div className="activity-content">
-                                <p className="text-gray-300">{activity}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Lunch activities */}
-                    {day.activities?.lunch && day.activities.lunch.length > 0 && (
-                      <div className="time-section mb-6">
-                        <h4 className="text-lg font-medium text-red-300 mb-3 flex items-center gap-1.5 bg-gradient-to-r from-red-900/10 to-transparent p-2 rounded-lg">
-                          <RiRestaurantLine className="text-red-400" /> ארוחת צהריים
-                        </h4>
-                        <div className="activities-list space-y-3 pr-4">
-                          {day.activities.lunch.map((activity, actIndex) => (
-                            <div 
-                              key={actIndex}
-                              className="activity-item flex items-start p-3 hover:bg-red-500/10 rounded-md transition-colors border border-red-500/10"
-                            >
-                              <div className="activity-icon mr-3 bg-red-500/20 p-2 rounded-full">
-                                <RiRestaurantLine className="text-red-400" />
-                              </div>
-                              <div className="activity-content">
-                                <p className="text-gray-300">{activity}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Dinner activities */}
-                    {day.activities?.dinner && day.activities.dinner.length > 0 && (
-                      <div className="time-section mb-6">
-                        <h4 className="text-lg font-medium text-orange-300 mb-3 flex items-center gap-1.5 bg-gradient-to-r from-orange-900/10 to-transparent p-2 rounded-lg">
-                          <RiRestaurantLine className="text-orange-400" /> ארוחת ערב
-                        </h4>
-                        <div className="activities-list space-y-3 pr-4">
-                          {day.activities.dinner.map((activity, actIndex) => (
-                            <div 
-                              key={actIndex}
-                              className="activity-item flex items-start p-3 hover:bg-orange-500/10 rounded-md transition-colors border border-orange-500/10"
-                            >
-                              <div className="activity-icon mr-3 bg-orange-500/20 p-2 rounded-full">
-                                <RiRestaurantLine className="text-orange-400" />
-                              </div>
-                              <div className="activity-content">
-                                <p className="text-gray-300">{activity}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-                
-                {/* Tips section */}
-                {(selectedTrip.structuredPlan?.additionalInfo?.tips || selectedTrip.structuredItinerary?.additionalInfo?.tips) && 
-                  (selectedTrip.structuredPlan?.additionalInfo?.tips?.length > 0 || selectedTrip.structuredItinerary?.additionalInfo?.tips?.length > 0) && (
-                  <div className="tips-section mt-8 bg-blue-900/20 p-6 rounded-xl border border-blue-500/30">
-                    <h3 className="text-xl font-bold text-blue-300 flex items-center gap-2 mb-4 pb-3 border-b border-blue-500/20">
-                      <span className="text-blue-300">💡</span> טיפים והמלצות
-                    </h3>
-                    <ul className="tips-list space-y-3">
-                      {(selectedTrip.structuredPlan?.additionalInfo?.tips || selectedTrip.structuredItinerary?.additionalInfo?.tips || []).map((tip, index) => (
-                        <li key={index} className="tip-item flex items-start bg-blue-900/10 p-3 rounded-lg border-r-4 border-blue-500">
-                          <span className="mr-3 text-blue-400 text-lg">💡</span>
-                          <p className="text-gray-300">{tip}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Fallback to markdown content if no structured plan
-              <div className="markdown-content prose prose-invert max-w-none prose-headings:text-blue-300 prose-p:text-gray-300 prose-strong:text-blue-200 prose-li:text-gray-300">
-                {(planContent || "טרם נוצר תוכן מפורט").split('\n').map((line, i) => {
-                  // הדגשת כותרות ראשיות (יעד, תקציר)
-                  if (line.startsWith('# ')) {
-                    return (
-                      <motion.h1
-                        key={i}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.01 }}
-                        className="text-2xl font-bold text-blue-300 mt-6 mb-4 flex items-center gap-2"
-                      >
-                        <RiRoadMapLine className="text-blue-400" />
-                        {line.replace('# ', '')}
-                      </motion.h1>
-                    );
-                  }
-
-                  // כותרות של ימים
-                  if (line.match(/^##\s+יום \d+/) || line.match(/^##\s+Day \d+/) || 
-                      (line.startsWith('## ') && (line.includes('יום') || line.includes('Day')))) {
-                    return (
-                      <motion.h2
-                        key={i}
-                        initial={{ opacity: 0, x: -5 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.01 }}
-                        className="text-xl font-bold text-blue-300 mt-8 mb-3 flex items-center gap-2 border-t border-blue-500/20 pt-6"
-                      >
-                        <RiCalendarLine className="text-blue-400" />
-                        {line.replace('## ', '')}
-                      </motion.h2>
-                    );
-                  }
-                  
-                  // כותרות משניות אחרות
-                  if (line.startsWith('## ')) {
-                    return (
-                      <motion.h2
-                        key={i}
-                        initial={{ opacity: 0, x: -5 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.01 }}
-                        className="text-xl font-bold text-blue-300 mt-5 mb-3 flex items-center gap-2"
-                      >
-                        <RiSuitcaseLine className="text-blue-400" />
-                        {line.replace('## ', '')}
-                      </motion.h2>
-                    );
-                  }
-
-                  // כותרות משניות (בוקר, צהריים, ערב)
-                  if (line.startsWith('### ')) {
-                    const timeOfDay = line.toLowerCase();
-                    let icon = <RiMapPinLine className="text-blue-400" />;
-                    let colorClass = "text-blue-300";
-                    
-                    if (timeOfDay.includes('בוקר') || timeOfDay.includes('morning')) {
-                      icon = <span className="text-yellow-300 text-xl">☀️</span>;
-                      colorClass = "text-yellow-300";
-                    } else if (timeOfDay.includes('צהריים') || timeOfDay.includes('afternoon')) {
-                      icon = <span className="text-blue-300 text-xl">🌞</span>;
-                      colorClass = "text-blue-300";
-                    } else if (timeOfDay.includes('ערב') || timeOfDay.includes('evening')) {
-                      icon = <span className="text-purple-300 text-xl">🌙</span>;
-                      colorClass = "text-purple-300";
-                    } else if (timeOfDay.includes('ארוחת') || timeOfDay.includes('lunch') || timeOfDay.includes('dinner')) {
-                      icon = <RiRestaurantLine className="text-red-400" />;
-                      colorClass = "text-red-300";
-                    }
-                    
-                    return (
-                      <motion.h3
-                        key={i}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: i * 0.01 }}
-                        className={`text-lg font-bold ${colorClass} mt-5 mb-2 flex items-center gap-2 bg-gradient-to-r from-blue-900/10 to-transparent p-2 rounded-lg`}
-                      >
-                        {icon}
-                        {line.replace('### ', '')}
-                      </motion.h3>
-                    );
-                  }
-
-                  // רשימות - זיהוי אטרקציות/מסעדות/מלונות
-                  if (line.match(/^\s*[*-]\s/)) {
-                    let icon = <span className="text-blue-400 mr-2">•</span>;
-                    const cleanText = line.replace(/^\s*[*-]\s/, '');
-
-                    if (cleanText.includes("מלון") || cleanText.includes("לינה") || cleanText.includes("Hotel")) {
-                      icon = <RiHotelLine className="text-indigo-400 mr-2" />;
-                    } else if (cleanText.includes("מסעדת") || cleanText.includes("ארוחת") || cleanText.includes("מסעדה") || cleanText.includes("Restaurant")) {
-                      icon = <RiRestaurantLine className="text-red-400 mr-2" />;
-                    } else if (cleanText.includes("אטרקציה") || cleanText.includes("ביקור") || cleanText.includes("סיור") || cleanText.includes("מוזיאון")) {
-                      icon = <RiMapPinLine className="text-green-400 mr-2" />;
-                    }
-
-                    return (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: i * 0.01 }}
-                        className="flex items-start my-2 px-3 py-2 hover:bg-blue-500/10 rounded-md transition-colors border border-blue-500/10"
-                      >
-                        {icon}
-                        <p className="text-gray-300">{cleanText}</p>
-                      </motion.div>
-                    );
-                  }
-
-                  // הדגשת טיפים
-                  if (line.includes("טיפ:") || line.includes("Tip:")) {
-                    return (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: i * 0.01 }}
-                        className="bg-blue-900/20 p-3 rounded-lg my-3 border-r-4 border-blue-500"
-                      >
-                        <p className="text-blue-200 flex items-center gap-2">
-                          <span className="text-blue-300">💡</span>
-                          {line}
-                        </p>
-                      </motion.div>
-                    );
-                  }
-
-                  // פסקאות רגילות
-                  if (line.trim() === '') {
-                    return <div key={i} className="h-4"></div>;
-                  }
-
-                  // הדגשת מידע חשוב
-                  if (line.includes("**")) {
-                    return (
-                      <motion.p
-                        key={i}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: i * 0.01 }}
-                        className="text-gray-300 my-2"
-                        dangerouslySetInnerHTML={{
-                          __html: line.replace(/\*\*(.*?)\*\*/g, '<span class="font-bold text-blue-200">$1</span>')
-                        }}
-                      />
-                    );
-                  }
-
-                  return (
-                    <motion.p
-                      key={i}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: i * 0.01 }}
-                      className="text-gray-300 my-2"
-                    >
-                      {line}
-                    </motion.p>
-                  );
-                })}
-              </div>
-            )}
           </motion.div>
 
           {/* Sidebar info panel */}
@@ -1027,9 +1351,10 @@ const MyTripsPage = () => {
             <div className="mt-auto p-4 bg-gradient-to-br from-blue-900/20 to-indigo-900/20 rounded-xl border border-blue-500/20">
               <button
                 onClick={() => navigate("/chat/new")}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-md py-2.5 transition-colors flex items-center justify-center gap-1.5"
+                className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium rounded-xl
+                      transition-all flex items-center gap-2 shadow-md self-start md:self-end"
               >
-                <RiPlaneLine size={18} />
+                <RiPlaneLine size={20} />
                 יצירת טיול חדש
               </button>
             </div>
@@ -1087,7 +1412,7 @@ const MyTripsPage = () => {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate("/chat/new")}
-            className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl
+            className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium rounded-xl
                       transition-all flex items-center gap-2 shadow-md self-start md:self-end"
           >
             <RiPlaneLine size={20} />
@@ -1100,19 +1425,19 @@ const MyTripsPage = () => {
             <div className="flex items-center gap-1 rounded-lg bg-blue-900/20 p-1 border border-blue-500/30">
               <button
                 onClick={() => setActiveTab("all")}
-                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "all" ? "bg-blue-600 text-white font-medium shadow-md" : "text-gray-300 hover:bg-blue-500/10"}`}
+                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "all" ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium shadow-md" : "text-gray-300 hover:bg-blue-500/10"}`}
               >
                 הכל
               </button>
               <button
                 onClick={() => setActiveTab("saved")}
-                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "saved" ? "bg-blue-600 text-white font-medium shadow-md" : "text-gray-300 hover:bg-blue-500/10"}`}
+                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "saved" ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium shadow-md" : "text-gray-300 hover:bg-blue-500/10"}`}
               >
                 מסלולים שמורים
               </button>
               <button
                 onClick={() => setActiveTab("itineraries")}
-                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "itineraries" ? "bg-blue-600 text-white font-medium shadow-md" : "text-gray-300 hover:bg-blue-500/10"}`}
+                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "itineraries" ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium shadow-md" : "text-gray-300 hover:bg-blue-500/10"}`}
               >
                 יומני מסע
               </button>
@@ -1165,7 +1490,7 @@ const MyTripsPage = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate("/chat/new")}
-            className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl
+            className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium rounded-xl
                       transition-all flex items-center gap-3 shadow-lg"
           >
             <RiPlaneLine size={24} />
@@ -1198,9 +1523,10 @@ const MyTripsPage = () => {
                   return (
                     <motion.div
                       key={trip._id || trip.id}
-                      className="itinerary-card rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col h-[360px]"
+                      className="itinerary-card rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col cursor-pointer h-[360px]"
                       variants={itemVariants}
                       whileHover={{ y: -8, transition: { duration: 0.2 } }}
+                      onClick={() => viewItinerary(trip)}
                     >
                       {/* Card image header with overlay */}
                       <div className="card-image-container relative h-40 overflow-hidden">
@@ -1209,31 +1535,36 @@ const MyTripsPage = () => {
                           alt={itineraryDestination}
                           className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/70 to-indigo-900/40 opacity-70"></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-indigo-800/50 to-purple-800/50 opacity-60"></div>
                         <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                          <h3 className="text-2xl font-bold text-white mb-1 truncate flex items-center gap-2">
-                            <span className="bg-blue-500/50 p-1.5 rounded-full backdrop-blur-sm">
-                              <RiRoadMapLine className="text-white" size={18} />
-                            </span>
-                            {itineraryDestination}
-                          </h3>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {(trip.duration || trip.metadata?.duration) && (
-                              <span className="text-xs bg-blue-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                                <RiTimeLine className="mr-1" /> {trip.duration || trip.metadata?.duration}
+                          <div className="bg-black/30 backdrop-blur-sm p-2 rounded-lg">
+                            <h3 className="text-2xl font-bold truncate flex items-center gap-2">
+                              <span className="bg-indigo-500/50 p-1.5 rounded-full backdrop-blur-sm">
+                                <RiRoadMapLine className="text-white" size={18} />
                               </span>
-                            )}
-                            {(trip.metadata?.dates?.from || trip.dates?.from) && (
-                              <span className="text-xs bg-purple-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                                <RiCalendarLine className="mr-1" />{" "}
-                                {formatDate(trip.metadata?.dates?.from || trip.dates?.from)}
-                              </span>
-                            )}
+                              <div className="flex flex-col">
+                                <span className="text-xs text-blue-200">יעד הטיול:</span>
+                                <span className="text-xl bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">{itineraryDestination}</span>
+                              </div>
+                            </h3>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {(trip.duration || trip.metadata?.duration) && (
+                                <span className="text-xs bg-blue-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
+                                  <RiTimeLine className="mr-1" /> {trip.duration || trip.metadata?.duration}
+                                </span>
+                              )}
+                              {(trip.metadata?.dates?.from || trip.dates?.from) && (
+                                <span className="text-xs bg-indigo-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
+                                  <RiCalendarLine className="mr-1" />{" "}
+                                  {formatDate(trip.metadata?.dates?.from || trip.dates?.from)}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="card-content p-5 flex-grow overflow-hidden bg-gradient-to-br from-blue-900/20 to-indigo-900/20">
+                      <div className="card-content p-5 flex-grow overflow-hidden bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border-t border-blue-500/20">
                         {trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0] ? (
                           <div className="trip-day-preview">
                             <h4 className="text-sm font-medium text-blue-300 flex items-center gap-1.5 mb-3">
@@ -1265,6 +1596,46 @@ const MyTripsPage = () => {
                                   </span>
                                 </div>
                               )}
+                              {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.afternoon?.[0] && (
+                                <div className="activity flex items-center gap-2 p-2 bg-white/5 rounded-lg">
+                                  <span className="text-blue-300 text-lg flex-shrink-0">🌞</span>
+                                  <span className="truncate">
+                                    {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).activities.afternoon[0].replace(
+                                      /^[^a-zA-Z0-9\u0590-\u05FF]+/,
+                                      ""
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.evening?.[0] && (
+                                <div className="activity flex items-center gap-2 p-2 bg-white/5 rounded-lg">
+                                  <span className="text-purple-300 text-lg flex-shrink-0">🌙</span>
+                                  <span className="truncate">
+                                    {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).activities.evening[0].replace(
+                                      /^[^a-zA-Z0-9\u0590-\u05FF]+/,
+                                      ""
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              {/* אם אין פעילויות, מציג אייקונים ברירת מחדל */}
+                              {!(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.morning?.[0] && 
+                               !(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.afternoon?.[0] && 
+                               !(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.evening?.[0] && 
+                               !(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.lunch?.[0] && (
+                                <div className="default-activities flex items-center justify-center gap-3 mt-3 p-3 bg-white/5 rounded-lg">
+                                  <span className="activity-icon p-2 bg-yellow-500/20 rounded-full">
+                                    <RiSuitcaseLine className="text-yellow-400" size={20} />
+                                  </span>
+                                  <span className="activity-icon p-2 bg-blue-500/20 rounded-full">
+                                    <RiMapPinLine className="text-blue-400" size={20} />
+                                  </span>
+                                  <span className="activity-icon p-2 bg-purple-500/20 rounded-full">
+                                    <RiRestaurantLine className="text-purple-400" size={20} />
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ) : (
@@ -1280,16 +1651,13 @@ const MyTripsPage = () => {
                                 </p>
                               </div>
                             ) : (
-                              <div className="default-activities flex flex-col items-center justify-center gap-3 mt-3 p-5 bg-white/5 rounded-lg text-center">
-                                <div className="flex justify-center gap-3">
-                                  <span className="activity-icon p-2 bg-blue-500/20 rounded-full">
-                                    <RiSuitcaseLine className="text-blue-400" size={20} />
-                                  </span>
-                                  <span className="activity-icon p-2 bg-purple-500/20 rounded-full">
-                                    <RiMapPinLine className="text-purple-400" size={20} />
-                                  </span>
+                              <div className="text-center py-3">
+                                <div className="flex justify-center gap-3 mb-3">
+                                  <span className="text-blue-300 text-2xl">✈️</span>
+                                  <span className="text-yellow-300 text-2xl">🌍</span>
+                                  <span className="text-green-300 text-2xl">🏞️</span>
                                 </div>
-                                <p className="text-blue-300 font-medium mt-2">יומן מסע מפורט</p>
+                                <p className="text-blue-300 font-medium">לחץ לצפייה ביומן המסע המלא</p>
                               </div>
                             )}
                           </div>
@@ -1306,13 +1674,14 @@ const MyTripsPage = () => {
                         )}
                       </div>
 
-                      <div className="card-footer p-4 bg-[#181C29]/80 border-t border-indigo-500/30">
+                      <div className="card-footer p-4 bg-[#181C29]/80 border-t border-indigo-500/30 flex justify-between items-center">
+                        <div></div> {/* ריק בצד שמאל כדי לשמור על יישור ימין של הכפתור */}
                         <button
                           onClick={() => viewItinerary(trip)}
-                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-md py-2.5 transition-all flex items-center justify-center gap-1.5"
+                          className="flex items-center text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
                         >
-                          <RiEyeLine size={20} />
-                          צפה ביומן המסע
+                          <RiEyeLine className="mr-1" />
+                          צפה במסלול
                         </button>
                       </div>
                     </motion.div>
@@ -1346,31 +1715,36 @@ const MyTripsPage = () => {
                         />
                         <div className={`absolute inset-0 bg-gradient-to-t ${headerGradient} opacity-60`}></div>
                         <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                          <h3 className="text-2xl font-bold truncate flex items-center gap-2">
-                            <span className="bg-indigo-500/50 p-1.5 rounded-full backdrop-blur-sm">
-                              <RiMapPinLine className="text-white" size={18} />
-                            </span>
-                            {displayDestination}
-                          </h3>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            <span className="text-xs bg-blue-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                              <RiTimeLine className="mr-1" /> 
-                              {trip.duration && !trip.duration.includes("Unknown") 
-                                ? trip.duration 
-                                : trip.structuredPlan?.days?.length > 0 
-                                  ? `${trip.structuredPlan.days.length} ימים` 
-                                  : trip.metadata?.duration && !trip.metadata.duration.includes("Unknown")
-                                    ? trip.metadata.duration
-                                    : "טיול מתוכנן"} 
-                            </span>
-                            <span className="text-xs bg-indigo-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                              <RiCalendarLine className="mr-1" /> {formatDate(trip.createdAt)}
-                            </span>
-                            {trip.activityCounts?.total > 0 && (
-                              <span className="text-xs bg-green-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                                <RiMapPinLine className="mr-1" /> {trip.activityCounts.total} פעילויות
+                          <div className="bg-black/30 backdrop-blur-sm p-2 rounded-lg">
+                            <h3 className="text-2xl font-bold truncate flex items-center gap-2">
+                              <span className="bg-indigo-500/50 p-1.5 rounded-full backdrop-blur-sm">
+                                <RiMapPinLine className="text-white" size={18} />
                               </span>
-                            )}
+                              <div className="flex flex-col">
+                                <span className="text-xs text-blue-200">יעד הטיול:</span>
+                                <span className="text-xl bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">{displayDestination}</span>
+                              </div>
+                            </h3>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              <span className="text-xs bg-blue-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
+                                <RiTimeLine className="mr-1" /> 
+                                {trip.duration && !trip.duration.includes("Unknown") 
+                                  ? trip.duration 
+                                  : trip.structuredPlan?.days?.length > 0 
+                                    ? `${trip.structuredPlan.days.length} ימים` 
+                                    : trip.metadata?.duration && !trip.metadata.duration.includes("Unknown")
+                                      ? trip.metadata.duration
+                                      : "טיול מתוכנן"} 
+                              </span>
+                              <span className="text-xs bg-indigo-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
+                                <RiCalendarLine className="mr-1" /> {formatDate(trip.createdAt)}
+                              </span>
+                              {trip.activityCounts?.total > 0 && (
+                                <span className="text-xs bg-green-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
+                                  <RiMapPinLine className="mr-1" /> {trip.activityCounts.total} פעילויות
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1446,6 +1820,10 @@ const MyTripsPage = () => {
                               <p className="line-clamp-5">
                                 {trip.plan.split('\n').filter(line => !line.startsWith('#') && line.trim() !== '')[0] || "לחץ לצפייה במסלול המלא"}
                               </p>
+                            ) : trip.rawContent ? (
+                              <p className="line-clamp-5">
+                                {trip.rawContent.split('\n').filter(line => line.trim() !== '')[0] || "לחץ לצפייה במסלול המלא"}
+                              </p>
                             ) : (
                               <div className="text-center py-3">
                                 <div className="flex justify-center gap-3 mb-3">
@@ -1500,7 +1878,7 @@ const MyTripsPage = () => {
                 <p className="text-gray-300 text-center">לא נמצאו תוצאות תואמות לחיפוש שלך</p>
                 <button
                   onClick={() => { setSearchTerm(""); setActiveTab("all"); }}
-                  className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  className="mt-4 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg transition-colors text-sm"
                 >
                   נקה סינון
                 </button>
