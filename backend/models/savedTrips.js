@@ -94,6 +94,78 @@ const savedTripSchema = new mongoose.Schema({
 // Update the updatedAt timestamp on save
 savedTripSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
+  
+  // Extract destination from content if it looks incorrect
+  if (!this.destination || 
+      this.destination === "Unknown destination" || 
+      this.destination.includes("Imperial") || 
+      this.destination.includes("Grandeur") ||
+      this.destination.includes("Luxury") || 
+      this.destination.includes("Experience")) {
+    
+    console.log("SavedTrip: Attempting to extract destination from content");
+    
+    // Try to extract destination from the content using multiple patterns
+    if (this.plan) {
+      const content = this.plan;
+      const patterns = [
+        /(?:יעד|destination):\s*([^\n]+)/i,
+        /(?:מיקום|location):\s*([^\n]+)/i,
+        /טיול ב([^\n]+)/i,
+        /טיול ל([^\n]+)/i,
+        /Trip to ([^\n]+)/i,
+        /Exploring ([^\n]+)/i,
+        /Experience in ([^\n]+)/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = content.match(pattern);
+        if (match && match[1]) {
+          const extractedDestination = match[1].trim()
+            .replace(/\*\*/g, '') // Remove markdown bold
+            .replace(/\*/g, '')   // Remove markdown italic
+            .replace(/:$/, '')    // Remove trailing colon
+            .trim();
+          
+          if (extractedDestination && extractedDestination !== "Unknown destination") {
+            console.log(`SavedTrip: Extracted destination: "${extractedDestination}"`);
+            this.destination = extractedDestination;
+            
+            // Also update in tripDetails and structuredPlan if they exist
+            if (this.tripDetails) {
+              this.tripDetails.destination = extractedDestination;
+            }
+            
+            if (this.structuredPlan) {
+              this.structuredPlan.destination = extractedDestination;
+            }
+            
+            break;
+          }
+        }
+      }
+      
+      // If still not found, try to extract from the title
+      if (this.destination === "Unknown destination") {
+        const titleMatch = content.match(/^#\s+.*?(?:in|at|to)\s+([A-Za-z\s,]+)(?::|\.|\n)/i);
+        if (titleMatch && titleMatch[1]) {
+          const extractedDestination = titleMatch[1].trim();
+          console.log(`SavedTrip: Extracted destination from title: "${extractedDestination}"`);
+          this.destination = extractedDestination;
+          
+          // Also update in tripDetails and structuredPlan if they exist
+          if (this.tripDetails) {
+            this.tripDetails.destination = extractedDestination;
+          }
+          
+          if (this.structuredPlan) {
+            this.structuredPlan.destination = extractedDestination;
+          }
+        }
+      }
+    }
+  }
+  
   next();
 });
 

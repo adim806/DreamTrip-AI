@@ -63,63 +63,12 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
     };
   }, [tripDetails, conversationState, currentChatId, transitionState]);
 
-  // Add debug output to understand why component might not render
-  // Only log if we haven't logged recently to prevent infinite logging
-  useEffect(() => {
-    if (!hasLoggedDebugInfo.current) {
-      const shouldRender = !!tripDetails && 
-        conversationState === CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION;
-      
-      console.log('TripSummary render check:', {
-        hasTripDetails: !!tripDetails,
-        conversationState,
-        isAwaitingConfirmation: conversationState === CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION,
-        activeTripChatId,
-        currentChatId,
-        activeChatId,
-        shouldRender,
-        forceShow
-      });
-      
-      // Set the flag to prevent duplicate logs
-      hasLoggedDebugInfo.current = true;
-      
-      // Reset the flag after a delay to allow future logs
-      setTimeout(() => {
-        hasLoggedDebugInfo.current = false;
-      }, 2000);
-    }
-  }, [tripDetails, conversationState, activeTripChatId, currentChatId, activeChatId]);
-  
   // Simplify rendering conditions - focus on the two most important ones
   if (!tripDetails || 
       (conversationState !== CONVERSATION_STATES.AWAITING_USER_TRIP_CONFIRMATION && !forceShow)) {
-    // Only log once in a while to prevent infinite console spam
-    if (!hasLoggedDebugInfo.current) {
-      console.log('TripSummary not rendering due to basic conditions');
-      hasLoggedDebugInfo.current = true;
-      
-      // Reset the flag after a delay
-      setTimeout(() => {
-        hasLoggedDebugInfo.current = false;
-      }, 2000);
-    }
     return null;
   }
   
-  // Check chat ID conditions separately and log if they're causing issues
-  if (!forceShow && (activeTripChatId && activeTripChatId !== currentChatId)) {
-    console.log('TripSummary not rendering due to activeTripChatId mismatch');
-    // Temporarily disabling this condition to see if it helps
-    // return null;
-  }
-  
-  if (!forceShow && (activeChatId && activeTripChatId !== activeChatId)) {
-    console.log('TripSummary not rendering due to activeChatId mismatch');
-    // Temporarily disabling this condition to see if it helps
-    // return null;
-  }
-
   // Format the summary text using the existing utility
   const summaryMarkdown = formatTripSummary(tripDetails);
   
@@ -241,35 +190,35 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
 
   // If this is a force-show mode, ignore normal conditions
   if (forceShow && tripDetails) {
-    console.log("FORCED rendering of TripSummary");
     // Format the summary text using the existing utility
     const summaryMarkdown = formatTripSummary(tripDetails);
     
     return (
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        className="trip-summary-card bg-[#2a3146] border border-blue-500/20 rounded-xl p-4 my-4 text-white max-w-[90%] self-start"
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.2 }}
+        className="trip-summary-card"
         data-testid="trip-summary-card"
       >
-        <div className="summary-header mb-3 border-b border-blue-400/20 pb-2">
-          <h3 className="text-lg font-medium text-blue-300">Trip Summary (Debug Mode)</h3>
-          <p className="text-sm text-gray-300">This summary is shown in forced debug mode</p>
+        <div className="summary-header">
+          <h3>Trip Summary (Debug Mode)</h3>
+          <p>This summary is shown in forced debug mode</p>
         </div>
         
         <div
-          className="summary-content mb-4 text-sm leading-relaxed"
+          className="summary-content"
           dangerouslySetInnerHTML={{
             __html: summaryMarkdown.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>')
           }}
         />
         
-        <div className="action-buttons flex flex-col gap-3">
-          <div className="buttons-row flex gap-2 justify-end">
+        <div className="action-buttons">
+          <div className="buttons-row">
             <button
               onClick={handleCancel}
-              className="btn-cancel px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm transition-colors"
+              className="btn-cancel"
               aria-label="Cancel trip planning"
               data-testid="btn-cancel-trip"
             >
@@ -278,7 +227,7 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
             
             <button
               onClick={handleEdit}
-              className="btn-edit px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-sm transition-colors"
+              className="btn-edit"
               aria-label="Edit trip details"
               data-testid="btn-edit-trip"
             >
@@ -287,7 +236,7 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
             
             <button
               onClick={handleConfirm}
-              className="btn-confirm px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm transition-colors"
+              className="btn-confirm"
               aria-label="Generate itinerary"
               data-testid="btn-confirm-trip"
             >
@@ -316,29 +265,30 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="trip-summary-card bg-[#2a3146] border border-blue-500/20 rounded-xl p-4 my-4 text-white max-w-[90%] self-start"
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+      className="trip-summary-card"
       data-testid="trip-summary-card"
     >
-      <div className="summary-header mb-3 border-b border-blue-400/20 pb-2">
-        <h3 className="text-lg font-medium text-blue-300">Trip Summary</h3>
-        <p className="text-sm text-gray-300">Please review your trip details before we generate your itinerary</p>
+      <div className="summary-header">
+        <h3>Trip Summary</h3>
+        <p>Please review your trip details</p>
       </div>
       
       <div
-        className="summary-content mb-4 text-sm leading-relaxed"
+        className="summary-content"
         dangerouslySetInnerHTML={{
           __html: summaryMarkdown.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>')
         }}
       />
       
-      <div className="action-buttons flex flex-col gap-3">
-        <div className="buttons-row flex gap-2 justify-end">
+      <div className="action-buttons">
+        <div className="buttons-row">
           <button
             onClick={handleCancel}
-            className="btn-cancel px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm transition-colors"
+            className="btn-cancel"
             aria-label="Cancel trip planning"
             data-testid="btn-cancel-trip"
           >
@@ -347,25 +297,25 @@ const TripSummary = ({ onConfirm, onEdit, onCancel, activeChatId }) => {
           
           <button
             onClick={handleEdit}
-            className="btn-edit px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-sm transition-colors"
+            className="btn-edit"
             aria-label="Edit trip details"
             data-testid="btn-edit-trip"
           >
-            Edit Details
+            Edit
           </button>
           
           <button
             onClick={handleConfirm}
-            className="btn-confirm px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm transition-colors"
+            className="btn-confirm"
             aria-label="Generate itinerary"
             data-testid="btn-confirm-trip"
           >
-            Generate Itinerary
+            Confirm
           </button>
         </div>
         
-        <div className="text-hint text-xs text-gray-400 text-right">
-          <p>You can also type: &ldquo;<span className="text-gray-300">confirm</span>&rdquo;, &ldquo;<span className="text-gray-300">edit</span>&rdquo;, or &ldquo;<span className="text-gray-300">cancel</span>&rdquo;</p>
+        <div className="text-hint">
+          <p>You can also type: &ldquo;confirm&rdquo;, &ldquo;edit&rdquo;, or &ldquo;cancel&rdquo;</p>
         </div>
       </div>
     </motion.div>

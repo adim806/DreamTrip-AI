@@ -25,7 +25,7 @@ import {
 import { motion } from "framer-motion";
 import { useAuth } from "@clerk/clerk-react";
 import { fieldComponentMap } from "../../components/FieldCompletion/FieldComponents";
-import MissingFieldsForm from "../../components/FieldCompletion/MissingFieldsForm";
+import MissingFieldsForm, { TestMissingFieldsForm } from "../../components/FieldCompletion/MissingFieldsForm";
 import "./chatPage.css";
 
 // Add imports for the new text animator
@@ -368,9 +368,8 @@ const ItineraryActions = React.memo(({ message }) => {
       // Get the chat ID from the URL
       const chatId = window.location.pathname.split("/").pop();
 
-      // Import the required functions
+      // Import the required functions for processing the itinerary
       const {
-        saveItinerary,
         convertItineraryToJSON,
         formatItineraryForDisplay,
       } = await import("../../utils/itineraryGenerator");
@@ -421,7 +420,7 @@ const ItineraryActions = React.memo(({ message }) => {
               "Error converting itinerary to JSON:",
               conversionError
             );
-            // Continue with null structuredItinerary - the saveItinerary function will handle this
+            // Continue with null structuredItinerary
             structuredItinerary = null;
           }
         }
@@ -435,7 +434,7 @@ const ItineraryActions = React.memo(({ message }) => {
           formattedItinerary = formatItineraryForDisplay(structuredItinerary);
         } catch (conversionError) {
           console.error("Error converting itinerary to JSON:", conversionError);
-          // Continue with null structuredItinerary - the saveItinerary function will handle this
+          // Continue with null structuredItinerary
           structuredItinerary = null;
         }
       }
@@ -545,27 +544,12 @@ const ItineraryActions = React.memo(({ message }) => {
         image: getDestinationImage(safeStructuredItinerary.destination)
       };
 
-      // Save the itinerary with the message content and structured format
-      const result = await saveItinerary(chatId, {
-        itinerary: formattedItinerary, // Use formatted text for display
-        rawItinerary: rawItinerary || cleanContent, // Use raw JSON if available, otherwise cleaned content
-        structuredItinerary: safeStructuredItinerary,
-        metadata: {
-          destination:
-            safeStructuredItinerary.destination ||
-            tripDetails?.vacation_location,
-          duration: safeStructuredItinerary.duration || tripDetails?.duration,
-          dates: safeStructuredItinerary.dates || tripDetails?.dates,
-          format,
-          savedManually: true,
-          savedAt: new Date().toISOString(),
-        },
-      });
-
-      // Also save to the savedTrips collection for display in MyTripsPage
+      // Only save to the savedTrips collection for display in MyTripsPage
       try {
         // Import tripPlanService
         const tripPlanService = (await import("../../utils/services/tripPlanService")).default;
+        
+        console.log("Saving itinerary only to savedTrips collection");
         
         const savedTripResult = await tripPlanService.saveToMyTrips({
           plan: formattedItinerary,
@@ -588,30 +572,31 @@ const ItineraryActions = React.memo(({ message }) => {
         // Dispatch event to notify MyTripsPage about the new trip
         const tripPlanGeneratedEvent = new CustomEvent('tripPlanGenerated', {
           detail: {
-            savedTripId: result.itineraryId,
+            savedTripId: chatId,
             destination: safeStructuredItinerary.destination || tripDetails?.vacation_location,
             duration: safeStructuredItinerary.duration || tripDetails?.duration,
             timestamp: Date.now()
           }
         });
         document.dispatchEvent(tripPlanGeneratedEvent);
+        
+        if (savedTripResult) {
+          setSavedStatus({
+            isSaved: true,
+            isSaving: false,
+            error: null,
+          });
+          console.log("Itinerary saved successfully to savedTrips collection");
+        } else {
+          throw new Error("Failed to save itinerary to savedTrips collection");
+        }
       } catch (savedTripError) {
         console.error("Error saving to savedTrips collection:", savedTripError);
-        // Continue even if this fails, as we already saved to the itinerary collection
-      }
-
-      if (result.success) {
         setSavedStatus({
-          isSaved: true,
+          isSaved: false,
           isSaving: false,
-          error: null,
+          error: savedTripError.message,
         });
-        console.log(
-          "Itinerary saved successfully with ID:",
-          result.itineraryId
-        );
-      } else {
-        throw new Error(result.error || "Failed to save itinerary");
       }
     } catch (error) {
       console.error("Error saving itinerary:", error);
@@ -1823,10 +1808,20 @@ const ChatPage = () => {
         return null;
       }
 
+      console.log("Rendering missing fields form with fields:", message.missingFields);
+
       // Check if we already have a form with the same message ID to prevent duplicates
       if (missingFieldsState.messageId === message.id) {
         // Get the trip duration from tripDetails if available
         const tripDuration = tripDetails?.duration;
+
+        // Format the fields properly for the new MissingFieldsForm component
+        const formattedFields = message.missingFields.map(field => ({
+          id: field,
+          label: field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " "),
+          required: true,
+          type: 'text'
+        }));
 
         // Form is already being rendered with this message ID, just return it
         return (
@@ -1836,13 +1831,14 @@ const ChatPage = () => {
             style={{ minWidth: 280, maxWidth: "90%" }}
           >
             <MissingFieldsForm
+              missingFields={formattedFields}
               fields={message.missingFields}
               initialValues={{
                 ...missingFieldsState.values,
                 submitted: missingFieldsState.submitted,
               }}
               onSubmit={handleMissingFieldsSubmit}
-              submitLabel="שלח"
+              submitLabel="Submit"
               intent={message.intent || missingFieldsState.intent}
               duration={tripDuration}
             />
@@ -1876,6 +1872,14 @@ const ChatPage = () => {
         );
       }
 
+      // Format the fields properly for the new MissingFieldsForm component
+      const formattedFields = message.missingFields.map(field => ({
+        id: field,
+        label: field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " "),
+        required: true,
+        type: 'text'
+      }));
+
       return (
         <div
           key={message.id}
@@ -1883,13 +1887,14 @@ const ChatPage = () => {
           style={{ minWidth: 280, maxWidth: "90%" }}
         >
           <MissingFieldsForm
+            missingFields={formattedFields}
             fields={message.missingFields}
             initialValues={{
               ...missingFieldsState.values,
               submitted: missingFieldsState.submitted,
             }}
             onSubmit={handleMissingFieldsSubmit}
-            submitLabel="שלח"
+            submitLabel="Submit"
             intent={message.intent || missingFieldsState.intent}
             duration={tripDetails?.duration}
           />
@@ -2933,6 +2938,32 @@ const ChatPage = () => {
     }
   }, [chatId, isSignedIn, user]);
 
+  // Add a test button to render the form directly
+  const TestFormButton = () => {
+    const [showTestForm, setShowTestForm] = useState(false);
+    
+    const toggleTestForm = () => {
+      setShowTestForm(prev => !prev);
+    };
+    
+    return (
+      <>
+        <button 
+          onClick={toggleTestForm}
+          className="fixed bottom-24 right-4 z-50 bg-blue-600 text-white px-3 py-1 rounded-md shadow-md text-xs"
+        >
+          {showTestForm ? 'Hide Test Form' : 'Show Test Form'}
+        </button>
+        
+        {showTestForm && (
+          <div className="fixed bottom-40 right-4 z-50 bg-gray-900 rounded-lg shadow-lg border border-blue-500/20 w-80">
+            <TestMissingFieldsForm />
+          </div>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className={`chat-with-map ${isMapVisible ? "with-map" : ""}`}>
       <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(25,28,40,0.97)] overflow-hidden compact-chat-container">
@@ -3296,6 +3327,7 @@ const ChatPage = () => {
           )}
         </div>
       </div>
+      <TestFormButton />
     </div>
   );
 };

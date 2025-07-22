@@ -196,12 +196,60 @@ const tripPlanService = {
         return false;
       }
 
+      // Extract destination from content if not provided or if it looks incorrect
+      let extractedDestination = "";
+      if (!tripData.destination || tripData.destination === "Unknown destination" || 
+          tripData.destination.includes("Imperial") || tripData.destination.includes("Grandeur") ||
+          tripData.destination.includes("Luxury") || tripData.destination.includes("Experience")) {
+        
+        console.log("TripPlanService: Extracting destination from content");
+        
+        // Try to extract destination from the content using multiple patterns
+        const content = tripData.plan;
+        const patterns = [
+          /(?:יעד|destination):\s*([^\n]+)/i,
+          /(?:מיקום|location):\s*([^\n]+)/i,
+          /טיול ב([^\n]+)/i,
+          /טיול ל([^\n]+)/i,
+          /Trip to ([^\n]+)/i,
+          /Exploring ([^\n]+)/i,
+          /Experience in ([^\n]+)/i
+        ];
+        
+        for (const pattern of patterns) {
+          const match = content.match(pattern);
+          if (match && match[1]) {
+            extractedDestination = match[1].trim();
+            console.log(`TripPlanService: Extracted destination: "${extractedDestination}"`);
+            break;
+          }
+        }
+        
+        // If still not found, try to extract from the title
+        if (!extractedDestination) {
+          const titleMatch = content.match(/^#\s+.*?(?:in|at|to)\s+([A-Za-z\s,]+)(?::|\.|\n)/i);
+          if (titleMatch && titleMatch[1]) {
+            extractedDestination = titleMatch[1].trim();
+            console.log(`TripPlanService: Extracted destination from title: "${extractedDestination}"`);
+          }
+        }
+        
+        // Clean up the extracted destination
+        if (extractedDestination) {
+          extractedDestination = extractedDestination
+            .replace(/\*\*/g, '') // Remove markdown bold
+            .replace(/\*/g, '')   // Remove markdown italic
+            .replace(/:$/, '')    // Remove trailing colon
+            .trim();
+        }
+      }
+
       // First save to localStorage as a backup
       const saveData = {
         id: tripData.chatId,
         plan: tripData.plan,
-        destination: tripData.tripDetails?.destination || "Unknown destination",
-        duration: tripData.tripDetails?.duration || "Unknown duration",
+        destination: extractedDestination || tripData.destination || tripData.tripDetails?.destination || "Unknown destination",
+        duration: tripData.duration || tripData.tripDetails?.duration || "Unknown duration",
         created: Date.now(),
         lastViewed: Date.now(),
       };
@@ -223,13 +271,13 @@ const tripPlanService = {
           lastViewed: Date.now(),
         };
         console.log(
-          `TripPlanService: Updated existing trip in localStorage for ${tripData.tripDetails?.destination}`
+          `TripPlanService: Updated existing trip in localStorage for ${saveData.destination}`
         );
       } else {
         // Add as new entry
         myTrips.push(saveData);
         console.log(
-          `TripPlanService: Added new trip to localStorage for ${tripData.tripDetails?.destination}`
+          `TripPlanService: Added new trip to localStorage for ${saveData.destination}`
         );
       }
 
@@ -252,21 +300,32 @@ const tripPlanService = {
       const userId =
         localStorage.getItem("userId") || sessionStorage.getItem("userId");
 
+      // Use the extracted destination if available
+      const finalDestination = extractedDestination || tripData.destination || tripData.tripDetails?.destination || "Unknown destination";
+      const finalDuration = tripData.duration || tripData.tripDetails?.duration || "Unknown duration";
+      
+      console.log(`TripPlanService: Final destination: "${finalDestination}"`);
+      console.log(`TripPlanService: Final duration: "${finalDuration}"`);
+
       // Prepare the data for the API
       const apiData = {
         plan: tripData.plan,
         tripDetails: {
           ...tripData.tripDetails,
-          destination: tripData.destination || tripData.tripDetails?.destination || "Unknown destination",
-          duration: tripData.duration || tripData.tripDetails?.duration || "Unknown duration"
+          destination: finalDestination,
+          duration: finalDuration
         },
         chatId: tripData.chatId,
         itineraryData: tripData.itineraryData || {},
         userId: userId, // Include userId for authentication fallback
-        destination: tripData.destination || tripData.tripDetails?.destination || "Unknown destination",
-        duration: tripData.duration || tripData.tripDetails?.duration || "Unknown duration",
+        destination: finalDestination,
+        duration: finalDuration,
         metadata: tripData.metadata || {},
-        structuredPlan: tripData.structuredPlan || {}
+        structuredPlan: tripData.structuredPlan ? {
+          ...tripData.structuredPlan,
+          destination: finalDestination,
+          duration: finalDuration
+        } : {}
       };
 
       console.log("TripPlanService: API Data for saving trip:", {

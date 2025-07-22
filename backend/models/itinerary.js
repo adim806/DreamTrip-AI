@@ -1,331 +1,230 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
+const Schema = mongoose.Schema;
 
-// Define a schema for coordinates
-const coordinatesSchema = new mongoose.Schema(
-  {
-    lat: Number,
-    lng: Number,
+// Schema for activities within a day
+const ActivitySchema = new Schema({
+  title: { type: String, required: true },
+  description: { type: String },
+  type: { 
+    type: String, 
+    enum: ['attraction', 'restaurant', 'hotel', 'transportation', 'other'],
+    default: 'other'
   },
-  { _id: false }
-);
+  location: { type: String },
+  time: { type: String },
+  duration: { type: String },
+  cost: { type: String },
+  notes: { type: String }
+});
 
-// Define a schema for external links
-const externalLinksSchema = new mongoose.Schema(
-  {
-    official_site: String,
-    google_maps: String,
-    booking_url: String,
-    tripadvisor: String,
-  },
-  { _id: false, strict: false }
-);
+// Schema for time blocks (morning, afternoon, evening, etc.)
+const TimeBlockSchema = new Schema({
+  morning: [ActivitySchema],
+  lunch: [ActivitySchema],
+  afternoon: [ActivitySchema],
+  dinner: [ActivitySchema],
+  evening: [ActivitySchema]
+});
 
-// Define an enhanced activity schema with geolocation and metadata
-const enhancedActivitySchema = new mongoose.Schema(
-  {
-    name: String,
-    description: String,
-    type: {
-      type: String,
-      enum: [
-        "attraction",
-        "restaurant",
-        "museum",
-        "outdoor",
-        "transport",
-        "accommodation",
-        "other",
-      ],
-      default: "attraction",
-    },
-    coordinates: coordinatesSchema,
-    duration_minutes: Number,
-    tags: [String],
-    weather_sensitive: Boolean,
-    eco_friendly: Boolean,
-    is_accessible: Boolean,
-    image_url: String,
-    external_links: externalLinksSchema,
-    timeBlock: String,
-    dayNumber: Number,
-    index: Number,
-    significance: String,
-    tip: String,
-  },
-  { _id: false, strict: false }
-);
+// Schema for a single day in the itinerary
+const DaySchema = new Schema({
+  dayNumber: { type: Number, required: true },
+  title: { type: String },
+  date: { type: Date },
+  summary: { type: String },
+  activities: TimeBlockSchema,
+  accommodation: {
+    name: { type: String },
+    address: { type: String },
+    notes: { type: String }
+  }
+});
 
-// Define a schema for cost estimates
-const costEstimateSchema = new mongoose.Schema(
-  {
-    currency: {
-      type: String,
-      default: "USD",
-    },
-    amount: {
-      type: Number,
-      default: 0,
-    },
-  },
-  { _id: false }
-);
+// Schema for additional information
+const AdditionalInfoSchema = new Schema({
+  tips: [String],
+  warnings: [String],
+  budgetNotes: [String],
+  packingList: [String],
+  localCustoms: [String],
+  emergencyContacts: [String]
+});
 
-// Define a schema for tags
-const tagSchema = new mongoose.Schema(
-  {
+// Main Itinerary Schema
+const ItinerarySchema = new Schema({
+  userId: {
     type: String,
+    required: true,
+    index: true
   },
-  { _id: false }
-);
-
-// Define a schema for location coordinates
-const locationSchema = new mongoose.Schema(
-  {
-    lat: Number,
-    lng: Number,
-  },
-  { _id: false }
-);
-
-// Define a schema for activity items
-const activityItemSchema = new mongoose.Schema(
-  {
-    activityId: String,
-    title: String,
+  title: {
     type: String,
-    description: String,
-    tip: String,
-    alternative: String,
-    location: locationSchema,
-    tags: [String],
-    estimatedCost: costEstimateSchema,
+    required: true
   },
-  { _id: false, strict: false }
-);
-
-// Define a schema for restaurant items
-const restaurantSchema = new mongoose.Schema(
-  {
-    activityId: String,
-    name: String,
+  destination: {
+    type: String, 
+    required: true,
+    index: true
+  },
+  duration: {
     type: String,
-    cuisine: String,
-    tags: [String],
-    estimatedCost: costEstimateSchema,
-    notes: String,
+    required: true
   },
-  { _id: false, strict: false }
-);
-
-// Define a schema for evening options
-const optionSchema = new mongoose.Schema(
-  {
-    activityId: String,
+  dates: {
+    from: { type: Date },
+    to: { type: Date }
+  },
+  budget: {
+    amount: { type: String },
+    currency: { type: String, default: 'USD' },
+    level: { type: String, enum: ['budget', 'moderate', 'luxury'] }
+  },
+  travelStyle: {
     type: String,
-    place: String,
-    description: String,
-    tags: [String],
-    estimatedCost: costEstimateSchema,
+    enum: ['family', 'romantic', 'adventure', 'cultural', 'relaxation', 'business', 'solo', 'other'],
+    default: 'other'
   },
-  { _id: false, strict: false }
-);
-
-// Define a schema for sections in the new format
-const sectionSchema = new mongoose.Schema(
-  {
-    timeOfDay: String,
-    time: String,
-    activities: {
-      type: [activityItemSchema],
-      default: undefined
-    },
-    restaurant: restaurantSchema,
-    options: {
-      type: [optionSchema],
-      default: undefined
-    }
+  summary: {
+    type: String
   },
-  { _id: false, strict: false }
-);
-
-// Define a flexible schema for activities that can handle various formats
-const activitySchema = new mongoose.Schema(
-  {
-    name: String,
-    description: String,
-    text: String,
-    time: String,
-    transitFromPrevious: String,
-    isChoice: Boolean,
-    options: [String],
-    significance: String,
-    tip: String,
-    details: mongoose.Schema.Types.Mixed,
-    // Allow any additional fields
+  days: [DaySchema],
+  additionalInfo: AdditionalInfoSchema,
+  highlights: [String],
+  travelMethods: [String],
+  image: {
+    type: String
   },
-  { strict: false, _id: false }
-);
-
-// Define a schema for time blocks
-const timeBlockSchema = new mongoose.Schema(
-  {
-    title: String,
-    timeRange: String,
-    activities: [mongoose.Schema.Types.Mixed],
+  rawContent: {
+    type: String
   },
-  { strict: false, _id: false }
-);
-
-// Define a schema for a day in the itinerary
-const daySchema = new mongoose.Schema(
-  {
-    dayId: String,
-    dayNumber: Number,
-    title: String,
-    theme: String,
-    date: String,
-    overview: String,
-    activities: {
-      morning: [mongoose.Schema.Types.Mixed],
-      lunch: [mongoose.Schema.Types.Mixed],
-      afternoon: [mongoose.Schema.Types.Mixed],
-      evening: [mongoose.Schema.Types.Mixed],
-      dinner: [mongoose.Schema.Types.Mixed],
-      transportation: [String],
-      notes: [String],
-    },
-    dayIndex: Number,
-    enhancedActivities: [mongoose.Schema.Types.Mixed],
-    sections: [sectionSchema],
+  processedContent: {
+    type: String
   },
-  { _id: false, strict: false }
-);
-
-// Define a schema for additional information
-const additionalInfoSchema = new mongoose.Schema(
-  {
-    tips: [String],
-    transportation: [String],
-    accommodation: [String],
-    createdAt: String,
-    lastEnhanced: String,
+  chatId: {
+    type: String,
+    index: true
   },
-  { _id: false }
-);
-
-// Define a schema for dates
-const datesSchema = new mongoose.Schema(
-  {
-    from: String,
-    to: String,
-    start: String,
-    end: String,
+  metadata: {
+    type: Map,
+    of: Schema.Types.Mixed
   },
-  { _id: false }
-);
-
-// Define a schema for metadata
-const metadataSchema = new mongoose.Schema(
-  {
-    isFavorite: {
-      type: Boolean,
-      default: false,
-    },
-    isPublic: {
-      type: Boolean,
-      default: false,
-    },
-    format: String,
-    destination: String,
-    duration: String,
-    budget: String,
-    dates: datesSchema,
-    savedAt: String,
-    generatedAt: String,
+  activityCounts: {
+    total: { type: Number, default: 0 },
+    attractions: { type: Number, default: 0 },
+    restaurants: { type: Number, default: 0 },
+    hotels: { type: Number, default: 0 }
   },
-  { _id: false, strict: false }
-);
-
-// Define a schema for structured content
-const structuredContentSchema = new mongoose.Schema(
-  {
-    title: String,
-    destination: String,
-    duration: String,
-    dates: datesSchema,
-    days: [daySchema],
-    budget: String,
-    additionalInfo: additionalInfoSchema,
+  status: {
+    type: String,
+    enum: ['draft', 'published', 'archived'],
+    default: 'published'
   },
-  { _id: false, strict: false }
-);
-
-const itinerarySchema = new mongoose.Schema(
-  {
-    chatId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "chat",
-      required: true,
-      index: true,
-    },
-    userId: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    title: {
-      type: String,
-      required: false,
-      default: "יומן טיול",
-    },
-    destination: {
-      type: String,
-      required: false,
-    },
-    duration: {
-      type: String,
-      required: false,
-    },
-    dates: {
-      type: datesSchema,
-      default: () => ({}),
-    },
-    rawContent: {
-      type: String,
-      required: true,
-    },
-    structuredContent: {
-      type: structuredContentSchema,
-      default: () => ({}),
-    },
-    metadata: {
-      type: metadataSchema,
-      default: () => ({
-        isFavorite: false,
-        isPublic: false,
-      }),
-    },
-    tags: {
-      type: [String],
-      default: [],
-    },
-    version: {
-      type: Number,
-      default: 1,
-    },
-    enhancedAt: {
-      type: Date,
-      default: null,
-    },
+  type: {
+    type: String,
+    enum: ['itinerary', 'saved_trip', 'ai_generated'],
+    default: 'itinerary'
   },
-  { timestamps: true, strict: false } // Set strict: false to allow flexible schema
-);
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, { timestamps: true });
 
-// אינדקסים לשיפור ביצועים
-itinerarySchema.index({ userId: 1, createdAt: -1 });
-itinerarySchema.index({ isPublic: 1, createdAt: -1 });
-itinerarySchema.index({ destination: 1 });
-itinerarySchema.index({ tags: 1 });
+// Methods to easily extract important information
+ItinerarySchema.methods.getDestination = function() {
+  return this.destination;
+};
 
-export default mongoose.models.itinerary ||
-  mongoose.model("itinerary", itinerarySchema);
+ItinerarySchema.methods.getDuration = function() {
+  return this.duration;
+};
+
+ItinerarySchema.methods.getDayCount = function() {
+  return this.days.length;
+};
+
+// Calculate activity counts before saving
+ItinerarySchema.pre('save', function(next) {
+  let totalActivities = 0;
+  let attractions = 0;
+  let restaurants = 0;
+  let hotels = 0;
+
+  if (this.days && this.days.length > 0) {
+    this.days.forEach(day => {
+      if (day.activities) {
+        // Count activities in each time block
+        Object.values(day.activities).forEach(timeBlock => {
+          if (Array.isArray(timeBlock)) {
+            timeBlock.forEach(activity => {
+              totalActivities++;
+              if (activity.type === 'attraction') attractions++;
+              if (activity.type === 'restaurant') restaurants++;
+              if (activity.type === 'hotel') hotels++;
+            });
+          }
+        });
+      }
+      
+      // Count accommodation
+      if (day.accommodation && day.accommodation.name) {
+        totalActivities++;
+        hotels++;
+      }
+    });
+  }
+
+  this.activityCounts = {
+    total: totalActivities,
+    attractions,
+    restaurants,
+    hotels
+  };
+
+  next();
+});
+
+// Static method to create a structured itinerary from raw content
+ItinerarySchema.statics.createFromRawContent = function(userId, rawContent, options = {}) {
+  // This would contain logic to parse the raw content and create a structured itinerary
+  // For now it's a placeholder - the actual implementation would depend on your parsing logic
+  
+  const extractDestination = (content) => {
+    const destinationMatch = content.match(/(?:יעד|destination):\s*([^\n]+)/i);
+    return destinationMatch ? destinationMatch[1].trim() : "Unknown destination";
+  };
+  
+  const extractDuration = (content) => {
+    const durationMatch = content.match(/(?:משך|duration):\s*([^\n]+)/i) || 
+                         content.match(/(\d+)\s+(?:ימים|days)/i);
+    return durationMatch ? durationMatch[1].trim() : "Unknown duration";
+  };
+  
+  // Create a basic structured itinerary with minimal information
+  return {
+    userId,
+    rawContent,
+    title: options.title || 'New Itinerary',
+    destination: options.destination || extractDestination(rawContent),
+    duration: options.duration || extractDuration(rawContent),
+    days: [],  // Would be populated by a more sophisticated parsing function
+    additionalInfo: {
+      tips: [],
+      warnings: [],
+      budgetNotes: [],
+      packingList: [],
+      localCustoms: [],
+      emergencyContacts: []
+    },
+    highlights: [],
+    type: 'itinerary',
+    chatId: options.chatId || null
+  };
+};
+
+const ItineraryModel = mongoose.model('Itinerary', ItinerarySchema);
+export default ItineraryModel;

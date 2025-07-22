@@ -952,36 +952,147 @@ const TripPlanner = ({ trip }) => {
             
             // Show saved notification
             const savedNotification = document.createElement('div');
-            savedNotification.className = 'fixed bottom-4 right-4 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center transition-opacity duration-500';
+            savedNotification.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 transition-opacity duration-500 max-w-md w-full';
             savedNotification.style.opacity = '0';
+            
+            // Get image for the destination
+            const getDestinationImage = (destination) => {
+              const defaultImage = "https://images.unsplash.com/photo-1488085061387-422e29b40080?q=80&w=1200&auto=format&fit=crop";
+              
+              // Common destinations mapping
+              const destinationImages = {
+                "paris": "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1200&auto=format&fit=crop",
+                "rome": "https://images.unsplash.com/photo-1552832230-c0197dd311b5?q=80&w=1200&auto=format&fit=crop",
+                "london": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=1200&auto=format&fit=crop",
+                "barcelona": "https://images.unsplash.com/photo-1583422409516-2895a77efded?q=80&w=1200&auto=format&fit=crop",
+                "new york": "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1200&auto=format&fit=crop",
+                "tokyo": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1200&auto=format&fit=crop",
+                "bangkok": "https://images.unsplash.com/photo-1563492065599-3520f775eeed?q=80&w=1200&auto=format&fit=crop",
+                "singapore": "https://images.unsplash.com/photo-1565967511849-76a60a516170?q=80&w=1200&auto=format&fit=crop",
+                "dubai": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=1200&auto=format&fit=crop",
+                "tel aviv": "https://images.unsplash.com/photo-1544971587-b842c27f8e14?q=80&w=1200&auto=format&fit=crop",
+                "jerusalem": "https://images.unsplash.com/photo-1529106492281-b02200cec7ec?q=80&w=1200&auto=format&fit=crop"
+              };
+              
+              // Try to find a match
+              const lowerDest = destination.toLowerCase();
+              for (const [key, url] of Object.entries(destinationImages)) {
+                if (lowerDest.includes(key)) {
+                  return url;
+                }
+              }
+              
+              // Default image if no match
+              return defaultImage;
+            };
+            
+            const destinationImage = getDestinationImage(enhancedTripData.destination);
+            
             savedNotification.innerHTML = `
-              <div class="mr-3 bg-white/20 rounded-full p-2">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
+              <div class="bg-[#171923] rounded-xl overflow-hidden shadow-2xl border border-indigo-500/30 animate-bounce-once">
+                <div class="relative h-48 overflow-hidden">
+                  <img 
+                    src="${destinationImage}" 
+                    alt="${enhancedTripData.destination}"
+                    class="w-full h-full object-cover"
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-indigo-900/90 via-indigo-900/70 to-indigo-900/30"></div>
+                  
+                  <div class="absolute top-3 right-3">
+                    <div class="bg-green-500/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium text-white flex items-center gap-1.5 shadow-lg">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                      <span>נשמר בהצלחה</span>
+                    </div>
+                  </div>
+                  
+                  <div class="absolute bottom-0 left-0 right-0 p-4">
+                    <h3 class="text-2xl font-bold mb-2 text-white drop-shadow-md">
+                      ${enhancedTripData.destination}
+                    </h3>
+                    
+                    <div class="flex flex-wrap gap-2">
+                      <span class="text-xs bg-blue-500/70 backdrop-blur-sm text-white px-3 py-1 rounded-full flex items-center shadow-sm">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        ${enhancedTripData.duration}
+                      </span>
+                      <span class="text-xs bg-indigo-500/70 backdrop-blur-sm text-white px-3 py-1 rounded-full flex items-center shadow-sm">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        נשמר כעת
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="p-4 bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border-t border-blue-500/20 text-center">
+                  <p class="text-white text-sm mb-3">יומן המסע נשמר בהצלחה!</p>
+                  <a href="/my-trips" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-medium rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                    צפה ביומני המסע שלי
+                  </a>
+                </div>
               </div>
-              <div>
-                <p class="font-bold">Trip Saved!</p>
-                <p class="text-sm">View in My Trips section</p>
-              </div>
+              
+              <style>
+                @keyframes bounce-once {
+                  0%, 100% { transform: translateY(0); }
+                  50% { transform: translateY(-10px); }
+                }
+                .animate-bounce-once {
+                  animation: bounce-once 1s ease-in-out;
+                }
+              </style>
             `;
+            
+            // Create a semi-transparent backdrop
+            const backdrop = document.createElement('div');
+            backdrop.className = 'fixed inset-0 bg-black/70 z-40 transition-opacity duration-500';
+            backdrop.style.opacity = '0';
+            document.body.appendChild(backdrop);
             
             document.body.appendChild(savedNotification);
             
             // Fade in animation for saved notification
             setTimeout(() => {
               savedNotification.style.opacity = '1';
+              backdrop.style.opacity = '1';
             }, 10);
             
-            // Fade out saved notification
-            setTimeout(() => {
+            // Add click event to close notification
+            backdrop.addEventListener('click', () => {
               savedNotification.style.opacity = '0';
+              backdrop.style.opacity = '0';
               setTimeout(() => {
                 if (document.body.contains(savedNotification)) {
                   document.body.removeChild(savedNotification);
                 }
+                if (document.body.contains(backdrop)) {
+                  document.body.removeChild(backdrop);
+                }
               }, 500);
-            }, 5000);
+            });
+            
+            // Fade out saved notification after some time
+            setTimeout(() => {
+              savedNotification.style.opacity = '0';
+              backdrop.style.opacity = '0';
+              setTimeout(() => {
+                if (document.body.contains(savedNotification)) {
+                  document.body.removeChild(savedNotification);
+                }
+                if (document.body.contains(backdrop)) {
+                  document.body.removeChild(backdrop);
+                }
+              }, 500);
+            }, 7000);
           } else {
             console.error("TripPlanner: Failed to save trip");
           }

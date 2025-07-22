@@ -872,3 +872,176 @@
     transform: translateY(0);
   }
 }
+
+/* Trip Summary Card - Chat Integration */
+.trip-summary-card {
+  max-width: 85% !important;
+  margin: 0.75rem 0 !important;
+  padding: 0.75rem !important;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.75)) !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(59, 130, 246, 0.25) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  font-size: 0.85rem !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Smaller header for trip summary */
+.trip-summary-card .summary-header {
+  margin-bottom: 0.5rem !important;
+  padding-bottom: 0.35rem !important;
+  border-bottom: 1px solid rgba(96, 165, 250, 0.2) !important;
+}
+
+.trip-summary-card .summary-header h3 {
+  font-size: 0.95rem !important;
+  color: #93c5fd !important;
+  margin-bottom: 0.2rem !important;
+}
+
+.trip-summary-card .summary-header p {
+  font-size: 0.75rem !important;
+  color: rgba(226, 232, 240, 0.7) !important;
+}
+
+/* More compact content */
+.trip-summary-card .summary-content {
+  font-size: 0.8rem !important;
+  line-height: 1.35 !important;
+  margin-bottom: 0.75rem !important;
+  max-height: 200px !important;
+  overflow-y: auto !important;
+  padding-right: 0.5rem !important;
+}
+
+/* Scrollbar for summary content */
+.trip-summary-card .summary-content::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.trip-summary-card .summary-content::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.3) !important;
+  border-radius: 4px !important;
+}
+
+.trip-summary-card .summary-content::-webkit-scrollbar-thumb {
+  background: rgba(96, 165, 250, 0.4) !important;
+  border-radius: 4px !important;
+}
+
+/* Highlight important text */
+.trip-summary-card .summary-content strong {
+  color: #a5b4fc !important;
+  font-weight: 500 !important;
+}
+
+/* Compact buttons */
+.trip-summary-card .action-buttons {
+  gap: 0.5rem !important;
+}
+
+.trip-summary-card .buttons-row {
+  justify-content: flex-end !important;
+  gap: 0.35rem !important;
+}
+
+.trip-summary-card .btn-cancel,
+.trip-summary-card .btn-edit,
+.trip-summary-card .btn-confirm {
+  font-size: 0.75rem !important;
+  padding: 0.25rem 0.75rem !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+.trip-summary-card .btn-confirm {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
+
+.trip-summary-card .btn-confirm:hover {
+  background: linear-gradient(135deg, #4f46e5, #3b82f6) !important;
+  transform: translateY(-1px) !important;
+}
+
+.trip-summary-card .text-hint {
+  font-size: 0.7rem !important;
+  color: rgba(148, 163, 184, 0.8) !important;
+  margin-top: 0.25rem !important;
+}
+
+/* Missing Fields Form - Chat Integration */
+.missing-fields-form {
+  max-width: 85% !important;
+  margin: 0.75rem 0 !important;
+  padding: 0.75rem !important;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.75)) !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(59, 130, 246, 0.25) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  font-size: 0.85rem !important;
+  align-self: flex-start !important;
+}
+
+/* Smaller header for missing fields */
+.missing-fields-form h3 {
+  font-size: 0.9rem !important;
+  margin-bottom: 0.5rem !important;
+  padding-bottom: 0.35rem !important;
+}
+
+/* More compact fields container */
+.missing-fields-form .fields-container {
+  gap: 0.5rem !important;
+  max-height: 180px !important;
+  margin-bottom: 0.5rem !important;
+}
+
+/* Smaller field items */
+.missing-fields-form .field-item {
+  padding: 0.15rem 0 !important;
+}
+
+.missing-fields-form .field-item label {
+  font-size: 0.75rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.missing-fields-form .field-item input {
+  font-size: 0.8rem !important;
+  height: 2rem !important;
+  padding: 0.35rem 0.6rem !important;
+  border-radius: 6px !important;
+}
+
+/* Smaller buttons */
+.missing-fields-form button {
+  font-size: 0.75rem !important;
+  height: 30px !important;
+  padding: 0.25rem 0.75rem !important;
+  border-radius: 6px !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .trip-summary-card,
+  .missing-fields-form {
+    max-width: 95% !important;
+    padding: 0.6rem !important;
+  }
+  
+  .trip-summary-card .summary-content {
+    max-height: 150px !important;
+  }
+  
+  .missing-fields-form .fields-container {
+    max-height: 160px !important;
+  }
+}
+
+/* Ensure both components align properly in chat flow */
+.message .trip-summary-card,
+.message .missing-fields-form {
+  margin: 0.5rem 0 !important;
+  width: 100% !important;
+}

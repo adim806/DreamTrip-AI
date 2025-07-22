@@ -286,6 +286,42 @@ const MyTripsPage = () => {
         else if (tripData.structuredPlan?.destination && tripData.structuredPlan.destination !== "Unknown destination" && tripData.structuredPlan.destination !== "") {
           tripData.destination = tripData.structuredPlan.destination;
         }
+        else if (tripData.tripDetails?.destination && tripData.tripDetails.destination !== "Unknown destination" && tripData.tripDetails.destination !== "") {
+          tripData.destination = tripData.tripDetails.destination;
+        }
+        else if (tripData.rawContent || tripData.content) {
+          // Try to extract destination from content
+          const content = tripData.rawContent || tripData.content;
+          const destinationMatch = content.match(/(?:יעד|destination):\s*([^\n]+)/i);
+          if (destinationMatch) {
+            tripData.destination = destinationMatch[1].trim();
+          } else {
+            // Look for destination in first lines
+            const lines = content.split('\n').slice(0, 10);
+            const destinationLine = lines.find(line => 
+              line.match(/(?:יעד|destination|מיקום|location):\s*(.+)/i) || 
+              line.match(/טיול ב(.+)/i) ||
+              line.match(/טיול ל(.+)/i) ||
+              line.match(/Trip to (.+)/i)
+            );
+            
+            if (destinationLine) {
+              const destMatch = destinationLine.match(/(?:יעד|destination|מיקום|location):\s*(.+)/i) || 
+                                destinationLine.match(/טיול ב(.+)/i) ||
+                                destinationLine.match(/טיול ל(.+)/i) ||
+                                destinationLine.match(/Trip to (.+)/i);
+              
+              if (destMatch) {
+                tripData.destination = destMatch[1].trim();
+              }
+            }
+          }
+        }
+      }
+      
+      // Clean up the destination name for display
+      if (tripData.destination) {
+        tripData.destination = getCleanDestinationName(tripData.destination);
       }
       
       if (!tripData.duration || tripData.duration === "Unknown duration" || tripData.duration.includes("Unknown")) {
@@ -887,15 +923,33 @@ const MyTripsPage = () => {
       
       console.log("Raw itinerary data:", itinerary);
       
+      // Ensure we have the best available destination
+      const itineraryDestination = itinerary.destination || 
+                                  itinerary.metadata?.destination || 
+                                  itinerary.structuredContent?.destination ||
+                                  itinerary.structuredItinerary?.destination;
+      
       // עיבוד הנתונים כדי שיתאימו לפורמט של מסלול שמור
       const processedItinerary = {
         ...itinerary,
         isItinerary: true,
-        destination: itinerary.destination || itinerary.metadata?.destination || "יומן מסע",
+        destination: getCleanDestinationName(itineraryDestination) || "יומן מסע",
         duration: itinerary.duration || itinerary.metadata?.duration || "טיול מתוכנן",
         plan: itinerary.content || itinerary.plan || "",
         structuredPlan: itinerary.structuredItinerary || itinerary.structuredPlan || {}
       };
+      
+      // Try to extract destination from content if still missing
+      if (!processedItinerary.destination || processedItinerary.destination === "יומן מסע") {
+        const content = itinerary.rawContent || itinerary.content || itinerary.plan;
+        if (content) {
+          const destinationMatch = content.match(/(?:יעד|destination):\s*([^\n]+)/i);
+          if (destinationMatch) {
+            const extractedDestination = destinationMatch[1].trim();
+            processedItinerary.destination = getCleanDestinationName(extractedDestination) || "יומן מסע";
+          }
+        }
+      }
       
       // בדיקה אם יש תוכן כלשהו
       const hasContent = itinerary.rawContent || itinerary.content || itinerary.plan;
@@ -1068,9 +1122,27 @@ const MyTripsPage = () => {
         else if (trip.structuredPlan?.destination && trip.structuredPlan.destination !== "Unknown destination" && trip.structuredPlan.destination !== "") {
           trip.destination = trip.structuredPlan.destination;
         }
+        else if (trip.structuredContent?.destination && trip.structuredContent.destination !== "Unknown destination" && trip.structuredContent.destination !== "") {
+          trip.destination = trip.structuredContent.destination;
+        }
         else if (trip.structuredItinerary?.destination && trip.structuredItinerary.destination !== "Unknown destination" && trip.structuredItinerary.destination !== "") {
           trip.destination = trip.structuredItinerary.destination;
         }
+        // Extract from rawContent or content if other options fail
+        else if (trip.rawContent || trip.content) {
+          const content = trip.rawContent || trip.content;
+          const destinationMatch = content.match(/(?:יעד|destination):\s*([^\n]+)/i);
+          if (destinationMatch) {
+            trip.destination = destinationMatch[1].trim();
+          }
+        }
+      }
+      
+      // Clean up the destination
+      if (trip.destination) {
+        trip.destination = getCleanDestinationName(trip.destination);
+      } else {
+        trip.destination = "יעד הטיול";
       }
       
       // וודא שיש משך טיול
@@ -1080,6 +1152,9 @@ const MyTripsPage = () => {
         }
         else if (trip.structuredPlan?.days?.length > 0) {
           trip.duration = `${trip.structuredPlan.days.length} ימים`;
+        }
+        else if (trip.structuredContent?.days?.length > 0) {
+          trip.duration = `${trip.structuredContent.days.length} ימים`;
         }
         else if (trip.structuredItinerary?.days?.length > 0) {
           trip.duration = `${trip.structuredItinerary.days.length} ימים`;
@@ -1167,6 +1242,59 @@ const MyTripsPage = () => {
         </div>
       </div>
     );
+  };
+
+  // Add a helper function to extract clean destination names
+  const getCleanDestinationName = (rawDestination) => {
+    if (!rawDestination) return "";
+    
+    // If it looks like a JSON object or contains HTML/markdown formatting, extract just the text
+    if (rawDestination.includes('{') || rawDestination.includes('<') || 
+        rawDestination.includes('**') || rawDestination.includes('#')) {
+      try {
+        // Try to parse if it's JSON
+        if (rawDestination.includes('{')) {
+          try {
+            const parsed = JSON.parse(rawDestination);
+            if (parsed.destination) return parsed.destination;
+            if (parsed.name) return parsed.name;
+            if (parsed.city) return parsed.city;
+          } catch (e) {
+            // Not valid JSON, continue with other cleaning methods
+          }
+        }
+        
+        // Remove markdown formatting
+        let cleaned = rawDestination
+          .replace(/\*\*/g, '')  // Remove bold markers
+          .replace(/\*/g, '')    // Remove italic markers
+          .replace(/\#\s+/g, '') // Remove headings
+          .replace(/\<[^>]*\>/g, ''); // Remove HTML tags
+          
+        // If it still contains structured data indicators after cleaning
+        if (cleaned.includes('{') || cleaned.includes('[') || 
+            cleaned.includes('destination:') || cleaned.includes('name:')) {
+          // Extract just the first word that looks like a place name
+          const placeMatch = cleaned.match(/([A-Za-z\u0590-\u05FF]+(?:\s+[A-Za-z\u0590-\u05FF]+){0,2})/);
+          if (placeMatch) {
+            return placeMatch[1];
+          }
+        }
+        
+        // If destination is too long, truncate it
+        if (cleaned.length > 30) {
+          return cleaned.substring(0, 30) + "...";
+        }
+        
+        return cleaned;
+      } catch (e) {
+        console.log("Error cleaning destination:", e);
+        return rawDestination.substring(0, 30); // Return truncated version as fallback
+      }
+    }
+    
+    // It's already a clean string
+    return rawDestination;
   };
 
   // אם נבחר מסלול שמור להצגה
@@ -1389,7 +1517,6 @@ const MyTripsPage = () => {
   }
 
   const hasNoContent = itineraries.length === 0 && savedTrips.length === 0;
-
   return (
     <div className="my-trips-page flex flex-col h-full overflow-y-auto bg-[#171923] text-white p-6">
       <header className="mb-8">
@@ -1516,67 +1643,80 @@ const MyTripsPage = () => {
               {filteredTrips().map((trip) => {
                 // For itineraries
                 if (trip.isItinerary || trip.type === "itinerary") {
-                  // שימוש בפונקציה שכבר יצרנו לבחירת תמונה לפי יעד
-                  const itineraryDestination = trip.destination || trip.metadata?.destination || "יומן מסע";
+                  // Get destination from the proper hierarchy of locations
+                  let itineraryDestination = trip.destination || 
+                                            trip.metadata?.destination || 
+                                            trip.structuredContent?.destination ||
+                                            trip.structuredItinerary?.destination;
+                  
+                  // Clean the destination name to ensure it's a proper display value                          
+                  itineraryDestination = getCleanDestinationName(itineraryDestination) || "יומן מסע";
+                  
                   const itineraryImage = trip.preview?.image || getDestinationImage(itineraryDestination);
                   
                   return (
                     <motion.div
                       key={trip._id || trip.id}
-                      className="itinerary-card rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col cursor-pointer h-[360px]"
+                      className="itinerary-card rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col cursor-pointer h-[360px] border border-indigo-500/20"
                       variants={itemVariants}
                       whileHover={{ y: -8, transition: { duration: 0.2 } }}
                       onClick={() => viewItinerary(trip)}
                     >
-                      {/* Card image header with overlay */}
-                      <div className="card-image-container relative h-40 overflow-hidden">
+                      {/* Card image header with standardized overlay */}
+                      <div className="card-image-container relative h-44 overflow-hidden">
                         <img 
                           src={itineraryImage} 
                           alt={itineraryDestination}
                           className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-indigo-800/50 to-purple-800/50 opacity-60"></div>
-                        <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                          <div className="bg-black/30 backdrop-blur-sm p-2 rounded-lg">
-                            <h3 className="text-2xl font-bold truncate flex items-center gap-2">
-                              <span className="bg-indigo-500/50 p-1.5 rounded-full backdrop-blur-sm">
-                                <RiRoadMapLine className="text-white" size={18} />
-                              </span>
-                              <div className="flex flex-col">
-                                <span className="text-xs text-blue-200">יעד הטיול:</span>
-                                <span className="text-xl bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">{itineraryDestination}</span>
-                              </div>
-                            </h3>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {(trip.duration || trip.metadata?.duration) && (
-                                <span className="text-xs bg-blue-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                                  <RiTimeLine className="mr-1" /> {trip.duration || trip.metadata?.duration}
-                                </span>
-                              )}
-                              {(trip.metadata?.dates?.from || trip.dates?.from) && (
-                                <span className="text-xs bg-indigo-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                                  <RiCalendarLine className="mr-1" />{" "}
-                                  {formatDate(trip.metadata?.dates?.from || trip.dates?.from)}
-                                </span>
-                              )}
-                            </div>
+                        {/* Standardized gradient overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/60 to-transparent"></div>
+                        
+                        {/* Trip type badge - standardized position */}
+                        <div className="absolute top-3 right-3">
+                          <div className="bg-blue-600/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium text-white flex items-center gap-1.5 shadow-lg">
+                            <RiRoadMapLine size={12} />
+                            <span>יומן מסע</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="card-content p-5 flex-grow overflow-hidden bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border-t border-blue-500/20">
+                      {/* Card title section - standardized across all cards */}
+                      <div className="card-title-section bg-gradient-to-r from-blue-900/90 to-indigo-900/90  border-b border-blue-500/30">
+                        <h3 className="text-xl font-bold text-white">
+                          {itineraryDestination}
+                        </h3>
+                        
+                        {/* Info badges row - standardized styling */}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {(trip.duration || trip.metadata?.duration) && (
+                            <span className="text-xs bg-blue-500/50 text-white px-2.5 py-0.5 rounded-full flex items-center">
+                              <RiTimeLine className="mr-1" size={12} /> 
+                              {trip.duration || trip.metadata?.duration}
+                            </span>
+                          )}
+                          {(trip.metadata?.dates?.from || trip.dates?.from) && (
+                            <span className="text-xs bg-indigo-500/50 text-white px-2.5 py-0.5 rounded-full flex items-center">
+                              <RiCalendarLine className="mr-1" size={12} />{" "}
+                              {formatDate(trip.metadata?.dates?.from || trip.dates?.from)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="card-content p-3 flex-grow overflow-hidden bg-gradient-to-br from-blue-900/20 to-indigo-900/20">
                         {trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0] ? (
                           <div className="trip-day-preview">
-                            <h4 className="text-sm font-medium text-blue-300 flex items-center gap-1.5 mb-3">
-                              <span className="bg-blue-500/30 px-2 py-1 rounded text-xs">יום {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).dayNumber || 1}</span>
+                            <h4 className="text-sm font-medium text-blue-300 flex items-center gap-1.5 mb-2">
+                              <span className="bg-blue-500/30 px-2 py-0.5 rounded text-xs">יום {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).dayNumber || 1}</span>
                               {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).title && (
                                 <span className="truncate">{(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).title}</span>
                               )}
                             </h4>
-                            <div className="text-sm text-gray-300 space-y-2">
+                            <div className="text-xs text-gray-300 space-y-1.5">
                               {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.morning?.[0] && (
-                                <div className="activity flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-                                  <span className="text-yellow-300 text-lg flex-shrink-0">☀️</span>
+                                <div className="activity flex items-center gap-2 p-1.5 bg-white/5 rounded-lg">
+                                  <span className="text-yellow-300 text-base flex-shrink-0">☀️</span>
                                   <span className="truncate">
                                     {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).activities.morning[0].replace(
                                       /^[^a-zA-Z0-9\u0590-\u05FF]+/,
@@ -1586,8 +1726,8 @@ const MyTripsPage = () => {
                                 </div>
                               )}
                               {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.lunch?.[0] && (
-                                <div className="activity flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-                                  <span className="text-blue-300 text-lg flex-shrink-0">🍽️</span>
+                                <div className="activity flex items-center gap-2 p-1.5 bg-white/5 rounded-lg">
+                                  <span className="text-blue-300 text-base flex-shrink-0">🍽️</span>
                                   <span className="truncate">
                                     {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).activities.lunch[0].replace(
                                       /^[^a-zA-Z0-9\u0590-\u05FF]+/,
@@ -1597,8 +1737,8 @@ const MyTripsPage = () => {
                                 </div>
                               )}
                               {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.afternoon?.[0] && (
-                                <div className="activity flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-                                  <span className="text-blue-300 text-lg flex-shrink-0">🌞</span>
+                                <div className="activity flex items-center gap-2 p-1.5 bg-white/5 rounded-lg">
+                                  <span className="text-blue-300 text-base flex-shrink-0">🌞</span>
                                   <span className="truncate">
                                     {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).activities.afternoon[0].replace(
                                       /^[^a-zA-Z0-9\u0590-\u05FF]+/,
@@ -1608,8 +1748,8 @@ const MyTripsPage = () => {
                                 </div>
                               )}
                               {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0])?.activities?.evening?.[0] && (
-                                <div className="activity flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-                                  <span className="text-purple-300 text-lg flex-shrink-0">🌙</span>
+                                <div className="activity flex items-center gap-2 p-1.5 bg-white/5 rounded-lg">
+                                  <span className="text-purple-300 text-base flex-shrink-0">🌙</span>
                                   <span className="truncate">
                                     {(trip.structuredItinerary?.days?.[0] || trip.structuredPlan?.days?.[0]).activities.evening[0].replace(
                                       /^[^a-zA-Z0-9\u0590-\u05FF]+/,
@@ -1641,23 +1781,23 @@ const MyTripsPage = () => {
                         ) : (
                           <div className="preview-content">
                             {trip.preview?.description ? (
-                              <div className="preview text-sm text-gray-300 bg-white/5 p-4 rounded-lg">
-                                <p className="line-clamp-5">{trip.preview.description}</p>
+                              <div className="preview text-sm text-gray-300 bg-white/5 p-3 rounded-lg">
+                                <p className="line-clamp-4">{trip.preview.description}</p>
                               </div>
                             ) : trip.content || trip.plan ? (
-                              <div className="preview text-sm text-gray-300 bg-white/5 p-4 rounded-lg">
-                                <p className="line-clamp-5">
+                              <div className="preview text-sm text-gray-300 bg-white/5 p-3 rounded-lg">
+                                <p className="line-clamp-4">
                                   {(trip.content || trip.plan).split('\n').filter(line => !line.startsWith('#') && line.trim() !== '')[0] || "לחץ לצפייה ביומן המסע המלא"}
                                 </p>
                               </div>
                             ) : (
                               <div className="text-center py-3">
-                                <div className="flex justify-center gap-3 mb-3">
+                                <div className="flex justify-center gap-3 mb-2">
                                   <span className="text-blue-300 text-2xl">✈️</span>
                                   <span className="text-yellow-300 text-2xl">🌍</span>
                                   <span className="text-green-300 text-2xl">🏞️</span>
                                 </div>
-                                <p className="text-blue-300 font-medium">לחץ לצפייה ביומן המסע המלא</p>
+                                <p className="text-blue-300 font-medium text-sm">לחץ לצפייה ביומן המסע המלא</p>
                               </div>
                             )}
                           </div>
@@ -1674,13 +1814,13 @@ const MyTripsPage = () => {
                         )}
                       </div>
 
-                      <div className="card-footer p-4 bg-[#181C29]/80 border-t border-indigo-500/30 flex justify-between items-center">
-                        <div></div> {/* ריק בצד שמאל כדי לשמור על יישור ימין של הכפתור */}
+                      <div className="card-footer p-3 bg-[#181C29]/80 border-t border-indigo-500/30 flex justify-between items-center">
+                        <div></div> {/* Empty for alignment */}
                         <button
                           onClick={() => viewItinerary(trip)}
-                          className="flex items-center text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+                          className="flex items-center text-xs bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors"
                         >
-                          <RiEyeLine className="mr-1" />
+                          <RiEyeLine className="mr-1" size={14} />
                           צפה במסלול
                         </button>
                       </div>
@@ -1689,78 +1829,89 @@ const MyTripsPage = () => {
                 }
                 // For saved trips
                 else {
-                  // קביעת צבעי רקע מותאמים לפי היעד או באופן אקראי אם אין יעד
-                  const displayDestination = trip.destination || "יעד הטיול שלי";
+                  // Get destination from the proper hierarchy of locations
+                  let displayDestination = trip.destination || 
+                                            trip.metadata?.destination || 
+                                            trip.structuredPlan?.destination || 
+                                            trip.tripDetails?.destination;
+                      
+                  // Clean the destination name to ensure it's a proper display value
+                  displayDestination = getCleanDestinationName(displayDestination) || "יעד הטיול";
                       
                   const cardGradient = getCardGradient(displayDestination);
-                  const headerGradient = "from-indigo-800/50 to-purple-800/50";
-                  
-                  // קביעת תמונת רקע לפי היעד
+                  // Set background image by destination
                   const cardImage = trip.preview?.image || getDestinationImage(displayDestination);
                   
                   return (
                     <motion.div
                       key={trip.id}
-                      className={`saved-trip-card rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col cursor-pointer h-[360px]`}
+                      className={`saved-trip-card rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col cursor-pointer h-[360px] border border-indigo-500/20`}
                       variants={itemVariants}
                       whileHover={{ y: -8, transition: { duration: 0.2 } }}
                       onClick={() => viewSavedTrip(trip.id)}
                     >
-                      {/* Card image header with overlay */}
-                      <div className="card-image-container relative h-40 overflow-hidden">
+                      {/* Card image header with standardized overlay */}
+                      <div className="card-image-container relative h-44 overflow-hidden">
                         <img 
                           src={cardImage} 
                           alt={displayDestination}
                           className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                         />
-                        <div className={`absolute inset-0 bg-gradient-to-t ${headerGradient} opacity-60`}></div>
-                        <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                          <div className="bg-black/30 backdrop-blur-sm p-2 rounded-lg">
-                            <h3 className="text-2xl font-bold truncate flex items-center gap-2">
-                              <span className="bg-indigo-500/50 p-1.5 rounded-full backdrop-blur-sm">
-                                <RiMapPinLine className="text-white" size={18} />
-                              </span>
-                              <div className="flex flex-col">
-                                <span className="text-xs text-blue-200">יעד הטיול:</span>
-                                <span className="text-xl bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">{displayDestination}</span>
-                              </div>
-                            </h3>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              <span className="text-xs bg-blue-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                                <RiTimeLine className="mr-1" /> 
-                                {trip.duration && !trip.duration.includes("Unknown") 
-                                  ? trip.duration 
-                                  : trip.structuredPlan?.days?.length > 0 
-                                    ? `${trip.structuredPlan.days.length} ימים` 
-                                    : trip.metadata?.duration && !trip.metadata.duration.includes("Unknown")
-                                      ? trip.metadata.duration
-                                      : "טיול מתוכנן"} 
-                              </span>
-                              <span className="text-xs bg-indigo-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                                <RiCalendarLine className="mr-1" /> {formatDate(trip.createdAt)}
-                              </span>
-                              {trip.activityCounts?.total > 0 && (
-                                <span className="text-xs bg-green-500/50 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center">
-                                  <RiMapPinLine className="mr-1" /> {trip.activityCounts.total} פעילויות
-                                </span>
-                              )}
-                            </div>
+                        {/* Standardized gradient overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/60 to-transparent"></div>
+                        
+                        {/* Trip type badge - standardized position */}
+                        <div className="absolute top-3 right-3">
+                          <div className="bg-purple-600/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium text-white flex items-center gap-1.5 shadow-lg">
+                            <RiMapPinLine size={12} />
+                            <span>מסלול שמור</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className={`card-content p-5 flex-grow overflow-hidden bg-gradient-to-br ${cardGradient} border-t border-blue-500/20`}>
+                      {/* Card title section - standardized across all cards */}
+                      <div className="card-title-section bg-gradient-to-r from-blue-900/90 to-indigo-900/90 p-3 border-b border-blue-500/30">
+                        <h3 className="text-xl font-bold text-white">
+                          {displayDestination}
+                        </h3>
+                        
+                        {/* Info badges row - standardized styling */}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <span className="text-xs bg-blue-500/50 text-white px-2.5 py-0.5 rounded-full flex items-center">
+                            <RiTimeLine className="mr-1" size={12} /> 
+                            {trip.duration && !trip.duration.includes("Unknown") 
+                              ? trip.duration 
+                              : trip.structuredPlan?.days?.length > 0 
+                                ? `${trip.structuredPlan.days.length} ימים` 
+                                : trip.metadata?.duration && !trip.metadata.duration.includes("Unknown")
+                                  ? trip.metadata.duration
+                                  : "טיול מתוכנן"} 
+                          </span>
+                          <span className="text-xs bg-indigo-500/50 text-white px-2.5 py-0.5 rounded-full flex items-center">
+                            <RiCalendarLine className="mr-1" size={12} /> 
+                            {formatDate(trip.createdAt)}
+                          </span>
+                          {trip.activityCounts?.total > 0 && (
+                            <span className="text-xs bg-green-500/50 text-white px-2.5 py-0.5 rounded-full flex items-center">
+                              <RiMapPinLine className="mr-1" size={12} /> 
+                              {trip.activityCounts.total} פעילויות
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className={`card-content p-3 flex-grow overflow-hidden bg-gradient-to-br ${cardGradient}`}>
                         {/* If we have structured plan days, show the first day */}
                         {trip.structuredPlan?.days && trip.structuredPlan.days.length > 0 ? (
                           <div className="trip-day-preview">
-                            <h4 className="text-sm font-medium text-blue-300 flex items-center gap-1.5 mb-3">
-                              <span className="bg-blue-500/30 px-2 py-1 rounded text-xs">יום {trip.structuredPlan.days[0].dayNumber}</span>
+                            <h4 className="text-sm font-medium text-blue-300 flex items-center gap-1.5 mb-2">
+                              <span className="bg-blue-500/30 px-2 py-0.5 rounded text-xs">יום {trip.structuredPlan.days[0].dayNumber}</span>
                               {trip.structuredPlan.days[0].title && <span className="truncate">{trip.structuredPlan.days[0].title}</span>}
                             </h4>
-                            <div className="text-sm text-gray-300 mt-1.5 space-y-2">
+                            <div className="text-xs text-gray-300 space-y-1.5">
                               {trip.structuredPlan.days[0].activities?.morning?.[0] && (
-                                <div className="activity flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-                                  <span className="text-yellow-300 text-lg flex-shrink-0">☀️</span>
+                                <div className="activity flex items-center gap-2 p-1.5 bg-white/5 rounded-lg">
+                                  <span className="text-yellow-300 text-base flex-shrink-0">☀️</span>
                                   <span className="truncate">
                                     {trip.structuredPlan.days[0].activities.morning[0].replace(
                                       /^[^a-zA-Z0-9\u0590-\u05FF]+/,
@@ -1770,8 +1921,8 @@ const MyTripsPage = () => {
                                 </div>
                               )}
                               {trip.structuredPlan.days[0].activities?.afternoon?.[0] && (
-                                <div className="activity flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-                                  <span className="text-blue-300 text-lg flex-shrink-0">🌞</span>
+                                <div className="activity flex items-center gap-2 p-1.5 bg-white/5 rounded-lg">
+                                  <span className="text-blue-300 text-base flex-shrink-0">🌞</span>
                                   <span className="truncate">
                                     {trip.structuredPlan.days[0].activities.afternoon[0].replace(
                                       /^[^a-zA-Z0-9\u0590-\u05FF]+/,
@@ -1781,8 +1932,8 @@ const MyTripsPage = () => {
                                 </div>
                               )}
                               {trip.structuredPlan.days[0].activities?.evening?.[0] && (
-                                <div className="activity flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-                                  <span className="text-purple-300 text-lg flex-shrink-0">🌙</span>
+                                <div className="activity flex items-center gap-2 p-1.5 bg-white/5 rounded-lg">
+                                  <span className="text-purple-300 text-base flex-shrink-0">🌙</span>
                                   <span className="truncate">
                                     {trip.structuredPlan.days[0].activities.evening[0].replace(
                                       /^[^a-zA-Z0-9\u0590-\u05FF]+/,
@@ -1811,27 +1962,27 @@ const MyTripsPage = () => {
                             </div>
                           </div>
                         ) : trip.preview?.description ? (
-                          <div className="preview text-sm text-gray-300 bg-white/5 p-4 rounded-lg">
-                            <p className="line-clamp-5">{trip.preview.description}</p>
+                          <div className="preview text-sm text-gray-300 bg-white/5 p-3 rounded-lg">
+                            <p className="line-clamp-4">{trip.preview.description}</p>
                           </div>
                         ) : (
-                          <div className="preview text-sm text-gray-300 bg-white/5 p-4 rounded-lg">
+                          <div className="preview text-sm text-gray-300 bg-white/5 p-3 rounded-lg">
                             {trip.plan ? (
-                              <p className="line-clamp-5">
+                              <p className="line-clamp-4">
                                 {trip.plan.split('\n').filter(line => !line.startsWith('#') && line.trim() !== '')[0] || "לחץ לצפייה במסלול המלא"}
                               </p>
                             ) : trip.rawContent ? (
-                              <p className="line-clamp-5">
+                              <p className="line-clamp-4">
                                 {trip.rawContent.split('\n').filter(line => line.trim() !== '')[0] || "לחץ לצפייה במסלול המלא"}
                               </p>
                             ) : (
-                              <div className="text-center py-3">
-                                <div className="flex justify-center gap-3 mb-3">
+                              <div className="text-center py-2">
+                                <div className="flex justify-center gap-3 mb-2">
                                   <span className="text-blue-300 text-2xl">✈️</span>
                                   <span className="text-yellow-300 text-2xl">🌍</span>
                                   <span className="text-green-300 text-2xl">🏞️</span>
                                 </div>
-                                <p className="text-blue-300 font-medium">לחץ לצפייה במסלול הטיול</p>
+                                <p className="text-blue-300 font-medium text-sm">לחץ לצפייה במסלול הטיול</p>
                               </div>
                             )}
                           </div>
@@ -1839,9 +1990,9 @@ const MyTripsPage = () => {
 
                         {/* Show highlights if available */}
                         {trip.structuredPlan?.highlights && trip.structuredPlan.highlights.length > 0 && (
-                          <div className="highlights mt-3 flex flex-wrap gap-2">
+                          <div className="highlights mt-2 flex flex-wrap gap-2">
                             {trip.structuredPlan.highlights.slice(0, 2).map((highlight, idx) => (
-                              <div key={idx} className="highlight-item text-xs bg-indigo-900/30 px-3 py-1.5 rounded-lg text-indigo-300 inline-block">
+                              <div key={idx} className="highlight-item text-xs bg-indigo-900/30 px-2 py-1 rounded-lg text-indigo-300 inline-block">
                                 ✨ {highlight.substring(0, 25)}{highlight.length > 25 ? '...' : ''}
                               </div>
                             ))}
@@ -1849,20 +2000,20 @@ const MyTripsPage = () => {
                         )}
                       </div>
 
-                      <div className="card-footer p-4 bg-[#181C29]/80 border-t border-indigo-500/30 flex justify-between items-center">
+                      <div className="card-footer p-3 bg-[#181C29]/80 border-t border-indigo-500/30 flex justify-between items-center">
                         <button
                           onClick={(e) => deleteSavedTrip(trip.id, e)}
-                          className="text-red-400 hover:text-red-300 p-2 rounded-full hover:bg-red-900/20 transition-colors"
+                          className="text-red-400 hover:text-red-300 p-1.5 rounded-full hover:bg-red-900/20 transition-colors"
                           title="מחק מסלול"
                         >
-                          <RiDeleteBinLine size={20} />
+                          <RiDeleteBinLine size={16} />
                         </button>
 
                         <button
                           onClick={() => viewSavedTrip(trip.id)}
-                          className="flex items-center text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+                          className="flex items-center text-xs bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors"
                         >
-                          <RiEyeLine className="mr-1" />
+                          <RiEyeLine className="mr-1" size={14} />
                           צפה במסלול
                         </button>
                       </div>
@@ -1892,3 +2043,4 @@ const MyTripsPage = () => {
 };
 
 export default MyTripsPage;
+
