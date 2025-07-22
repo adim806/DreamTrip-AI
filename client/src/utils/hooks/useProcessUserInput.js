@@ -2648,6 +2648,15 @@ export function useProcessUserInput(chatData) {
         processedData.dates
       );
     }
+    // Handle single date format - preserve it as is without converting to range
+    else if (
+      formValues.dates && 
+      typeof formValues.dates === "string" && 
+      !formValues.dates.includes(" to ")
+    ) {
+      // Keep the single date as is, don't convert to a range
+      console.log("[FormProcessing] Preserving single date:", formValues.dates);
+    }
 
     console.log("[FormProcessing] Final processed form data:", processedData);
     return processedData;
@@ -2728,6 +2737,11 @@ export function useProcessUserInput(chatData) {
               } else {
                 formattedValue = value.from;
               }
+            }
+            // For dates field with single date string, preserve it exactly as is
+            else if (field === 'dates' && typeof value === 'string' && !value.includes(" to ")) {
+              formattedValue = value;
+              console.log("[MissingFields] Using exact date string in message:", value);
             }
 
             return `${field}: ${formattedValue}`;

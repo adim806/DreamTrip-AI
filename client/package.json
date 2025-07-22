@@ -59,7 +59,6 @@
     "react-markdown": "^9.0.1",
     "react-places-autocomplete": "^7.3.0",
     "react-router-dom": "^6.27.0",
-    "react-spring": "^9.7.5",
     "rollup": "^4.29.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",

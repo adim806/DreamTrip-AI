@@ -4,6 +4,7 @@ import { SplineSceneBasic } from '../../components/ui/spline-scene-demo';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import './DashboardPage.css';
+import { useAuth } from '@clerk/clerk-react';
 
 /**
  * DashboardPage Component
@@ -30,6 +31,7 @@ const DashboardPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isExiting, setIsExiting] = useState(false);
+  const { userId } = useAuth();
   const [popularDestinations] = useState([
     { name: "Paris", image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=200&auto=format&fit=crop" },
     { name: "Tokyo", image: "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?q=80&w=200&auto=format&fit=crop" },
@@ -48,7 +50,8 @@ const DashboardPage = () => {
 
   const mutation = useMutation({
     mutationFn: async(text) => {
-      return fetch(`${import.meta.env.VITE_API_URL}/api/chats`, {
+      // Include userId as a query parameter
+      return fetch(`${import.meta.env.VITE_API_URL}/api/chats?userId=${userId}`, {
         method: "POST",
         credentials: "include",
         headers: {

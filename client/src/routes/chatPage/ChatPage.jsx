@@ -1742,6 +1742,28 @@ const ChatPage = () => {
         return;
       }
 
+      // Ensure date values remain as objects in the form values
+      // This is important for the itinerary generation process
+      const processedFormValues = { ...formValues };
+      
+      // If dates is a string instead of an object, convert it to the proper format
+      if (processedFormValues.dates && typeof processedFormValues.dates === 'string') {
+        const startDate = new Date(processedFormValues.dates);
+        if (!isNaN(startDate.getTime())) {
+          // Calculate end date based on duration if available
+          const duration = missingFieldsState.values.duration || 7; // Default to 7 days
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + parseInt(duration, 10) - 1);
+          
+          processedFormValues.dates = {
+            from: startDate.toISOString().split('T')[0],
+            to: endDate.toISOString().split('T')[0]
+          };
+          
+          console.log(`[ChatPage] Converted dates string to object: ${JSON.stringify(processedFormValues.dates)}`);
+        }
+      }
+
       // Add the submitted values as a user message to the chat FIRST
       if (window.__processingHookState?.setPendingMessages) {
         window.__processingHookState.setPendingMessages((prev) => {
@@ -1757,7 +1779,7 @@ const ChatPage = () => {
               id: submissionId,
               timestamp: new Date().toISOString(),
               isFormSubmission: true, // Mark as form submission to identify it later
-              formValues: formValues, // Store original form values for processing
+              formValues: processedFormValues, // Store processed form values for processing
             },
           ];
         });
