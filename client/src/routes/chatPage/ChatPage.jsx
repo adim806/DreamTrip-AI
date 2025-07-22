@@ -25,7 +25,7 @@ import {
 import { motion } from "framer-motion";
 import { useAuth } from "@clerk/clerk-react";
 import { fieldComponentMap } from "../../components/FieldCompletion/FieldComponents";
-import MissingFieldsForm, { TestMissingFieldsForm } from "../../components/FieldCompletion/MissingFieldsForm";
+import MissingFieldsForm from "../../components/FieldCompletion/MissingFieldsForm";
 import "./chatPage.css";
 
 // Add imports for the new text animator
@@ -1808,20 +1808,10 @@ const ChatPage = () => {
         return null;
       }
 
-      console.log("Rendering missing fields form with fields:", message.missingFields);
-
       // Check if we already have a form with the same message ID to prevent duplicates
       if (missingFieldsState.messageId === message.id) {
         // Get the trip duration from tripDetails if available
         const tripDuration = tripDetails?.duration;
-
-        // Format the fields properly for the new MissingFieldsForm component
-        const formattedFields = message.missingFields.map(field => ({
-          id: field,
-          label: field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " "),
-          required: true,
-          type: 'text'
-        }));
 
         // Form is already being rendered with this message ID, just return it
         return (
@@ -1831,14 +1821,13 @@ const ChatPage = () => {
             style={{ minWidth: 280, maxWidth: "90%" }}
           >
             <MissingFieldsForm
-              missingFields={formattedFields}
               fields={message.missingFields}
               initialValues={{
                 ...missingFieldsState.values,
                 submitted: missingFieldsState.submitted,
               }}
               onSubmit={handleMissingFieldsSubmit}
-              submitLabel="Submit"
+              submitLabel="שלח"
               intent={message.intent || missingFieldsState.intent}
               duration={tripDuration}
             />
@@ -1872,14 +1861,6 @@ const ChatPage = () => {
         );
       }
 
-      // Format the fields properly for the new MissingFieldsForm component
-      const formattedFields = message.missingFields.map(field => ({
-        id: field,
-        label: field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " "),
-        required: true,
-        type: 'text'
-      }));
-
       return (
         <div
           key={message.id}
@@ -1887,14 +1868,13 @@ const ChatPage = () => {
           style={{ minWidth: 280, maxWidth: "90%" }}
         >
           <MissingFieldsForm
-            missingFields={formattedFields}
             fields={message.missingFields}
             initialValues={{
               ...missingFieldsState.values,
               submitted: missingFieldsState.submitted,
             }}
             onSubmit={handleMissingFieldsSubmit}
-            submitLabel="Submit"
+            submitLabel="שלח"
             intent={message.intent || missingFieldsState.intent}
             duration={tripDetails?.duration}
           />
@@ -2938,32 +2918,6 @@ const ChatPage = () => {
     }
   }, [chatId, isSignedIn, user]);
 
-  // Add a test button to render the form directly
-  const TestFormButton = () => {
-    const [showTestForm, setShowTestForm] = useState(false);
-    
-    const toggleTestForm = () => {
-      setShowTestForm(prev => !prev);
-    };
-    
-    return (
-      <>
-        <button 
-          onClick={toggleTestForm}
-          className="fixed bottom-24 right-4 z-50 bg-blue-600 text-white px-3 py-1 rounded-md shadow-md text-xs"
-        >
-          {showTestForm ? 'Hide Test Form' : 'Show Test Form'}
-        </button>
-        
-        {showTestForm && (
-          <div className="fixed bottom-40 right-4 z-50 bg-gray-900 rounded-lg shadow-lg border border-blue-500/20 w-80">
-            <TestMissingFieldsForm />
-          </div>
-        )}
-      </>
-    );
-  };
-
   return (
     <div className={`chat-with-map ${isMapVisible ? "with-map" : ""}`}>
       <div className="flex flex-col h-full w-full rounded-xl shadow-lg bg-[rgba(25,28,40,0.97)] overflow-hidden compact-chat-container">
@@ -3327,7 +3281,6 @@ const ChatPage = () => {
           )}
         </div>
       </div>
-      <TestFormButton />
     </div>
   );
 };

@@ -1,336 +1,276 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import fieldComponentMap from './FieldComponents';
-import './MissingFieldsForm.css';
+import React, { useState, useEffect, useRef } from "react";
+import fieldComponentMap from "./FieldComponents";
+import { motion } from "framer-motion";
+import "./MissingFieldsForm.css";
 
 /**
- * MissingFieldsForm component renders a form for collecting missing trip details
+ * MissingFieldsForm - A component that renders a form for collecting missing fields
  * 
- * This component displays a form with fields for any missing required information
- * needed to complete trip planning. It's designed to be compact and fit well within
- * the chat flow.
+ * @param {Object} props
+ * @param {Array} props.fields - Array of field names that need to be collected
+ * @param {Object} props.initialValues - Initial values for the fields
+ * @param {Function} props.onSubmit - Function to call when the form is submitted
+ * @param {String} props.submitLabel - Label for the submit button
+ * @param {String} props.intent - The intent that requires these fields (optional)
+ * @param {Number} props.duration - The duration of the trip (optional)
  */
-const MissingFieldsForm = ({ 
-  missingFields = [], 
-  onSubmit, 
-  onCancel,
-  initialValues = {},
-  title = "Complete Your Trip Details",
-  duration = null,
-  fields = [], // Backward compatibility for older code
-  submitLabel = "Submit" // Allow customizing the submit button text
-}) => {
-  // Initialize form state with any provided initial values
-  const [formValues, setFormValues] = useState({});
-  
-  // Initialize form validation state
-  const [formErrors, setFormErrors] = useState({});
-  
-  // Track if the form has been submitted
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  
-  // Track if submission is in progress
+const MissingFieldsForm = React.memo(function MissingFieldsForm({ 
+  fields = [], 
+  initialValues = {}, 
+  onSubmit,
+  submitLabel = "שלח",
+  intent = null,
+  duration = null
+}) {
+  const [formValues, setFormValues] = useState(initialValues || {});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const formSubmittedRef = useRef(false);
+  const previousFieldsRef = useRef([]);
+  const previousInitialValuesRef = useRef({});
+  const formMountedRef = useRef(false);
   
-  // Track currently focused field
-  const [focusedField, setFocusedField] = useState(null);
-  
-  // Process fields from either missingFields or fields prop
-  const processedFields = React.useMemo(() => {
-    // If missingFields array has items, use it
-    if (missingFields && missingFields.length > 0) {
-      return missingFields;
-    }
-    
-    // Otherwise, convert the older fields format to the new format
-    if (fields && fields.length > 0) {
-      return fields.map(fieldName => ({
-        id: fieldName,
-        label: fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/_/g, " "),
-        required: true,
-        type: 'text'
-      }));
-    }
-    
-    // FALLBACK: If no fields provided, show some default fields for testing
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('No fields provided to MissingFieldsForm, using test fields');
-      return [
-        { id: 'destination', label: 'Destination', required: true, type: 'text' },
-        { id: 'dates', label: 'Travel Dates', required: true, type: 'text' },
-        { id: 'budget', label: 'Budget', required: true, type: 'text' }
-      ];
-    }
-    
-    return [];
-  }, [missingFields, fields]);
-
-  // Set up initial values when the component mounts or when initialValues changes
+  // Track if this is the first render - only runs once on mount
   useEffect(() => {
-    const initialFormValues = {};
+    formMountedRef.current = true;
     
-    // Initialize all fields with empty strings or provided initial values
-    processedFields.forEach(field => {
-      const fieldId = typeof field === 'string' ? field : field.id;
-      initialFormValues[fieldId] = initialValues[fieldId] || '';
-    });
+    // Cleanup function to prevent memory leaks
+    return () => {
+      formMountedRef.current = false;
+    };
+  }, []);
+  
+  // Initialize form values from initialValues when they change
+  useEffect(() => {
+    // Skip if the form is already submitted
+    if (formSubmittedRef.current || initialValues?.submitted === true) {
+      return;
+    }
     
-    setFormValues(initialFormValues);
-  }, [processedFields, initialValues]);
-
-  // Handle input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    // Only update if initialValues actually changed
+    const prevValues = previousInitialValuesRef.current;
+    const valuesChanged = JSON.stringify(prevValues) !== JSON.stringify(initialValues);
     
-    setFormValues(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear error for this field if it exists
-    if (formErrors[name]) {
-      setFormErrors(prev => ({
+    if (valuesChanged && initialValues && Object.keys(initialValues).length > 0) {
+      previousInitialValuesRef.current = {...initialValues};
+      setFormValues(prev => ({
         ...prev,
-        [name]: null
+        ...initialValues
       }));
     }
-  };
+  }, [initialValues]);
   
-  // Handle custom field component changes
-  const handleFieldChange = (fieldId, value) => {
-    setFormValues(prev => ({
-      ...prev,
-      [fieldId]: value
-    }));
-    
-    // Clear error for this field if it exists
-    if (formErrors[fieldId]) {
-      setFormErrors(prev => ({
-        ...prev,
-        [fieldId]: null
-      }));
+  // Reset submission state when fields change
+  useEffect(() => {
+    // Skip if the form is already submitted
+    if (initialValues?.submitted === true) {
+      formSubmittedRef.current = true;
+      return;
     }
-  };
-
-  // Validate the form
-  const validateForm = () => {
-    const errors = {};
-    let isValid = true;
     
-    processedFields.forEach(field => {
-      const fieldId = typeof field === 'string' ? field : field.id;
-      const fieldLabel = typeof field === 'string' 
-        ? fieldId.charAt(0).toUpperCase() + fieldId.slice(1).replace(/_/g, " ")
-        : field.label;
-      const isRequired = typeof field === 'string' ? true : field.required;
-      
-      if (isRequired && !formValues[fieldId]?.toString().trim()) {
-        errors[fieldId] = `${fieldLabel} is required`;
-        isValid = false;
-      }
-    });
+    // Check if fields actually changed using the ref
+    const prevFields = previousFieldsRef.current;
+    const fieldsChanged = 
+      prevFields.length !== fields.length || 
+      fields.some((field, i) => prevFields[i] !== field);
     
-    setFormErrors(errors);
-    return isValid;
-  };
-
-  // Handle form submission
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setIsSubmitted(true);
-    
-    if (validateForm()) {
-      setIsSubmitting(true);
-      
-      // Call onSubmit with the form values
-      try {
-        onSubmit(formValues);
-        
-        // Reset form after successful submission
-        setTimeout(() => {
-          setIsSubmitting(false);
-        }, 500);
-      } catch (error) {
-        console.error('Error submitting form:', error);
-        setIsSubmitting(false);
-      }
+    if (!fieldsChanged) {
+      return;
     }
-  };
-  
-  // Handle field focus
-  const handleFocus = (fieldId) => {
-    setFocusedField(fieldId);
-  };
-  
-  // Handle field blur
-  const handleBlur = () => {
-    setFocusedField(null);
-  };
+    
+    // Update previous fields ref
+    previousFieldsRef.current = [...fields];
+    
+    if (fields?.length > 0 && formSubmittedRef.current) {
+      return;
+    }
+    
+    formSubmittedRef.current = false;
+    setIsSubmitting(false);
+  }, [fields, initialValues]);
 
-  // If no fields to display, don't render the form
-  if (!processedFields || processedFields.length === 0) {
+  // If no fields, don't render the form
+  if (!fields || fields.length === 0) {
+    return null;
+  }
+  
+  // If form was already submitted, don't render it again
+  if (formSubmittedRef.current || initialValues?.submitted === true) {
     return null;
   }
 
+  const handleFieldChange = (field, value) => {
+    if (formSubmittedRef.current) {
+      return;
+    }
+    
+    setFormValues(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    // Prevent double submission
+    if (isSubmitting || formSubmittedRef.current) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    formSubmittedRef.current = true;
+    
+    // Check if we have values for all fields
+    const allFieldsHaveValues = fields.every(field => 
+      formValues[field] !== undefined && formValues[field] !== ""
+    );
+    
+    if (!allFieldsHaveValues) {
+      setIsSubmitting(false);
+      formSubmittedRef.current = false;
+      return;
+    }
+    
+    // Call onSubmit with the form values
+    try {
+      // Mark form as submitted BEFORE calling onSubmit to prevent loops
+      const submissionValues = {...formValues};
+      
+      // Log the exact values being submitted, especially budget
+      if (submissionValues.budget) {
+        console.log(`[MissingFieldsForm] Submitting budget value: "${submissionValues.budget}"`);
+      }
+      
+      // Clear the form after successful submission
+      setFormValues({});
+      
+      // Call onSubmit with the values we captured
+      if (typeof onSubmit === 'function') {
+        onSubmit(submissionValues);
+      } else {
+        console.error("[MissingFieldsForm] onSubmit is not a function:", onSubmit);
+      }
+    } catch (error) {
+      console.error("[MissingFieldsForm] Error submitting form:", error);
+      setIsSubmitting(false);
+      formSubmittedRef.current = false;
+    }
+  };
+
+  // Return the form UI with improved styling
   return (
     <motion.div 
-      className="missing-fields-form"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: 0.4, type: "spring", stiffness: 100 }}
+      className="missing-fields-form bg-gradient-to-r from-[#1e2538] to-[#252a3d] rounded-lg p-4 border border-blue-500/20 shadow-lg"
     >
-      <motion.h3
+      <motion.h3 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.1, duration: 0.3 }}
+        className="text-blue-300 text-sm font-medium mb-3 flex items-center"
       >
-        <span className="status-dot"></span>
-        {title}
+        <motion.span 
+          animate={{ 
+            scale: [1, 1.3, 1],
+            opacity: [0.7, 1, 0.7]
+          }}
+          transition={{ 
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="inline-block w-2 h-2 bg-blue-400 rounded-full mr-2"
+        ></motion.span>
+        {intent ? `Complete info for ${intent.replace(/-/g, " ")}` : "Please provide the missing information"}
       </motion.h3>
       
-      <form onSubmit={handleSubmit} className="fields-form">
+      <motion.form 
+        onSubmit={handleSubmit} 
+        className="fields-form"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2, duration: 0.3 }}
+      >
         <div className="fields-container">
-          <AnimatePresence>
-            {processedFields.map((field, index) => {
-              const fieldId = typeof field === 'string' ? field : field.id;
-              const fieldLabel = typeof field === 'string' 
-                ? fieldId.charAt(0).toUpperCase() + fieldId.slice(1).replace(/_/g, " ")
-                : field.label;
-              const fieldType = typeof field === 'string' ? 'text' : (field.type || 'text');
-              const isRequired = typeof field === 'string' ? true : field.required;
-              const placeholder = typeof field === 'string' 
-                ? `Enter ${fieldLabel.toLowerCase()}`
-                : (field.placeholder || `Enter ${fieldLabel.toLowerCase()}`);
-                
-              // Check if we have a specialized component for this field type
-              const FieldComponent = fieldComponentMap[fieldId];
-              
-              if (FieldComponent) {
-                // Pass duration prop to DateInput component if the field is 'dates'
-                const extraProps = fieldId === 'dates' ? { duration } : {};
-                
-                return (
-                  <motion.div 
-                    key={fieldId}
-                    className="field-item"
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 * index, duration: 0.2 }}
-                  >
-                    <FieldComponent
-                      value={formValues[fieldId] || ""}
-                      onComplete={(value) => handleFieldChange(fieldId, value)}
-                      label={fieldLabel}
-                      error={formErrors[fieldId] && isSubmitted ? formErrors[fieldId] : null}
-                      {...extraProps}
-                    />
-                  </motion.div>
-                );
-              }
-              
+          {fields.map((field, index) => {
+            const FieldComponent = fieldComponentMap[field];
+            
+            if (!FieldComponent) {
               return (
                 <motion.div 
-                  key={fieldId} 
-                  className={`field-item ${focusedField === fieldId ? 'focused' : ''}`}
+                  key={field} 
+                  className="field-item mb-3"
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.05 * index, duration: 0.2 }}
+                  transition={{ delay: 0.1 + index * 0.05, duration: 0.3 }}
                 >
-                  <label htmlFor={fieldId}>
-                    {fieldLabel}
-                    {isRequired && <span className="required-mark">*</span>}
-                  </label>
-                  
+                  <label className="block text-blue-300 text-xs font-medium mb-1">{field}:</label>
                   <input
-                    type={fieldType}
-                    id={fieldId}
-                    name={fieldId}
-                    value={formValues[fieldId] || ''}
-                    onChange={handleInputChange}
-                    onFocus={() => handleFocus(fieldId)}
-                    onBlur={handleBlur}
-                    placeholder={placeholder}
-                    className={formErrors[fieldId] && isSubmitted ? 'error' : ''}
+                    type="text"
+                    value={formValues[field] || ""}
+                    onChange={e => handleFieldChange(field, e.target.value)}
+                    className="w-full px-3 py-2 bg-[#1a1f2e] border border-blue-500/20 rounded-md text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder={`Enter ${field}`}
                   />
-                  
-                  <AnimatePresence>
-                    {formErrors[fieldId] && isSubmitted && (
-                      <motion.div 
-                        className="error-message"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                      >
-                        {formErrors[fieldId]}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </motion.div>
               );
-            })}
-          </AnimatePresence>
+            }
+            
+            // Pass duration prop to DateInput component if the field is 'dates'
+            const extraProps = field === 'dates' ? { duration } : {};
+            
+            return (
+              <motion.div
+                key={field}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + index * 0.05, duration: 0.3 }}
+              >
+                <FieldComponent
+                  value={formValues[field] || ""}
+                  onComplete={value => handleFieldChange(field, value)}
+                  label={field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+                  className="field-component"
+                  {...extraProps}
+                />
+              </motion.div>
+            );
+          })}
         </div>
         
         <motion.div 
-          className="form-actions"
+          className="mt-4 flex justify-end"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.3, duration: 0.3 }}
         >
-          {onCancel && (
-            <motion.button 
-              type="button" 
-              onClick={onCancel}
-              className="cancel-button"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </motion.button>
-          )}
-          
-          <motion.button 
-            type="submit" 
-            className={`submit-button ${isSubmitting ? 'submitting' : ''}`}
-            whileHover={!isSubmitting ? { scale: 1.03, boxShadow: "0 3px 8px rgba(59, 130, 246, 0.3)" } : {}}
-            whileTap={!isSubmitting ? { scale: 0.97 } : {}}
+          <motion.button
+            whileHover={{ scale: 1.03, boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)" }}
+            whileTap={{ scale: 0.95 }}
             disabled={isSubmitting}
+            type="submit"
+            className={`px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm rounded-md shadow-md transition-all duration-200 flex items-center ${
+              isSubmitting ? "opacity-70 cursor-not-allowed" : ""
+            }`}
           >
             {isSubmitting ? (
-              <span className="loading-spinner"></span>
-            ) : submitLabel}
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Processing...</span>
+              </>
+            ) : (
+              <span className="font-medium">{submitLabel}</span>
+            )}
           </motion.button>
         </motion.div>
-      </form>
+      </motion.form>
     </motion.div>
   );
-};
-
-// Add a TestForm component for direct testing
-export const TestMissingFieldsForm = () => {
-  const testFields = [
-    { id: 'destination', label: 'Destination', required: true, type: 'text' },
-    { id: 'dates', label: 'Travel Dates', required: true, type: 'text' },
-    { id: 'budget', label: 'Budget', required: true, type: 'text' }
-  ];
-  
-  const handleSubmit = (values) => {
-    console.log('Test form submitted with values:', values);
-    alert('Form submitted: ' + JSON.stringify(values));
-  };
-  
-  return (
-    <div className="p-4">
-      <h2 className="text-xl mb-4">Test Missing Fields Form</h2>
-      <MissingFieldsForm 
-        missingFields={testFields} 
-        onSubmit={handleSubmit}
-        title="Complete Trip Details"
-      />
-    </div>
-  );
-};
+});
 
 export default MissingFieldsForm; 
