@@ -132,16 +132,16 @@ const DashboardPage = () => {
       {/* Content Layer */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="relative h-full flex flex-col items-center px-8">
-          <div className="flex-1 flex flex-col items-center w-full max-w-6xl mx-auto pt-6">
+          <div className="flex-1 flex flex-col items-center w-full max-w-6xl mx-auto pt-3">
             {/* Logo Section */}
             <motion.div 
-              className={`flex items-start gap-4 ml-[-150px] rounded-2xl py-3 px-6 ${glassEffect} pointer-events-auto enhanced-glass`}
+              className={`flex items-start ml-[-150px] rounded-2xl px-2 pb-0 ${glassEffect} pointer-events-auto enhanced-glass`}
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
               <img src="logo.png" alt="" className="w-16 h-16 mt-0 filter drop-shadow-lg logo-animate" />
-              <h1 className="text-6xl bg-gradient-to-r from-[#217bfe] via-[#6c8dff] to-[#e55571] bg-clip-text text-transparent font-bold drop-shadow-sm">
+              <h1 className="text-6xl bg-gradient-to-r from-[#217bfe] via-[#6c8dff] to-[#e55571] bg-clip-text text-transparent font-bold drop-shadow-sm mb-0">
                 DreamTrip-AI
               </h1>
             </motion.div>
@@ -149,7 +149,7 @@ const DashboardPage = () => {
 
           {/* Popular Destinations Section */}
           <motion.div
-            className="flex justify-center mt-8 mb-4 w-full"
+            className="flex justify-center mt-0 mb-4 w-full"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
