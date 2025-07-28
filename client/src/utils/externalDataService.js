@@ -167,7 +167,7 @@ export const extractFilterParameters = (intent, requestDetails) => {
  * @param {string} date - The date to get weather for (YYYY-MM-DD)
  * @returns {Promise<Object>} - Weather data or error object
  */
-export const fetchWeatherData = async (location, country, date) => {
+export const fetchWeatherData = async (location, country, date, options = {}) => {
   try {
     // Validate inputs
     if (!location) {
@@ -178,18 +178,43 @@ export const fetchWeatherData = async (location, country, date) => {
       };
     }
 
+    // Handle special time values by converting to proper format
+    let normalizedDate = date;
+    let isToday = false;
+    let isTomorrow = false;
+
+    if (date === "now" || date === "right now" || date === "today") {
+      normalizedDate = new Date().toISOString().split("T")[0]; // Today's date in YYYY-MM-DD format
+      isToday = true;
+      console.log(`Normalized time value "${date}" to today's date: ${normalizedDate}`);
+    } 
+    else if (date === "tomorrow") {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      normalizedDate = tomorrow.toISOString().split("T")[0]; // Tomorrow's date in YYYY-MM-DD format
+      isTomorrow = true;
+      console.log(`Normalized time value "${date}" to tomorrow's date: ${normalizedDate}`);
+    }
+
     // Log all parameters to troubleshoot
     console.log(`fetchWeatherData called with parameters:`, {
       location,
       country,
-      date,
+      originalDate: date,
+      normalizedDate,
+      isToday,
+      isTomorrow,
+      options
     });
 
     // Call server-side endpoint instead of directly accessing OpenWeatherMap API
     const params = new URLSearchParams({
       location,
       ...(country && { country }),
-      ...(date && { date }),
+      ...(normalizedDate && { date: normalizedDate }),
+      isToday: isToday ? "true" : "false",
+      isTomorrow: isTomorrow ? "true" : "false",
+      ...(options.timeContext && { timeContext: options.timeContext })
     });
 
     const response = await fetch(
@@ -1473,9 +1498,11 @@ export const processRequestDetails = (requestDetails) => {
 
       if (
         processedDetails.timeContext === "now" ||
-        processedDetails.timeContext === "today"
+        processedDetails.timeContext === "today" ||
+        processedDetails.timeContext === "right now"
       ) {
         processedDetails.date = today.toISOString().split("T")[0];
+        processedDetails.isToday = true;
         console.log(
           `Set date=${processedDetails.date} based on timeContext="${processedDetails.timeContext}"`
         );
@@ -1483,8 +1510,10 @@ export const processRequestDetails = (requestDetails) => {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         processedDetails.date = tomorrow.toISOString().split("T")[0];
+        processedDetails.isTomorrow = true;
+        processedDetails.timeContext = "tomorrow";
         console.log(
-          `Set date=${processedDetails.date} based on timeContext="${processedDetails.timeContext}"`
+          `Set date=${processedDetails.date} based on timeContext="${processedDetails.timeContext}" (tomorrow)`
         );
       } else if (processedDetails.timeContext === "weekend") {
         const weekend = new Date(today);
@@ -1555,6 +1584,22 @@ export const processRequestDetails = (requestDetails) => {
           console.error("Error calculating days difference:", error);
         }
       }
+    }
+
+    // Handle special time values like "right now"
+    if (processedDetails.time === "right now") {
+      processedDetails.time = "now";
+      processedDetails.isToday = true;
+      processedDetails.timeContext = "now";
+      console.log(`Normalized "right now" to time="now" and set isToday=true`);
+    }
+    else if (processedDetails.time === "tomorrow") {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      processedDetails.date = tomorrow.toISOString().split("T")[0];
+      processedDetails.isTomorrow = true;
+      processedDetails.timeContext = "tomorrow";
+      console.log(`Normalized "tomorrow" to date=${processedDetails.date} and set isTomorrow=true`);
     }
 
     // If we have a daySpecificInfo object with date information, use it

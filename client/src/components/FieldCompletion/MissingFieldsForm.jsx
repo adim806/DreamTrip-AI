@@ -163,28 +163,37 @@ const MissingFieldsForm = React.memo(function MissingFieldsForm({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, type: "spring", stiffness: 100 }}
-      className="missing-fields-form bg-gradient-to-r from-[#1e2538] to-[#252a3d] rounded-lg p-4 border border-blue-500/20 shadow-lg"
+      className="missing-fields-form bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900/80 rounded-lg p-4 border border-blue-500/20 shadow-lg"
     >
-      <motion.h3 
+      <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.3 }}
-        className="text-blue-300 text-sm font-medium mb-3 flex items-center"
+        className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-blue-500/20"
       >
-        <motion.span 
-          animate={{ 
-            scale: [1, 1.3, 1],
-            opacity: [0.7, 1, 0.7]
-          }}
-          transition={{ 
-            duration: 2,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-          className="inline-block w-2 h-2 bg-blue-400 rounded-full mr-2"
-        ></motion.span>
-        {intent ? `Complete info for ${intent.replace(/-/g, " ")}` : "Please provide the missing information"}
-      </motion.h3>
+        <div className="flex items-center">
+          <motion.span 
+            animate={{ 
+              scale: [1, 1.3, 1],
+              opacity: [0.7, 1, 0.7]
+            }}
+            transition={{ 
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="inline-block w-1.5 h-1.5 bg-blue-400 rounded-full mr-1.5"
+          ></motion.span>
+          <span className="text-blue-300 text-xs font-medium tracking-wide">
+            {intent ? `Complete trip details` : "Missing information"}
+          </span>
+        </div>
+        {intent && (
+          <span className="text-blue-300/80 text-[10px] font-medium px-1.5 py-0.5 bg-blue-900/50 rounded-md">
+            {intent.replace(/-/g, " ")}
+          </span>
+        )}
+      </motion.div>
       
       <motion.form 
         onSubmit={handleSubmit} 
@@ -201,17 +210,17 @@ const MissingFieldsForm = React.memo(function MissingFieldsForm({
               return (
                 <motion.div 
                   key={field} 
-                  className="field-item mb-3"
+                  className="field-item mb-2"
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 + index * 0.05, duration: 0.3 }}
                 >
-                  <label className="block text-blue-300 text-xs font-medium mb-1">{field}:</label>
+                  <label className="block text-blue-300 text-xs uppercase tracking-wide font-medium mb-1">{field}:</label>
                   <input
                     type="text"
                     value={formValues[field] || ""}
                     onChange={e => handleFieldChange(field, e.target.value)}
-                    className="w-full px-3 py-2 bg-[#1a1f2e] border border-blue-500/20 rounded-md text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-3 py-2 appearance-none bg-slate-800/60 border border-blue-500/20 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 h-8"
                     placeholder={`Enter ${field}`}
                   />
                 </motion.div>
@@ -241,7 +250,7 @@ const MissingFieldsForm = React.memo(function MissingFieldsForm({
         </div>
         
         <motion.div 
-          className="mt-4 flex justify-end"
+          className="mt-3 flex justify-end"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3, duration: 0.3 }}
@@ -251,13 +260,13 @@ const MissingFieldsForm = React.memo(function MissingFieldsForm({
             whileTap={{ scale: 0.95 }}
             disabled={isSubmitting}
             type="submit"
-            className={`px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm rounded-md shadow-md transition-all duration-200 flex items-center ${
+            className={`px-3 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-xs rounded-md shadow-md transition-all duration-200 flex items-center ${
               isSubmitting ? "opacity-70 cursor-not-allowed" : ""
             }`}
           >
             {isSubmitting ? (
               <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>

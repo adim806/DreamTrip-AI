@@ -279,18 +279,51 @@ export const formatTripSummary = (tripDetails = {}) => {
 
   // Format duration
   const duration = tripDetails.duration
-    ? `${tripDetails.duration} days`
+    ? `${tripDetails.duration} ${parseInt(tripDetails.duration, 10) === 1 ? 'day' : 'days'}`
     : "Duration not specified";
 
   // Format dates if available
   let dateInfo = "Dates not specified";
   if (tripDetails.dates) {
-    if (tripDetails.dates.from && tripDetails.dates.to) {
-      dateInfo = `${formatDate(tripDetails.dates.from)} to ${formatDate(
-        tripDetails.dates.to
-      )}`;
-    } else if (tripDetails.dates.from) {
-      dateInfo = `Starting on ${formatDate(tripDetails.dates.from)}`;
+    // Handle string format with "to" separator
+    if (typeof tripDetails.dates === 'string') {
+      if (tripDetails.dates.includes(" to ")) {
+        // Standard date range format
+        const [startDate, endDate] = tripDetails.dates.split(" to ");
+        dateInfo = `${formatDate(startDate)} to ${formatDate(endDate)}`;
+      } else {
+        // Single date format (for 1-day trips)
+        dateInfo = formatDate(tripDetails.dates);
+        
+        // If we have a duration greater than 1, calculate and show the end date
+        if (tripDetails.duration && parseInt(tripDetails.duration, 10) > 1) {
+          const startDate = new Date(tripDetails.dates);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + parseInt(tripDetails.duration, 10) - 1);
+          dateInfo = `${formatDate(tripDetails.dates)} to ${formatDate(endDate)}`;
+        }
+      }
+    } 
+    // Handle object format with from/to properties
+    else if (typeof tripDetails.dates === 'object') {
+      if (tripDetails.dates.from && tripDetails.dates.to) {
+        dateInfo = `${formatDate(tripDetails.dates.from)} to ${formatDate(tripDetails.dates.to)}`;
+      } else if (tripDetails.dates.from) {
+        // For single-day trips or when only start date is known
+        if (tripDetails.duration === 1) {
+          dateInfo = formatDate(tripDetails.dates.from);
+        } else {
+          // For multi-day trips with only start date, calculate end date
+          const startDate = new Date(tripDetails.dates.from);
+          if (tripDetails.duration && parseInt(tripDetails.duration, 10) > 1) {
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + parseInt(tripDetails.duration, 10) - 1);
+            dateInfo = `${formatDate(startDate)} to ${formatDate(endDate)}`;
+          } else {
+            dateInfo = `Starting on ${formatDate(tripDetails.dates.from)}`;
+          }
+        }
+      }
     }
   } else if (tripDetails.isTomorrow) {
     const tomorrow = new Date();

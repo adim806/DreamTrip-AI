@@ -4,6 +4,8 @@ import ImageKit from "imagekit";
 import mongoose from "mongoose";
 import Chat from "./models/chat.js";
 import UserChats from "./models/userChats.js";
+// Change the ES modules import to CommonJS require
+// import Itinerary from "./models/itinerary.js";
 import Itinerary from "./models/itinerary.js";
 import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
 import dotenv from "dotenv";
@@ -12,6 +14,9 @@ import dotenv from "dotenv";
 import NodeCache from "node-cache";
 
 import ActivityModel from "./models/activities.js";
+
+// Import itinerary routes
+import itineraryRoutes from './routes/itineraryRoutes.js';
 
 const port = process.env.PORT || 3000;
 const app = express();
@@ -2612,11 +2617,17 @@ import SavedTrip from "./models/savedTrips.js";
 // Save a trip plan to MongoDB
 app.post("/api/trips/save", authMiddleware, async (req, res) => {
   try {
-    const { plan, tripDetails, chatId, itineraryData } = req.body;
+    const { plan, tripDetails, chatId, itineraryData, destination, duration, metadata, structuredPlan } = req.body;
     const userId = req.auth?.userId || req.body.userId;
 
     console.log(`Saving trip plan for user ${userId}, chat ${chatId}`);
-
+    
+    // Prioritize vacation_location from tripDetails if available
+    const vacationLocation = tripDetails?.vacation_location;
+    console.log(`Trip vacation_location from tripDetails: ${vacationLocation || "Not provided"}`);
+    console.log(`Trip destination from request: ${destination || "Not provided"}`);
+    console.log(`Trip destination from tripDetails: ${tripDetails?.destination || "Not provided"}`);
+    
     if (!plan || !chatId) {
       return res.status(400).json({
         error: "Missing required fields",
@@ -2627,14 +2638,20 @@ app.post("/api/trips/save", authMiddleware, async (req, res) => {
     // Check if this trip already exists
     const existingTrip = await SavedTrip.findByChatId(chatId, userId);
 
+    // Prioritize vacation_location over other destination values
+    const finalDestination = vacationLocation || destination || tripDetails?.destination || "Unknown destination";
+    const finalDuration = duration || tripDetails?.duration || "Unknown duration";
+    
+    console.log(`Final destination to be saved: ${finalDestination}`);
+    console.log(`Final duration to be saved: ${finalDuration}`);
+
     if (existingTrip) {
       console.log(`Updating existing trip plan for chat ${chatId}`);
 
       // Update the existing trip
       existingTrip.plan = plan;
-      existingTrip.destination =
-        tripDetails?.destination || existingTrip.destination;
-      existingTrip.duration = tripDetails?.duration || existingTrip.duration;
+      existingTrip.destination = finalDestination;
+      existingTrip.duration = finalDuration;
 
       if (tripDetails) {
         existingTrip.tripDetails = tripDetails;
@@ -2642,6 +2659,18 @@ app.post("/api/trips/save", authMiddleware, async (req, res) => {
 
       if (itineraryData) {
         existingTrip.itineraryData = itineraryData;
+      }
+
+      if (metadata) {
+        existingTrip.metadata = metadata;
+      }
+
+      if (structuredPlan) {
+        existingTrip.structuredPlan = structuredPlan;
+        // Also update destination in structuredPlan for consistency
+        if (existingTrip.structuredPlan && finalDestination !== "Unknown destination") {
+          existingTrip.structuredPlan.destination = finalDestination;
+        }
       }
 
       existingTrip.lastViewedAt = new Date();
@@ -2660,14 +2689,21 @@ app.post("/api/trips/save", authMiddleware, async (req, res) => {
       userId,
       chatId,
       plan,
-      destination: tripDetails?.destination || "Unknown destination",
-      duration: tripDetails?.duration || "Unknown duration",
+      destination: finalDestination,
+      duration: finalDuration,
       tripDetails: tripDetails || {},
       itineraryData: itineraryData || {},
+      metadata: metadata || {},
+      structuredPlan: structuredPlan ? {
+        ...structuredPlan,
+        destination: finalDestination // Ensure destination is consistent
+      } : {}
     });
 
     const savedTrip = await newTrip.save();
     console.log(`New trip plan saved with ID: ${savedTrip._id}`);
+    console.log(`Saved destination: ${savedTrip.destination}`);
+    console.log(`Saved duration: ${savedTrip.duration}`);
 
     return res.status(201).json({
       success: true,
@@ -2719,7 +2755,7 @@ app.get("/api/trips/saved", authMiddleware, async (req, res) => {
 
     const trips = await SavedTrip.findByUserId(userId);
 
-    // Return limited data for the list view
+    // Return complete data for the list view
     const formattedTrips = trips.map((trip) => ({
       id: trip._id,
       chatId: trip.chatId,
@@ -2728,6 +2764,10 @@ app.get("/api/trips/saved", authMiddleware, async (req, res) => {
       createdAt: trip.createdAt,
       updatedAt: trip.updatedAt,
       lastViewedAt: trip.lastViewedAt,
+      metadata: trip.metadata || {},
+      structuredPlan: trip.structuredPlan || {},
+      preview: trip.preview || {},
+      activityCounts: trip.activityCounts || {}
     }));
 
     console.log(
@@ -2799,3 +2839,70 @@ app.delete("/api/trips/saved/:tripId", authMiddleware, async (req, res) => {
     return res.status(500).json({ error: "Failed to delete saved trip" });
   }
 });
+
+// Get all saved trips and itineraries for a user
+app.get("/api/user/all-trips", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.auth?.userId;
+
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId" });
+    }
+
+    console.log(`Fetching all trips and itineraries for user ${userId}`);
+
+    // Fetch both saved trips and itineraries in parallel
+    const [savedTrips, itineraries] = await Promise.all([
+      SavedTrip.findByUserId(userId),
+      Itinerary.find({ userId }).sort({ createdAt: -1 })
+    ]);
+
+    // Format saved trips
+    const formattedSavedTrips = savedTrips.map((trip) => ({
+      id: trip._id,
+      chatId: trip.chatId,
+      destination: trip.destination,
+      duration: trip.duration,
+      createdAt: trip.createdAt,
+      updatedAt: trip.updatedAt,
+      lastViewedAt: trip.lastViewedAt,
+      metadata: trip.metadata || {},
+      structuredPlan: trip.structuredPlan || {},
+      preview: trip.preview || {},
+      activityCounts: trip.activityCounts || {},
+      plan: trip.plan,
+      type: "savedTrip"
+    }));
+
+    // Format itineraries
+    const formattedItineraries = itineraries.map((itinerary) => ({
+      id: itinerary._id,
+      chatId: itinerary.chatId,
+      destination: itinerary.destination || itinerary.metadata?.destination || "Unknown destination",
+      duration: itinerary.duration || itinerary.metadata?.duration || "Unknown duration",
+      createdAt: itinerary.createdAt,
+      updatedAt: itinerary.updatedAt,
+      content: itinerary.rawContent,
+      metadata: itinerary.metadata || {},
+      structuredItinerary: itinerary.structuredContent || {},
+      type: "itinerary"
+    }));
+
+    console.log(
+      `Found ${formattedSavedTrips.length} saved trips and ${formattedItineraries.length} itineraries for user ${userId}`
+    );
+
+    return res.status(200).json({
+      savedTrips: formattedSavedTrips,
+      itineraries: formattedItineraries
+    });
+  } catch (error) {
+    console.error("Error fetching user trips:", error);
+    return res.status(500).json({ error: "Failed to fetch user trips" });
+  }
+});
+
+// Register routes
+// ... existing route registrations ...
+// Temporarily disable the itineraries route to prevent double saving
+// app.use('/api/itineraries', itineraryRoutes);

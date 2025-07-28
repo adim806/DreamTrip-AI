@@ -1,0 +1,213 @@
+/* DashboardPage.css - Travel-themed animations and styles */
+
+/* Animated flight path effect */
+.flight-path {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 5;
+  }
+  
+  .flight-path::before {
+    content: '';
+    position: absolute;
+    top: 15%;
+    left: -10%;
+    width: 120%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+    animation: flight-path 15s linear infinite;
+    opacity: 0.7;
+    transform: rotate(-5deg);
+  }
+  
+  .flight-path::after {
+    content: '';
+    position: absolute;
+    top: 75%;
+    left: -10%;
+    width: 120%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.15), transparent);
+    animation: flight-path 20s linear infinite;
+    opacity: 0.5;
+    transform: rotate(3deg);
+  }
+  
+  @keyframes flight-path {
+    0% {
+      transform: translateX(0%) rotate(-5deg);
+    }
+    100% {
+      transform: translateX(100%) rotate(-5deg);
+    }
+  }
+  
+  /* Destination card hover effects */
+  .destination-card {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .destination-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.7) 100%);
+    z-index: 1;
+  }
+  
+  .destination-card:hover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba(59, 130, 246, 0.5);
+    border-radius: inherit;
+    animation: border-pulse 1.5s ease-out infinite;
+  }
+  
+  @keyframes border-pulse {
+    0% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.1);
+    }
+  }
+  
+  /* Star twinkle animation */
+  .star {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background-color: #fff;
+    border-radius: 50%;
+    animation: twinkle 4s infinite;
+  }
+  
+  @keyframes twinkle {
+    0% {
+      opacity: 0.1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+    100% {
+      opacity: 0.1;
+    }
+  }
+  
+  /* Floating clouds animation */
+  .cloud {
+    position: absolute;
+    opacity: 0.03;
+    filter: blur(8px);
+    background: #fff;
+    border-radius: 100px;
+  }
+  
+  .cloud-1 {
+    width: 200px;
+    height: 60px;
+    top: 10%;
+    left: 5%;
+    animation: float 30s linear infinite;
+  }
+  
+  .cloud-2 {
+    width: 100px;
+    height: 40px;
+    top: 60%;
+    right: 10%;
+    animation: float 25s linear infinite reverse;
+  }
+  
+  @keyframes float {
+    0% {
+      transform: translateX(-150px);
+    }
+    100% {
+      transform: translateX(150%);
+    }
+  }
+  
+  /* Travel icon pulse animation */
+  .travel-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  
+  /* Enhanced glassmorphism effect */
+  .enhanced-glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Input focus effect */
+  .travel-input {
+    position: relative;
+    transition: all 0.3s ease;
+  }
+  
+  .travel-input:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  }
+  
+  .travel-input:focus::before {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  }
+  
+  /* Logo animation */
+  @keyframes logo-glow {
+    0% {
+      filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.5));
+    }
+    50% {
+      filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.7));
+    }
+    100% {
+      filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.5));
+    }
+  }
+  
+  .logo-animate {
+    animation: logo-glow 3s ease-in-out infinite;
+  }
+  
+  /* Button press effect */
+  .btn-travel {
+    transition: all 0.2s ease;
+  }
+  
+  .btn-travel:active {
+    transform: translateY(2px);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  } 

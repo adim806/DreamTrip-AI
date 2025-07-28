@@ -22,10 +22,21 @@ export const MAP_EVENTS = {
 /**
  * Dispatch an event to display restaurants on the map
  * @param {Array} restaurants - Array of restaurant objects with coordinates
+ * @param {string} location - The location/city name for these restaurants
  */
-export const displayRestaurantsOnMap = (restaurants) => {
+export const displayRestaurantsOnMap = (restaurants, location = null) => {
+  // Try to extract location from data if not provided
+  let locationName = location;
+  if (!locationName && restaurants && restaurants.length > 0) {
+    locationName = restaurants[0].city || 
+                  (restaurants[0].address && restaurants[0].address.split(',')[0]);
+  }
+  
   const event = new CustomEvent(MAP_EVENTS.DISPLAY_RESTAURANTS, {
-    detail: { data: restaurants },
+    detail: { 
+      data: restaurants,
+      location: locationName 
+    },
   });
   window.dispatchEvent(event);
 };
@@ -33,10 +44,21 @@ export const displayRestaurantsOnMap = (restaurants) => {
 /**
  * Dispatch an event to display hotels on the map
  * @param {Array} hotels - Array of hotel objects with coordinates
+ * @param {string} location - The location/city name for these hotels
  */
-export const displayHotelsOnMap = (hotels) => {
+export const displayHotelsOnMap = (hotels, location = null) => {
+  // Try to extract location from data if not provided
+  let locationName = location;
+  if (!locationName && hotels && hotels.length > 0) {
+    locationName = hotels[0].city || 
+                  (hotels[0].address && hotels[0].address.split(',')[0]);
+  }
+  
   const event = new CustomEvent(MAP_EVENTS.DISPLAY_HOTELS, {
-    detail: { data: hotels },
+    detail: { 
+      data: hotels,
+      location: locationName 
+    },
   });
   window.dispatchEvent(event);
 };
@@ -44,10 +66,21 @@ export const displayHotelsOnMap = (hotels) => {
 /**
  * Dispatch an event to display attractions on the map
  * @param {Array} attractions - Array of attraction objects with coordinates
+ * @param {string} location - The location/city name for these attractions
  */
-export const displayAttractionsOnMap = (attractions) => {
+export const displayAttractionsOnMap = (attractions, location = null) => {
+  // Try to extract location from data if not provided
+  let locationName = location;
+  if (!locationName && attractions && attractions.length > 0) {
+    locationName = attractions[0].city || 
+                  (attractions[0].address && attractions[0].address.split(',')[0]);
+  }
+  
   const event = new CustomEvent(MAP_EVENTS.DISPLAY_ATTRACTIONS, {
-    detail: { data: attractions },
+    detail: { 
+      data: attractions,
+      location: locationName 
+    },
   });
   window.dispatchEvent(event);
 };
