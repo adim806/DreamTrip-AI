@@ -687,13 +687,13 @@ const SearchData = ({ trip }) => {
 
       <Tabs defaultValue={activeTab} onValueChange={handleTabChange} value={activeTab}>
         <TabsList className="grid grid-cols-6 mb-6">
-          <TabsTrigger value="generalInfo">🌍 מידע כללי</TabsTrigger>
-          <TabsTrigger value="tripDetails">📋 עריכת היומן</TabsTrigger>
-          <TabsTrigger value="hotels">🏨 מלונות</TabsTrigger>
-          <TabsTrigger value="restaurants">🍽 מסעדות</TabsTrigger>
-          <TabsTrigger value="attractions">🎡 אטרקציות</TabsTrigger>
+          <TabsTrigger value="generalInfo">🌍 General Info</TabsTrigger>
+          <TabsTrigger value="tripDetails">📋 Edit Journal</TabsTrigger>
+          <TabsTrigger value="hotels">🏨 Hotels</TabsTrigger>
+          <TabsTrigger value="restaurants">🍽 Restaurants</TabsTrigger>
+          <TabsTrigger value="attractions">🎡 Attractions</TabsTrigger>
           <TabsTrigger value="itinerary" className={generatedPlan ? "text-blue-300 font-medium" : ""}>
-            🗺️ המסלול
+            🗺️ Itinerary
           </TabsTrigger>
         </TabsList>
 

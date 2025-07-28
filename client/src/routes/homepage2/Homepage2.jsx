@@ -128,7 +128,7 @@ function Homepage2() {
               <Col xs={6}>
                 <div>
                   <h1 style={{ marginBottom: "0px" }}>
-                    Sometimes you can feel
+                    Discover the world
                   </h1>
                 </div>
               </Col>
@@ -145,9 +145,9 @@ function Homepage2() {
             >
               <Col xs={6}>
                 <div>
-                  <h1 style={{ marginBottom: "0px" }}>Lost</h1>
-                  <h1 style={{ marginBottom: "0px" }}>Overwhelmed</h1>
-                  <h1 style={{ marginBottom: "0px" }}>Empty inside</h1>
+                  <h1 style={{ marginBottom: "0px" }}>Breathtaking Beaches</h1>
+                  <h1 style={{ marginBottom: "0px" }}>Mountain Adventures</h1>
+                  <h1 style={{ marginBottom: "0px" }}>Cultural Experiences</h1>
                 </div>
               </Col>
             </Row>
@@ -164,8 +164,8 @@ function Homepage2() {
               <Col xs={6}>
                 <div>
                   <h1 style={{ marginBottom: "0px" }}>
-                    Drifting through life <br />
-                    With no help or guidance
+                    Explore new cultures <br />
+                    Create lasting memories
                   </h1>
                 </div>
               </Col>
@@ -184,8 +184,8 @@ function Homepage2() {
               <Col xs={8}>
                 <div>
                   <h1 style={{ marginBottom: "0px" }}>
-                    But there is hope...
-                    <br /> and people who can help
+                    Your perfect trip awaits...
+                    <br /> Let AI plan it for you
                   </h1>
                 </div>
               </Col>
@@ -204,15 +204,15 @@ function Homepage2() {
               <Col xs={6}>
                 <div>
                   <h1 style={{ marginBottom: "0px" }}>
-                    Its time to get
-                    <br /> the support you need
+                    It's time to embark
+                    <br /> on your dream vacation
                   </h1>
                   <h2 style={{ marginBottom: "30px", marginTop: "-20px" }}>
-                    To get your life back
+                    Let the adventure begin
                   </h2>
                   
                   <Button variant="outline-light" size="lg">
-                    Get help now
+                    Start planning now
                   </Button>{" "}
                 </div>
               </Col>

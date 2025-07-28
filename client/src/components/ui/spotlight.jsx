@@ -64,11 +64,11 @@ export function Spotlight({ className = "", fill = "white" }) {
       className={`pointer-events-none absolute inset-0 z-30 transition-all duration-1500 ease-in-out ${className}`}
       style={{
         background: isMoving
-          ? `radial-gradient(450px circle at ${position.x}px ${position.y}px, 
+          ? `radial-gradient(250px circle at ${position.x}px ${position.y}px, 
               ${fill}${Math.round(opacity * 100)}%, 
               rgba(255,255,255,0.01) 20%, 
               transparent 40%)`
-          : `radial-gradient(450px circle at ${position.x}px ${position.y}px, 
+          : `radial-gradient(250px circle at ${position.x}px ${position.y}px, 
               ${fill}${Math.round(opacity * 100)}%, 
               rgba(255,255,255,0.01) 20%, 
               transparent 40%)`
