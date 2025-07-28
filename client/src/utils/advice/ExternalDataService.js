@@ -87,12 +87,8 @@ export const processRestaurantsData = async (restaurantsData) => {
       // AFTER map is positioned, display the restaurants
       console.log(`Displaying ${mapData.length} restaurants on map`);
 
-      // Use custom event to display restaurants
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.DISPLAY_RESTAURANTS, {
-          detail: { data: mapData },
-        })
-      );
+      // Use the helper function to display restaurants with location information
+      displayRestaurantsOnMap(mapData, locationName);
 
       console.log(`Displayed ${mapData.length} restaurants on map`);
     } else {
@@ -183,12 +179,8 @@ export const processHotelsData = async (hotelsData) => {
       // AFTER map is positioned, display the hotels
       console.log(`Displaying ${mapData.length} hotels on map`);
 
-      // Use custom event to display hotels
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.DISPLAY_HOTELS, {
-          detail: { data: mapData },
-        })
-      );
+      // Use the helper function to display hotels with location information
+      displayHotelsOnMap(mapData, locationName);
 
       console.log(`Displayed ${mapData.length} hotels on map`);
     } else {
@@ -279,12 +271,8 @@ export const processAttractionsData = async (attractionsData) => {
       // AFTER map is positioned, display the attractions
       console.log(`Displaying ${mapData.length} attractions on map`);
 
-      // Use custom event to display attractions
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.DISPLAY_ATTRACTIONS, {
-          detail: { data: mapData },
-        })
-      );
+      // Use the helper function to display attractions with location information
+      displayAttractionsOnMap(mapData, locationName);
 
       console.log(`Displayed ${mapData.length} attractions on map`);
     } else {

@@ -43,6 +43,7 @@ const ViewMap = ({ trip }) => {
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const lastChatIdRef = useRef(null);
+  const handleFitBoundsRef = useRef(null);
 
   // Map configuration state
   const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -441,7 +442,7 @@ const ViewMap = ({ trip }) => {
   // Define event handler functions with useCallback to prevent unnecessary re-renders
   const handleDisplayRestaurants = useCallback(
     (event) => {
-      const { data } = event.detail;
+      const { data, location } = event.detail;
       console.log(
         "📍 Received restaurants data for map:",
         data.length,
@@ -451,31 +452,121 @@ const ViewMap = ({ trip }) => {
       // Clear all markers first
       clearMarkers();
 
-      displayRestaurantsOnMap(data);
+      // Extract location name from data or use provided location
+      const locationName = location || (data.length > 0 && data[0].city) || 
+        (data.length > 0 && data[0].address && data[0].address.split(',')[0]);
+      
+      if (locationName && mapRef.current) {
+        console.log(`🌍 Flying to restaurants location: ${locationName}`);
+        
+        // First try to fly to the location
+        fetchCoordinates2(locationName)
+          .then(coords => {
+            if (coords) {
+              // Fly to location
+              mapRef.current.flyTo({
+                center: [coords.lng, coords.lat],
+                zoom: 13,
+                essential: true,
+                duration: 1500
+              });
+              
+              // Once the fly animation is complete, display markers
+              mapRef.current.once('moveend', () => {
+                displayRestaurantsOnMap(data);
+                
+                // After markers are added, fit bounds to show all of them
+                setTimeout(() => {
+                  handleFitBoundsRef.current({ detail: { padding: 70, maxZoom: 15 } });
+                }, 300);
+              });
+            } else {
+              // If coordinates not found, display markers directly
+              displayRestaurantsOnMap(data);
+              setTimeout(() => handleFitBoundsRef.current({ detail: { padding: 70 } }), 300);
+            }
+          })
+          .catch(error => {
+            console.error("Error getting coordinates:", error);
+            // If there was an error, still display markers
+            displayRestaurantsOnMap(data);
+            setTimeout(() => handleFitBoundsRef.current({ detail: { padding: 70 } }), 300);
+          });
+      } else {
+        // If no location could be determined, just display markers
+        displayRestaurantsOnMap(data);
+        setTimeout(() => handleFitBoundsRef.current({ detail: { padding: 70 } }), 300);
+      }
+      
       setRestaurantsData(data);
       setActiveLayer("restaurants");
     },
-    [setRestaurantsData, setActiveLayer, clearMarkers]
+    [setRestaurantsData, setActiveLayer, clearMarkers, fetchCoordinates2, handleFitBoundsRef]
   );
 
   const handleDisplayHotels = useCallback(
     (event) => {
-      const { data } = event.detail;
+      const { data, location } = event.detail;
       console.log("📍 Received hotels data for map:", data.length, "items");
 
       // Clear all markers first
       clearMarkers();
 
-      displayHotelsOnMap(data);
+      // Extract location name from data or use provided location
+      const locationName = location || (data.length > 0 && data[0].city) || 
+        (data.length > 0 && data[0].address && data[0].address.split(',')[0]);
+      
+      if (locationName && mapRef.current) {
+        console.log(`🌍 Flying to hotels location: ${locationName}`);
+        
+        // First try to fly to the location
+        fetchCoordinates2(locationName)
+          .then(coords => {
+            if (coords) {
+              // Fly to location
+              mapRef.current.flyTo({
+                center: [coords.lng, coords.lat],
+                zoom: 13,
+                essential: true,
+                duration: 1500
+              });
+              
+              // Once the fly animation is complete, display markers
+              mapRef.current.once('moveend', () => {
+                displayHotelsOnMap(data);
+                
+                // After markers are added, fit bounds to show all of them
+                setTimeout(() => {
+                  handleFitBoundsRef.current({ detail: { padding: 70, maxZoom: 15 } });
+                }, 300);
+              });
+            } else {
+              // If coordinates not found, display markers directly
+              displayHotelsOnMap(data);
+              setTimeout(() => handleFitBoundsRef.current({ detail: { padding: 70 } }), 300);
+            }
+          })
+          .catch(error => {
+            console.error("Error getting coordinates:", error);
+            // If there was an error, still display markers
+            displayHotelsOnMap(data);
+            setTimeout(() => handleFitBoundsRef.current({ detail: { padding: 70 } }), 300);
+          });
+      } else {
+        // If no location could be determined, just display markers
+        displayHotelsOnMap(data);
+        setTimeout(() => handleFitBoundsRef.current({ detail: { padding: 70 } }), 300);
+      }
+      
       setHotelsData(data);
       setActiveLayer("hotels");
     },
-    [setHotelsData, setActiveLayer, clearMarkers]
+    [setHotelsData, setActiveLayer, clearMarkers, fetchCoordinates2, handleFitBoundsRef]
   );
 
   const handleDisplayAttractions = useCallback(
     (event) => {
-      const { data } = event.detail;
+      const { data, location } = event.detail;
       console.log(
         "📍 Received attractions data for map:",
         data.length,
@@ -485,11 +576,56 @@ const ViewMap = ({ trip }) => {
       // Clear all markers first
       clearMarkers();
 
-      displayAttractionsOnMap(data);
+      // Extract location name from data or use provided location
+      const locationName = location || (data.length > 0 && data[0].city) || 
+        (data.length > 0 && data[0].address && data[0].address.split(',')[0]);
+      
+      if (locationName && mapRef.current) {
+        console.log(`🌍 Flying to attractions location: ${locationName}`);
+        
+        // First try to fly to the location
+        fetchCoordinates2(locationName)
+          .then(coords => {
+            if (coords) {
+              // Fly to location
+              mapRef.current.flyTo({
+                center: [coords.lng, coords.lat],
+                zoom: 13,
+                essential: true,
+                duration: 1500
+              });
+              
+              // Once the fly animation is complete, display markers
+              mapRef.current.once('moveend', () => {
+                displayAttractionsOnMap(data);
+                
+                // After markers are added, fit bounds to show all of them
+                setTimeout(() => {
+                  handleFitBoundsRef.current({ detail: { padding: 70, maxZoom: 15 } });
+                }, 300);
+              });
+            } else {
+              // If coordinates not found, display markers directly
+              displayAttractionsOnMap(data);
+              setTimeout(() => handleFitBoundsRef.current({ detail: { padding: 70 } }), 300);
+            }
+          })
+          .catch(error => {
+            console.error("Error getting coordinates:", error);
+            // If there was an error, still display markers
+            displayAttractionsOnMap(data);
+            setTimeout(() => handleFitBoundsRef.current({ detail: { padding: 70 } }), 300);
+          });
+      } else {
+        // If no location could be determined, just display markers
+        displayAttractionsOnMap(data);
+        setTimeout(() => handleFitBoundsRef.current({ detail: { padding: 70 } }), 300);
+      }
+      
       setAttractionsData(data);
       setActiveLayer("attractions");
     },
-    [setAttractionsData, setActiveLayer, clearMarkers]
+    [setAttractionsData, setActiveLayer, clearMarkers, fetchCoordinates2, handleFitBoundsRef]
   );
 
   const handleDisplayItineraryLocations = useCallback(
@@ -1310,6 +1446,11 @@ const ViewMap = ({ trip }) => {
     }
   }, []);
 
+  // Store handleFitBounds in ref to avoid dependency cycles
+  useEffect(() => {
+    handleFitBoundsRef.current = handleFitBounds;
+  }, [handleFitBounds]);
+
   // Handle highlighting a specific marker
   const handleHighlightMarker = useCallback(
     (event) => {
@@ -1491,8 +1632,16 @@ const ViewMap = ({ trip }) => {
     window.addEventListener(MAP_EVENTS.HIGHLIGHT_MARKER, handleHighlightMarker);
     window.addEventListener(MAP_EVENTS.CLEAR_ROUTES, handleClearRoutes);
     window.addEventListener(MAP_EVENTS.RESET_MAP, handleResetMap);
-    window.addEventListener(MAP_EVENTS.FIT_BOUNDS, handleFitBounds);
     
+    // Use a wrapper function that calls the ref for FIT_BOUNDS
+    const fitBoundsHandler = (event) => {
+      if (handleFitBoundsRef.current) {
+        handleFitBoundsRef.current(event);
+      }
+    };
+    
+    window.addEventListener(MAP_EVENTS.FIT_BOUNDS, fitBoundsHandler);
+
     // Add listener for tab changes
     const handleTabChange = (event) => {
       const { tab } = event.detail || {};
@@ -1572,7 +1721,7 @@ const ViewMap = ({ trip }) => {
       } else if (tab === 'itinerary') {
         // When switching to the itinerary tab, wait a moment then fit the map to show all routes
         setTimeout(() => {
-          handleFitBounds({ detail: { padding: 50 } });
+          handleFitBoundsRef.current({ detail: { padding: 50 } });
         }, 500);
       } else if (tab === 'hotels' || tab === 'restaurants' || tab === 'attractions') {
         // For these tabs, ensure we start with a clean map
@@ -1596,7 +1745,7 @@ const ViewMap = ({ trip }) => {
       window.removeEventListener(MAP_EVENTS.HIGHLIGHT_MARKER, handleHighlightMarker);
       window.removeEventListener(MAP_EVENTS.CLEAR_ROUTES, handleClearRoutes);
       window.removeEventListener(MAP_EVENTS.RESET_MAP, handleResetMap);
-      window.removeEventListener(MAP_EVENTS.FIT_BOUNDS, handleFitBounds);
+      window.removeEventListener(MAP_EVENTS.FIT_BOUNDS, fitBoundsHandler);
       window.removeEventListener('tabChange', handleTabChange);
     };
   }, [
@@ -1610,7 +1759,6 @@ const ViewMap = ({ trip }) => {
     clearMarkers,
     handleClearRoutes,
     handleResetMap,
-    handleFitBounds,
   ]);
 
   useEffect(() => {

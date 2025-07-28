@@ -187,19 +187,35 @@ class GeminiRAGProcessor {
     });
 
     prompt += `
-    Please format your response as follows:
-    1. Start with a brief, concise introduction (1-2 sentences only)
-    2. List only the top 3-5 hotels in an elegant, well-formatted list:
-      - Use "🏨" only once at the beginning of your hotel list section
-      - Format each hotel as: "• Hotel Name - Rating (★), Price Range, Location"
-      - Include address on a separate line if available
-      - Mention 1-2 standout amenities without using too many emojis
-    3. Keep the ENTIRE response under 150 words
-    4. End with a very brief question about preferences
+    Please present the hotel suggestions in a clean and elegant layout, using a refined "card-style" format as follows:
 
-    Present the information clearly and elegantly without cluttering the response with too many emojis.
-    Focus on a clean, well-organized display of the key information from the data.
-    DO NOT say you're an AI or that you've processed data - just present the hotel information naturally.
+    ---
+
+    🏨 **[Hotel Name]**  
+    ⭐ **Rating:** [X.X]/5  
+    💰 **Price:** [Price Range Symbol]  
+    📍 **Area:** [Neighborhood or District]  
+    📬 **Address:** [Full Street Address] _(optional)_  
+    💡 **Highlight:** [A standout feature, amenity, or guest benefit]
+
+    ---
+
+    📌 Guidelines:
+
+    1. Begin with one warm and welcoming sentence introducing the hotel options (max 2 lines).  
+      Example: _“Here are some of the finest places to stay in your chosen destination:”_
+
+    2. Separate each hotel block with a **horizontal divider** ("---") to create visual clarity and structure.
+
+    3. Conclude with a soft, friendly follow-up question, such as:  
+      _“Would you prefer a quiet boutique stay or a lively beachfront view?”_
+
+    4. Use **emojis sparingly and purposefully**, only at the beginning of lines where they add clarity or style.
+
+    5. Keep the **entire response under 150 words**.
+
+    ✒️ Tone: Personal, polished, and professional — avoid generic, robotic, or AI-related language.  
+    Present the content naturally, as if curated by a trusted travel advisor.
     `;
 
     return prompt;
@@ -253,19 +269,22 @@ class GeminiRAGProcessor {
     }
 
     prompt += `
-    Please format your response as follows:
-    1. Start with a very concise summary (maximum 1-2 sentences)
-    2. Present the weather information in a clean, organized format:
-      - Use one appropriate weather emoji based on the conditions
-      - Current temperature and feels-like temperature
-      - Min-Max temperature range
-      - Conditions description
-      - Humidity and wind information
-    3. Add a 1-sentence practical recommendation
-    4. Keep the ENTIRE response under 100 words
+    🌤️ Please present the weather update in a concise, elegant format, following these guidelines:
 
-    Present the information in a clean, elegant format with minimal but effective use of formatting.
-    Your response should be direct and helpful without unnecessary explanations or excess emojis.
+    1. 🗣️ Begin with a **brief summary** of the current or expected weather. Keep it to **1–2 clear sentences**.
+    2. 🌡️ Then display the forecast details using a clean, readable layout:
+      - **Current temperature** and **feels like**
+      - **Min–Max temperature** range
+      - **Short description** of conditions (e.g., “Partly cloudy with light breeze”)
+      - **Humidity** level and **wind speed**
+
+    3. 💡 Include **one practical suggestion** (e.g., “A light jacket is recommended.”)
+
+    4. ✂️ Keep the total response **under 100 words**.
+
+    🖋️ Tone: Friendly and helpful — avoid technical jargon or robotic phrasing.  
+    🎯 Focus on clarity, not decoration. Use formatting sparingly, and only when it enhances readability.  
+    🚫 Do not mention AI, data retrieval, or system processing — just present the weather as if you're a smart, informed assistant.
     `;
 
     return prompt;
@@ -306,18 +325,38 @@ class GeminiRAGProcessor {
     });
 
     prompt += `
-    Please format your response as follows:
-    1. One brief sentence introducing top attractions (max 15 words)
-    2. List ONLY top 3-5 attractions in a clean, well-formatted list:
-      - Use "🏛️" only once at the beginning of your attractions list section
-      - Format each attraction as: "• Attraction Name - Rating, Category"
-      - Include location/address on a separate line if available
-      - Add one brief descriptive phrase about what makes it special
-    3. Keep the ENTIRE response under 120 words
-    4. End with a very brief question
+    Please present the list of top attractions in an elegant editorial-style format, where each attraction is shown as a short curated "travel card" including a brief descriptive paragraph.
 
-    Present the information in a clean, elegant format that's easy to read.
-    Focus on a clear display of the information rather than excessive use of emojis.
+    ---
+
+    **🏛️ [Attraction Name]**  
+    ⭐ **Rating:** [X.X]/5 🏷️ **Category:** [Type]  
+    📍 **Location:** [Area or Neighborhood]  
+    📬 **Address:** [Full Address] _(optional)_
+
+    ✒️ **Description:**  
+    [A short 2–3 line paragraph explaining what makes the attraction special, what visitors can expect to see or feel, and why it’s worth visiting.]
+
+    ---
+
+    📝 Guidelines:
+
+    1. Begin the entire list with one graceful, travel-magazine-style intro sentence.  
+      Example: _“Uncover some of the most inspiring and must-see attractions in your destination:”_
+
+    2. Include **3 to 4 curated attractions** only.  
+      For each, use the exact format above – clear heading, location info, and a well-written description.
+
+    3. Separate each entry with a horizontal divider ("---") to ensure visual clarity and structure.
+
+    4. End the list with a refined, engaging question like:  
+      _“Would you prefer to explore more hidden gems or iconic landmarks next?”_
+
+    5. Total response must be **under 140 words**.  
+      Focus on storytelling over raw data — make it vivid yet concise.
+
+    ✒️ Tone: Curated, inspiring, and human — as if written by a boutique travel editor.  
+    Avoid robotic phrasing, list overloads, or AI mentions.
     `;
 
     return prompt;
@@ -363,18 +402,31 @@ class GeminiRAGProcessor {
     });
 
     prompt += `
-    Please format your response as follows:
-    1. One short sentence introduction (max 15 words)
-    2. List ONLY top 3-5 restaurants in a clean, well-formatted list:
-      - Use "🍽️" only once at the beginning of your restaurant list section
-      - Format each restaurant as: "• Restaurant Name - Rating, Cuisine Type, Price Range"
-      - Include address on a separate line if available
-      - Include opening hours if available
-    3. Keep the ENTIRE response under 120 words
-    4. End with a very short question
+    Please display the restaurant recommendations in a clean and elegant multi-line card-style format, using this exact layout:
 
-    Present the information in a clean, elegant format with minimal use of emojis.
-    Focus on a well-organized display of the restaurant details from the data.
+    ---
+
+    🍽️ **[Restaurant Name]**  
+    ⭐ **Rating:** [X.X]/5  
+    🍴 **Cuisine:** [Cuisine Type]  
+    💰 **Price Range:** [Price Symbol]  
+    📍 **Address:** [Full Address]  
+    🕒 **Opening Hours:** [if available]
+
+    ---
+
+    📝 Guidelines:
+    1. Use this exact block layout for each restaurant — with a horizontal line ("---") between each item.
+    2. Limit the list to **3–5 top restaurants**.
+    3. Start the whole section with **one short elegant sentence** (max 15 words), e.g.:  
+      _“Here are some top-rated restaurants in Berlin worth exploring:”_
+    4. End the section with a brief question to prompt preference, e.g.:  
+      _“Would you prefer something romantic or more casual?”_
+    5. Use emojis **sparingly and meaningfully**: one per line at most, only where appropriate.
+    6. Total response must be **under 120 words**.
+
+    🖋️ Tone: Natural, friendly and refined — avoid robotic or overly technical wording.  
+    Do **not** mention that this is AI-generated or reference data sources.
     `;
 
     return prompt;
