@@ -1,3 +1,55 @@
+# DreamTrip-AI
+
+**DreamTrip-AI** is an intelligent travel agency web application that helps users plan personalized trips using AI-powered recommendations.  
+This project demonstrates a full-stack setup with secure user authentication, AI integration, and modular development workflows.
+<img width="400" height="350" alt="IMG_2500" src="https://github.com/user-attachments/assets/bc850157-e945-4e10-9c15-194f1da07737" />
+
+---
+
+## 🚀 Overview
+
+DreamTrip-AI allows users to:
+
+- Search and receive AI-based travel recommendations
+- Save and manage trip history
+- Use personalized features through **Clerk authentication**
+- Interact with the application via a modern, responsive UI
+
+The project is built with scalability and maintainability in mind, using modern frontend and backend technologies.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend:** React / Next.js  
+- **Backend:** Node.js + Express  
+- **Authentication:** [Clerk](https://clerk.com)  
+- **Database:** MongoDB  
+- **AI Integration:** Gemini API  
+- **Styling:** Tailwind CSS / Material UI  
+- **Containerization & CI/CD:** Docker, GitHub Actions, Vercel/Render (future deployment)  
+
+---
+
+## ✨ Key Features
+
+- ✅ Personalized travel recommendations powered by AI  
+- ✅ User authentication and session management with Clerk  
+- ✅ Persistent trip history in MongoDB  
+- ✅ Full-stack modular architecture (client & backend separation)  
+- ✅ CI/CD pipelines with automated linting, testing, and build validation  
+
+---
+
+## 📂 Project Structure
+client/ # Frontend React/Next.js code
+backend/ # Node.js + Express backend
+workflows/ # GitHub Actions workflows
+docker/ # Docker configuration files
+package.json # Dependencies and scripts
+README.md # Project documentation
+
+---------------
 # GitHub Actions Workflows for DreamTrip-AI
 
 This directory contains the GitHub Actions workflows for the DreamTrip-AI monorepo project during the development phase.
@@ -40,30 +92,6 @@ During development, the workflows are focused on ensuring code quality through:
 - Linting to maintain code style and catch syntax errors
 - Running tests with MongoDB integration for the backend
 - Ensuring builds complete successfully
-
-## Future Deployment Setup
-
-For future reference, the following secrets will need to be set in your GitHub repository once we reach the deployment phase:
-
-### Vercel Deployment
-
-- `VERCEL_TOKEN`: Your Vercel access token
-- `VERCEL_ORG_ID`: Your Vercel organization ID
-- `VERCEL_PROJECT_ID_FRONTEND`: The project ID for your frontend application
-
-### Render Deployment
-
-- `RENDER_API_KEY`: Your Render API key
-- `RENDER_SERVICE_ID_BACKEND`: The service ID for your backend application
-
-## Best Practices
-
-1. Keep workflows modular and focused on specific tasks
-2. Use matrix builds for parallel execution where possible
-3. Cache dependencies to speed up builds
-4. Set appropriate timeout limits for jobs
-5. Use consistent naming conventions for jobs and workflows
-6. Document any custom environment variables needed for tests or builds
 
 ## Using the Local Development Helper
 
