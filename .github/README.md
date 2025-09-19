@@ -16,6 +16,7 @@ DreamTrip-AI allows users to:
 - Interact with the application via a modern, responsive UI
 
 The project is built with scalability and maintainability in mind, using modern frontend and backend technologies.
+<img width="400" height="350" alt="IMG_2507" src="https://github.com/user-attachments/assets/8197096b-8bf7-4f29-a6de-d6be94ab2e7a" />
 
 ---
 
